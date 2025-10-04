@@ -11,4 +11,8 @@ public class AttributeValueNotFoundException extends RuntimeException {
     public AttributeValueNotFoundException(UUID definitionId, String value) {
         super("Attribute value '" + value + "' not found for definition: " + definitionId);
     }
+
+    public AttributeValueNotFoundException(String message) {
+        super(message);
+    }
 }

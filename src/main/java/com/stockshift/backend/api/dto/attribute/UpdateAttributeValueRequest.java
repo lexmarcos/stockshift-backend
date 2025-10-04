@@ -1,5 +1,6 @@
 package com.stockshift.backend.api.dto.attribute;
 
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,4 +16,8 @@ public class UpdateAttributeValueRequest {
 
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
+
+    @Pattern(regexp = "^#[0-9A-Fa-f]{6}$", message = "Swatch hex must be in format #RRGGBB")
+    @Size(max = 7)
+    private String swatchHex;
 }

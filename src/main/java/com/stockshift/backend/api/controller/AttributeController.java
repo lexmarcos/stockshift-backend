@@ -57,11 +57,11 @@ public class AttributeController {
         return ResponseEntity.ok(attributeMapper.toDefinitionResponse(definition));
     }
 
-    @GetMapping("/definitions/name/{name}")
-    public ResponseEntity<AttributeDefinitionResponse> getDefinitionByName(
-            @PathVariable(value = "name") String name
+    @GetMapping("/definitions/code/{code}")
+    public ResponseEntity<AttributeDefinitionResponse> getDefinitionByCode(
+            @PathVariable(value = "code") String code
     ) {
-        AttributeDefinition definition = attributeService.getDefinitionByName(name);
+        AttributeDefinition definition = attributeService.getDefinitionByCode(code);
         return ResponseEntity.ok(attributeMapper.toDefinitionResponse(definition));
     }
 
@@ -78,7 +78,7 @@ public class AttributeController {
     @DeleteMapping("/definitions/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteDefinition(@PathVariable(value = "id") UUID id) {
-        attributeService.deleteDefinition(id);
+        attributeService.deactivateDefinition(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -111,7 +111,9 @@ public class AttributeController {
             @RequestParam(value = "onlyActive", required = false, defaultValue = "false") Boolean onlyActive,
             @PageableDefault(size = 20, sort = "value", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        Page<AttributeValue> values = attributeService.getValuesByDefinition(definitionId, onlyActive, pageable);
+        Page<AttributeValue> values = onlyActive 
+            ? attributeService.getActiveValuesByDefinition(definitionId, pageable)
+            : attributeService.getValuesByDefinition(definitionId, pageable);
         return ResponseEntity.ok(values.map(attributeMapper::toValueResponse));
     }
 
@@ -136,7 +138,7 @@ public class AttributeController {
     @DeleteMapping("/values/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteValue(@PathVariable(value = "id") UUID id) {
-        attributeService.deleteValue(id);
+        attributeService.deactivateValue(id);
         return ResponseEntity.noContent().build();
     }
 

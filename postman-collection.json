@@ -971,6 +971,157 @@
           "path": ["api","v1","products","{{product_id}}","activate"]
         }
       }
+    },
+    {
+      "name": "63. Create Product Variant",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{product_id}}/variants",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","{{product_id}}","variants"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sku\": \"PHONE-XYZ-128GB-BLACK\",\n  \"gtin\": \"1234567890123\",\n  \"attributeValueIds\": [],\n  \"price\": 99999,\n  \"weight\": 200,\n  \"length\": 15,\n  \"width\": 7,\n  \"height\": 1\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "64. List Variants by Product",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{product_id}}/variants?onlyActive=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","{{product_id}}","variants"],
+          "query": [
+            { "key": "onlyActive", "value": "true" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "65. List All Variants",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants?page=0&size=20&onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" },
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "66. Get Variants by Attributes",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/by-attributes?attributeValueIds={{attribute_value_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","by-attributes"],
+          "query": [
+            { "key": "attributeValueIds", "value": "{{attribute_value_id}}" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "67. Get Variant by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","{{variant_id}}"]
+        }
+      }
+    },
+    {
+      "name": "68. Get Variant by SKU",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/sku/PHONE-XYZ-128GB-BLACK",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","sku","PHONE-XYZ-128GB-BLACK"]
+        }
+      }
+    },
+    {
+      "name": "69. Get Variant by GTIN",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/gtin/1234567890123",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","gtin","1234567890123"]
+        }
+      }
+    },
+    {
+      "name": "70. Update Variant",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","{{variant_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"price\": 109999,\n  \"weight\": 210\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "71. Deactivate Variant",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","{{variant_id}}"]
+        }
+      }
+    },
+    {
+      "name": "72. Activate Variant",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","variants","{{variant_id}}","activate"]
+        }
+      }
     }
   ],
   "variable": [
@@ -982,6 +1133,7 @@
     { "key": "category_id", "value": "CATEGORY_ID_HERE" },
     { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },
     { "key": "attribute_value_id", "value": "ATTRIBUTE_VALUE_ID_HERE" },
-    { "key": "product_id", "value": "PRODUCT_ID_HERE" }
+    { "key": "product_id", "value": "PRODUCT_ID_HERE" },
+    { "key": "variant_id", "value": "VARIANT_ID_HERE" }
   ]
 }

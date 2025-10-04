@@ -9,8 +9,11 @@ import com.stockshift.backend.domain.brand.exception.BrandNotFoundException;
 import com.stockshift.backend.domain.category.exception.CategoryAlreadyExistsException;
 import com.stockshift.backend.domain.category.exception.CategoryNotFoundException;
 import com.stockshift.backend.domain.category.exception.CircularCategoryReferenceException;
+import com.stockshift.backend.domain.product.exception.DuplicateAttributeCombinationException;
 import com.stockshift.backend.domain.product.exception.ProductAlreadyExistsException;
 import com.stockshift.backend.domain.product.exception.ProductNotFoundException;
+import com.stockshift.backend.domain.product.exception.ProductVariantAlreadyExistsException;
+import com.stockshift.backend.domain.product.exception.ProductVariantNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -267,6 +270,54 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    @ExceptionHandler(ProductVariantNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleProductVariantNotFound(
+            ProductVariantNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Product Variant Not Found",
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(ProductVariantAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleProductVariantAlreadyExists(
+            ProductVariantAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Product Variant Already Exists",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(DuplicateAttributeCombinationException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateAttributeCombination(
+            DuplicateAttributeCombinationException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Duplicate Attribute Combination",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(
             RuntimeException ex,
@@ -305,6 +356,120 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    // New Attribute System Exception Handlers
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.InvalidAttributePairException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidAttributePair(
+            com.stockshift.backend.application.exception.InvalidAttributePairException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Invalid Attribute Pair",
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.MissingRequiredAttributeException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequiredAttribute(
+            com.stockshift.backend.application.exception.MissingRequiredAttributeException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Missing Required Attribute",
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.InactiveAttributeException.class)
+    public ResponseEntity<ErrorResponse> handleInactiveAttribute(
+            com.stockshift.backend.application.exception.InactiveAttributeException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Inactive Attribute",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.AttributeNotApplicableException.class)
+    public ResponseEntity<ErrorResponse> handleAttributeNotApplicable(
+            com.stockshift.backend.application.exception.AttributeNotApplicableException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Attribute Not Applicable",
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.DuplicateSkuException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateSku(
+            com.stockshift.backend.application.exception.DuplicateSkuException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Duplicate SKU",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.DuplicateGtinException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateGtin(
+            com.stockshift.backend.application.exception.DuplicateGtinException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Duplicate GTIN",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.application.exception.DuplicateVariantCombinationException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateVariantCombination(
+            com.stockshift.backend.application.exception.DuplicateVariantCombinationException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Duplicate Variant Combination",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex,
@@ -321,3 +486,4 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }
+

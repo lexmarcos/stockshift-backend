@@ -1,22 +1,25 @@
 package com.stockshift.backend.api.dto.attribute;
 
-import lombok.AllArgsConstructor;
+import com.stockshift.backend.domain.attribute.AttributeStatus;
+import com.stockshift.backend.domain.attribute.AttributeType;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class AttributeDefinitionResponse {
-
     private UUID id;
     private String name;
+    private String code;
+    private AttributeType type;
     private String description;
-    private Integer valueCount;
-    private Boolean active;
+    private Boolean isVariantDefining;
+    private Boolean isRequired;
+    private List<UUID> applicableCategoryIds;
+    private Integer sortOrder;
+    private AttributeStatus status;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

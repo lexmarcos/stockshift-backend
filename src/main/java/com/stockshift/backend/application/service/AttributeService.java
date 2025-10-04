@@ -4,7 +4,10 @@ import com.stockshift.backend.api.dto.attribute.CreateAttributeDefinitionRequest
 import com.stockshift.backend.api.dto.attribute.CreateAttributeValueRequest;
 import com.stockshift.backend.api.dto.attribute.UpdateAttributeDefinitionRequest;
 import com.stockshift.backend.api.dto.attribute.UpdateAttributeValueRequest;
+import com.stockshift.backend.api.mapper.AttributeMapper;
+import com.stockshift.backend.application.exception.InactiveAttributeException;
 import com.stockshift.backend.domain.attribute.AttributeDefinition;
+import com.stockshift.backend.domain.attribute.AttributeStatus;
 import com.stockshift.backend.domain.attribute.AttributeValue;
 import com.stockshift.backend.domain.attribute.exception.AttributeDefinitionAlreadyExistsException;
 import com.stockshift.backend.domain.attribute.exception.AttributeDefinitionNotFoundException;
@@ -26,19 +29,17 @@ public class AttributeService {
 
     private final AttributeDefinitionRepository definitionRepository;
     private final AttributeValueRepository valueRepository;
+    private final AttributeMapper mapper;
 
     // Attribute Definition Methods
 
     @Transactional
     public AttributeDefinition createDefinition(CreateAttributeDefinitionRequest request) {
-        if (definitionRepository.existsByNameAndActiveTrue(request.getName())) {
-            throw new AttributeDefinitionAlreadyExistsException(request.getName());
+        if (definitionRepository.existsByCode(request.getCode().toUpperCase())) {
+            throw new AttributeDefinitionAlreadyExistsException("Definition with code " + request.getCode() + " already exists");
         }
 
-        AttributeDefinition definition = new AttributeDefinition();
-        definition.setName(request.getName());
-        definition.setDescription(request.getDescription());
-
+        AttributeDefinition definition = mapper.toEntity(request);
         return definitionRepository.save(definition);
     }
 
@@ -49,7 +50,7 @@ public class AttributeService {
 
     @Transactional(readOnly = true)
     public Page<AttributeDefinition> getActiveDefinitions(Pageable pageable) {
-        return definitionRepository.findAllByActiveTrue(pageable);
+        return definitionRepository.findAllByStatus(AttributeStatus.ACTIVE, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -59,36 +60,25 @@ public class AttributeService {
     }
 
     @Transactional(readOnly = true)
-    public AttributeDefinition getDefinitionByName(String name) {
-        return definitionRepository.findByNameAndActiveTrue(name)
-                .orElseThrow(() -> new AttributeDefinitionNotFoundException(name));
+    public AttributeDefinition getDefinitionByCode(String code) {
+        return definitionRepository.findByCode(code.toUpperCase())
+                .orElseThrow(() -> new AttributeDefinitionNotFoundException("Definition with code " + code + " not found"));
     }
 
     @Transactional
     public AttributeDefinition updateDefinition(UUID id, UpdateAttributeDefinitionRequest request) {
         AttributeDefinition definition = getDefinitionById(id);
-
-        if (request.getName() != null && !request.getName().equals(definition.getName())) {
-            if (definitionRepository.existsByNameAndActiveTrueAndIdNot(request.getName(), id)) {
-                throw new AttributeDefinitionAlreadyExistsException(request.getName());
-            }
-            definition.setName(request.getName());
-        }
-
-        if (request.getDescription() != null) {
-            definition.setDescription(request.getDescription());
-        }
-
+        mapper.updateEntity(request, definition);
         return definitionRepository.save(definition);
     }
 
     @Transactional
-    public void deleteDefinition(UUID id) {
+    public void deactivateDefinition(UUID id) {
         AttributeDefinition definition = getDefinitionById(id);
-        definition.setActive(false);
+        definition.setStatus(AttributeStatus.INACTIVE);
         
         // Also deactivate all values
-        definition.getValues().forEach(value -> value.setActive(false));
+        definition.getValues().forEach(value -> value.setStatus(AttributeStatus.INACTIVE));
         
         definitionRepository.save(definition);
     }
@@ -96,7 +86,7 @@ public class AttributeService {
     @Transactional
     public void activateDefinition(UUID id) {
         AttributeDefinition definition = getDefinitionById(id);
-        definition.setActive(true);
+        definition.setStatus(AttributeStatus.ACTIVE);
         definitionRepository.save(definition);
     }
 
@@ -105,33 +95,38 @@ public class AttributeService {
     @Transactional
     public AttributeValue createValue(UUID definitionId, CreateAttributeValueRequest request) {
         AttributeDefinition definition = getDefinitionById(definitionId);
-
-        if (!definition.getActive()) {
-            throw new IllegalArgumentException("Cannot add values to inactive attribute definition");
+        
+        if (definition.getStatus() == AttributeStatus.INACTIVE) {
+            throw new InactiveAttributeException("definition", definition.getCode());
         }
 
-        if (valueRepository.existsByDefinitionIdAndValueAndActiveTrue(definitionId, request.getValue())) {
-            throw new AttributeValueAlreadyExistsException(definition.getName(), request.getValue());
+        if (!definition.isEnumType()) {
+            throw new IllegalArgumentException("Can only create values for ENUM or MULTI_ENUM attribute definitions");
         }
 
-        AttributeValue value = new AttributeValue();
-        value.setDefinition(definition);
-        value.setValue(request.getValue());
-        value.setDescription(request.getDescription());
+        String code = request.getCode().toUpperCase();
+        if (valueRepository.existsByDefinitionIdAndCode(definitionId, code)) {
+            throw new AttributeValueAlreadyExistsException("Value with code " + code + " already exists for definition " + definition.getCode());
+        }
 
+        AttributeValue value = mapper.toEntity(request, definition);
         return valueRepository.save(value);
     }
 
     @Transactional(readOnly = true)
-    public Page<AttributeValue> getValuesByDefinition(UUID definitionId, Boolean onlyActive, Pageable pageable) {
-        // Verify definition exists
+    public Page<AttributeValue> getValuesByDefinition(UUID definitionId, Pageable pageable) {
         if (!definitionRepository.existsById(definitionId)) {
             throw new AttributeDefinitionNotFoundException(definitionId);
         }
+        return valueRepository.findAllByDefinitionId(definitionId, pageable);
+    }
 
-        return onlyActive 
-            ? valueRepository.findByDefinitionIdAndActiveTrue(definitionId, pageable)
-            : valueRepository.findByDefinitionId(definitionId, pageable);
+    @Transactional(readOnly = true)
+    public Page<AttributeValue> getActiveValuesByDefinition(UUID definitionId, Pageable pageable) {
+        if (!definitionRepository.existsById(definitionId)) {
+            throw new AttributeDefinitionNotFoundException(definitionId);
+        }
+        return valueRepository.findAllByDefinitionIdAndStatus(definitionId, AttributeStatus.ACTIVE, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -141,47 +136,29 @@ public class AttributeService {
     }
 
     @Transactional(readOnly = true)
-    public AttributeValue getValueByDefinitionAndValue(UUID definitionId, String value) {
-        return valueRepository.findByDefinitionIdAndValueAndActiveTrue(definitionId, value)
-                .orElseThrow(() -> new AttributeValueNotFoundException(definitionId, value));
+    public AttributeValue getValueByDefinitionAndCode(UUID definitionId, String code) {
+        return valueRepository.findByDefinitionIdAndCode(definitionId, code.toUpperCase())
+                .orElseThrow(() -> new AttributeValueNotFoundException("Value with code " + code + " not found"));
     }
 
     @Transactional
     public AttributeValue updateValue(UUID id, UpdateAttributeValueRequest request) {
         AttributeValue value = getValueById(id);
-
-        if (request.getValue() != null && !request.getValue().equals(value.getValue())) {
-            if (valueRepository.existsByDefinitionIdAndValueAndActiveTrueAndIdNot(
-                    value.getDefinition().getId(), request.getValue(), id)) {
-                throw new AttributeValueAlreadyExistsException(
-                    value.getDefinition().getName(), request.getValue());
-            }
-            value.setValue(request.getValue());
-        }
-
-        if (request.getDescription() != null) {
-            value.setDescription(request.getDescription());
-        }
-
+        mapper.updateEntity(request, value);
         return valueRepository.save(value);
     }
 
     @Transactional
-    public void deleteValue(UUID id) {
+    public void deactivateValue(UUID id) {
         AttributeValue value = getValueById(id);
-        value.setActive(false);
+        value.setStatus(AttributeStatus.INACTIVE);
         valueRepository.save(value);
     }
 
     @Transactional
     public void activateValue(UUID id) {
         AttributeValue value = getValueById(id);
-        
-        if (!value.getDefinition().getActive()) {
-            throw new IllegalArgumentException("Cannot activate value: definition is not active");
-        }
-        
-        value.setActive(true);
+        value.setStatus(AttributeStatus.ACTIVE);
         valueRepository.save(value);
     }
 }

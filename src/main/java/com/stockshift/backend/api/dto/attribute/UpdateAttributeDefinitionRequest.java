@@ -5,6 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -15,4 +18,12 @@ public class UpdateAttributeDefinitionRequest {
 
     @Size(max = 500, message = "Description must not exceed 500 characters")
     private String description;
+
+    private Boolean isVariantDefining;
+
+    private Boolean isRequired;
+
+    private List<UUID> applicableCategoryIds;
+
+    private Integer sortOrder;
 }

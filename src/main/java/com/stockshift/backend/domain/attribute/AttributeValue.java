@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "attribute_values", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"definition_id", "value"})
+    @UniqueConstraint(columnNames = {"definition_id", "code"})
 })
 @Getter
 @Setter
@@ -32,11 +32,18 @@ public class AttributeValue {
     @Column(nullable = false, length = 100)
     private String value;
 
+    @Column(nullable = false, length = 100)
+    private String code;
+
     @Column(length = 500)
     private String description;
 
-    @Column(nullable = false)
-    private Boolean active = true;
+    @Column(length = 7)
+    private String swatchHex;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private AttributeStatus status = AttributeStatus.ACTIVE;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
