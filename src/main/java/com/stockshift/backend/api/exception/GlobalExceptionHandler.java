@@ -4,9 +4,13 @@ import com.stockshift.backend.domain.attribute.exception.AttributeDefinitionAlre
 import com.stockshift.backend.domain.attribute.exception.AttributeDefinitionNotFoundException;
 import com.stockshift.backend.domain.attribute.exception.AttributeValueAlreadyExistsException;
 import com.stockshift.backend.domain.attribute.exception.AttributeValueNotFoundException;
+import com.stockshift.backend.domain.brand.exception.BrandAlreadyExistsException;
+import com.stockshift.backend.domain.brand.exception.BrandNotFoundException;
 import com.stockshift.backend.domain.category.exception.CategoryAlreadyExistsException;
 import com.stockshift.backend.domain.category.exception.CategoryNotFoundException;
 import com.stockshift.backend.domain.category.exception.CircularCategoryReferenceException;
+import com.stockshift.backend.domain.product.exception.ProductAlreadyExistsException;
+import com.stockshift.backend.domain.product.exception.ProductNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -223,6 +227,38 @@ public class GlobalExceptionHandler {
         ErrorResponse error = new ErrorResponse(
                 "about:blank",
                 "Attribute Value Already Exists",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleProductNotFound(
+            ProductNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Product Not Found",
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(ProductAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleProductAlreadyExists(
+            ProductAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Product Already Exists",
                 HttpStatus.CONFLICT.value(),
                 ex.getMessage(),
                 request.getRequestURI(),

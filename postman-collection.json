@@ -781,6 +781,196 @@
           "path": ["api","v1","attributes","values","{{attribute_value_id}}","activate"]
         }
       }
+    },
+    {
+      "name": "50. Create Product",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Smartphone XYZ\",\n  \"description\": \"Latest smartphone model\",\n  \"brandId\": null,\n  \"categoryId\": null,\n  \"basePrice\": 99999,\n  \"expiryDate\": null\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "51. List All Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products?page=0&size=20&onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" },
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "52. List Active Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products?onlyActive=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products"],
+          "query": [
+            { "key": "onlyActive", "value": "true" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "53. Search Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/search?q=smartphone",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","search"],
+          "query": [
+            { "key": "q", "value": "smartphone" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "54. Get Products by Brand",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/brand/{{brand_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","brand","{{brand_id}}"]
+        }
+      }
+    },
+    {
+      "name": "55. Get Products by Category",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/category/{{category_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","category","{{category_id}}"]
+        }
+      }
+    },
+    {
+      "name": "56. Get Expired Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/expired",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","expired"]
+        }
+      }
+    },
+    {
+      "name": "57. Get Products Expiring Soon",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/expiring-soon?days=30",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","expiring-soon"],
+          "query": [
+            { "key": "days", "value": "30" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "58. Get Product by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{product_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","{{product_id}}"]
+        }
+      }
+    },
+    {
+      "name": "59. Get Product by Name",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/name/Smartphone XYZ",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","name","Smartphone XYZ"]
+        }
+      }
+    },
+    {
+      "name": "60. Update Product",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{product_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","{{product_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Smartphone XYZ Pro\",\n  \"description\": \"Updated description\",\n  \"basePrice\": 109999\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "61. Deactivate Product",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{product_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","{{product_id}}"]
+        }
+      }
+    },
+    {
+      "name": "62. Activate Product",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/products/{{product_id}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","products","{{product_id}}","activate"]
+        }
+      }
     }
   ],
   "variable": [
@@ -791,6 +981,7 @@
     { "key": "brand_id", "value": "BRAND_ID_HERE" },
     { "key": "category_id", "value": "CATEGORY_ID_HERE" },
     { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },
-    { "key": "attribute_value_id", "value": "ATTRIBUTE_VALUE_ID_HERE" }
+    { "key": "attribute_value_id", "value": "ATTRIBUTE_VALUE_ID_HERE" },
+    { "key": "product_id", "value": "PRODUCT_ID_HERE" }
   ]
 }
