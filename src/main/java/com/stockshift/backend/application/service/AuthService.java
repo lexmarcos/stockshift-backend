@@ -5,7 +5,6 @@ import com.stockshift.backend.api.dto.auth.LoginResponse;
 import com.stockshift.backend.api.dto.auth.RefreshTokenRequest;
 import com.stockshift.backend.domain.user.RefreshToken;
 import com.stockshift.backend.domain.user.User;
-import com.stockshift.backend.infrastructure.repository.UserRepository;
 import com.stockshift.backend.infrastructure.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,7 +20,6 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
-    private final UserRepository userRepository;
 
     @Transactional
     public LoginResponse login(LoginRequest request) {

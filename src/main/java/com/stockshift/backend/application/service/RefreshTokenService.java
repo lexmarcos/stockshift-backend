@@ -3,7 +3,6 @@ package com.stockshift.backend.application.service;
 import com.stockshift.backend.domain.user.RefreshToken;
 import com.stockshift.backend.domain.user.User;
 import com.stockshift.backend.infrastructure.repository.RefreshTokenRepository;
-import com.stockshift.backend.infrastructure.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -17,7 +16,6 @@ import java.util.UUID;
 public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @Value("${jwt.refresh-token-expiration}")
     private Long refreshTokenExpiration;
