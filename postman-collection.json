@@ -1122,6 +1122,160 @@
           "path": ["api","v1","variants","{{variant_id}}","activate"]
         }
       }
+    },
+    {
+      "name": "73. Create Warehouse",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"code\": \"WH-MAIN\",\n  \"name\": \"Main Warehouse\",\n  \"description\": \"Central warehouse for inventory management\",\n  \"type\": \"MAIN\",\n  \"address\": \"123 Industrial Ave\",\n  \"city\": \"São Paulo\",\n  \"state\": \"SP\",\n  \"postalCode\": \"01234-567\",\n  \"country\": \"Brazil\",\n  \"phone\": \"+55 11 98765-4321\",\n  \"email\": \"warehouse@stockshift.com\",\n  \"managerName\": \"John Doe\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "74. Get All Warehouses",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses?page=0&size=20&onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" },
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "75. Get Active Warehouses",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses?onlyActive=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses"],
+          "query": [
+            { "key": "onlyActive", "value": "true" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "76. Get Warehouses by Type",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/type/MAIN?onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","type","MAIN"],
+          "query": [
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "77. Search Warehouses",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/search?query=main",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","search"],
+          "query": [
+            { "key": "query", "value": "main" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "78. Get Warehouse by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","{{warehouse_id}}"]
+        }
+      }
+    },
+    {
+      "name": "79. Get Warehouse by Code",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/code/WH-MAIN",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","code","WH-MAIN"]
+        }
+      }
+    },
+    {
+      "name": "80. Update Warehouse",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","{{warehouse_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Main Warehouse - Updated\",\n  \"description\": \"Updated description\",\n  \"phone\": \"+55 11 98765-9999\",\n  \"managerName\": \"Jane Smith\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "81. Deactivate Warehouse",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","{{warehouse_id}}"]
+        }
+      }
+    },
+    {
+      "name": "82. Activate Warehouse",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","warehouses","{{warehouse_id}}","activate"]
+        }
+      }
     }
   ],
   "variable": [
@@ -1134,6 +1288,7 @@
     { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },
     { "key": "attribute_value_id", "value": "ATTRIBUTE_VALUE_ID_HERE" },
     { "key": "product_id", "value": "PRODUCT_ID_HERE" },
-    { "key": "variant_id", "value": "VARIANT_ID_HERE" }
+    { "key": "variant_id", "value": "VARIANT_ID_HERE" },
+    { "key": "warehouse_id", "value": "WAREHOUSE_ID_HERE" }
   ]
 }

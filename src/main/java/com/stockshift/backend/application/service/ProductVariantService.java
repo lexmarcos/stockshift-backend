@@ -161,7 +161,7 @@ public class ProductVariantService {
         if (!productRepository.existsById(productId)) {
             throw new ProductNotFoundException(productId);
         }
-        return variantRepository.findByProductId(productId, pageable);
+        return variantRepository.findAllByProductId(productId, pageable);
     }
 
     @Transactional(readOnly = true)

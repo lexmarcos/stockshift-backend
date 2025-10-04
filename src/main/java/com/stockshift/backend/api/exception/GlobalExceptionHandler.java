@@ -470,6 +470,40 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    // Warehouse Exception Handlers
+
+    @ExceptionHandler(com.stockshift.backend.domain.warehouse.exception.WarehouseNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleWarehouseNotFound(
+            com.stockshift.backend.domain.warehouse.exception.WarehouseNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Warehouse Not Found",
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.domain.warehouse.exception.WarehouseAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleWarehouseAlreadyExists(
+            com.stockshift.backend.domain.warehouse.exception.WarehouseAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Warehouse Already Exists",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex,
