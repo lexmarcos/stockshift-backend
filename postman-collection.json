@@ -392,6 +392,395 @@
           "path": ["api","v1","brands","{{brand_id}}","activate"]
         }
       }
+    },
+    {
+      "name": "25. Create Category",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Electronics\",\n  \"description\": \"Electronic products\",\n  \"parentId\": null\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "26. List All Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories?page=0&size=20&onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" },
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "27. List Active Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories?onlyActive=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories"],
+          "query": [
+            { "key": "onlyActive", "value": "true" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "28. List Root Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/root?page=0&size=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","root"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "29. Get Category by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","{{category_id}}"]
+        }
+      }
+    },
+    {
+      "name": "30. Get Category by Name",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/name/Electronics",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","name","Electronics"]
+        }
+      }
+    },
+    {
+      "name": "31. Get Subcategories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}/subcategories?page=0&size=20",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","{{category_id}}","subcategories"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "32. Get All Descendants",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}/descendants",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","{{category_id}}","descendants"]
+        }
+      }
+    },
+    {
+      "name": "33. Update Category",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","{{category_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Consumer Electronics\",\n  \"description\": \"Updated description\",\n  \"parentId\": null\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "34. Deactivate Category",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","{{category_id}}"]
+        }
+      }
+    },
+    {
+      "name": "35. Activate Category",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","categories","{{category_id}}","activate"]
+        }
+      }
+    },
+    {
+      "name": "36. Create Attribute Definition",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Color\",\n  \"description\": \"Product color options\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "37. List All Attribute Definitions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions?page=0&size=20&onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" },
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "38. List Active Attribute Definitions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions?onlyActive=true",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions"],
+          "query": [
+            { "key": "onlyActive", "value": "true" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "39. Get Attribute Definition by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}"]
+        }
+      }
+    },
+    {
+      "name": "40. Get Attribute Definition by Name",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/name/Color",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","name","Color"]
+        }
+      }
+    },
+    {
+      "name": "41. Update Attribute Definition",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Product Color\",\n  \"description\": \"Updated description\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "42. Deactivate Attribute Definition",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}"]
+        }
+      }
+    },
+    {
+      "name": "43. Activate Attribute Definition",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}","activate"]
+        }
+      }
+    },
+    {
+      "name": "44. Create Attribute Value",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}/values",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}","values"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"value\": \"Blue\",\n  \"description\": \"Blue color option\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "45. List Values by Definition",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}/values?page=0&size=20&onlyActive=false",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}","values"],
+          "query": [
+            { "key": "page", "value": "0" },
+            { "key": "size", "value": "20" },
+            { "key": "onlyActive", "value": "false" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "46. Get Attribute Value by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","values","{{attribute_value_id}}"]
+        }
+      }
+    },
+    {
+      "name": "47. Update Attribute Value",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","values","{{attribute_value_id}}"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"value\": \"Dark Blue\",\n  \"description\": \"Updated description\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "48. Deactivate Attribute Value",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","values","{{attribute_value_id}}"]
+        }
+      }
+    },
+    {
+      "name": "49. Activate Attribute Value",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}/activate",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","attributes","values","{{attribute_value_id}}","activate"]
+        }
+      }
     }
   ],
   "variable": [
@@ -399,6 +788,9 @@
     { "key": "access_token", "value": "" },
     { "key": "refresh_token", "value": "" },
     { "key": "user_id", "value": "USER_ID_HERE" },
-    { "key": "brand_id", "value": "BRAND_ID_HERE" }
+    { "key": "brand_id", "value": "BRAND_ID_HERE" },
+    { "key": "category_id", "value": "CATEGORY_ID_HERE" },
+    { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },
+    { "key": "attribute_value_id", "value": "ATTRIBUTE_VALUE_ID_HERE" }
   ]
 }
