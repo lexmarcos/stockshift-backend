@@ -1,0 +1,33 @@
+# Application Configuration - Development
+spring.application.name=backend
+
+# Database Configuration
+spring.datasource.url=jdbc:postgresql://localhost:5432/stockshift
+spring.datasource.username=stockshift
+spring.datasource.password=stockshift
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA/Hibernate
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.properties.hibernate.jdbc.time_zone=UTC
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# JWT Configuration
+jwt.secret=your-256-bit-secret-key-change-this-in-production-environment-must-be-at-least-256-bits
+jwt.access-token-expiration=3600000
+jwt.refresh-token-expiration=86400000
+
+# Server Configuration
+server.port=8080
+server.error.include-message=always
+server.error.include-binding-errors=always
+server.error.include-stacktrace=never
+
+# Logging
+logging.level.root=INFO
+logging.level.com.stockshift.backend=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.hibernate.SQL=DEBUG
+logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE

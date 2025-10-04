@@ -1,0 +1,47 @@
+# Application Configuration - Production
+spring.application.name=backend
+
+# Database Configuration (use environment variables)
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/stockshift}
+spring.datasource.username=${DB_USERNAME:stockshift}
+spring.datasource.password=${DB_PASSWORD:stockshift}
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# Connection Pool
+spring.datasource.hikari.maximum-pool-size=20
+spring.datasource.hikari.minimum-idle=5
+spring.datasource.hikari.connection-timeout=30000
+spring.datasource.hikari.idle-timeout=600000
+spring.datasource.hikari.max-lifetime=1800000
+
+# JPA/Hibernate
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.properties.hibernate.jdbc.time_zone=UTC
+spring.jpa.properties.hibernate.format_sql=false
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# JWT Configuration (use environment variables)
+jwt.secret=${JWT_SECRET:change-this-secret-in-production}
+jwt.access-token-expiration=${JWT_ACCESS_EXPIRATION:3600000}
+jwt.refresh-token-expiration=${JWT_REFRESH_EXPIRATION:86400000}
+
+# Server Configuration
+server.port=${PORT:8080}
+server.error.include-message=never
+server.error.include-binding-errors=never
+server.error.include-stacktrace=never
+
+# Security Headers
+server.servlet.session.cookie.http-only=true
+server.servlet.session.cookie.secure=true
+
+# Logging
+logging.level.root=WARN
+logging.level.com.stockshift.backend=INFO
+logging.level.org.springframework.security=WARN
+logging.level.org.hibernate.SQL=WARN
+
+# Actuator (only health endpoint exposed)
+management.endpoints.web.exposure.include=health
+management.endpoint.health.show-details=when-authorized
