@@ -36,7 +36,7 @@ public class BrandController {
 
     @GetMapping
     public ResponseEntity<Page<BrandResponse>> getAllBrands(
-            @RequestParam(required = false, defaultValue = "false") Boolean onlyActive,
+            @RequestParam(value = "onlyActive", required = false, defaultValue = "false") Boolean onlyActive,
             @PageableDefault(size = 20, sort = "name", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Page<Brand> brands = onlyActive 
@@ -46,13 +46,13 @@ public class BrandController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BrandResponse> getBrandById(@PathVariable UUID id) {
+    public ResponseEntity<BrandResponse> getBrandById(@PathVariable(value = "id") UUID id) {
         Brand brand = brandService.getBrandById(id);
         return ResponseEntity.ok(brandMapper.toResponse(brand));
     }
 
     @GetMapping("/name/{name}")
-    public ResponseEntity<BrandResponse> getBrandByName(@PathVariable String name) {
+    public ResponseEntity<BrandResponse> getBrandByName(@PathVariable(value = "name") String name) {
         Brand brand = brandService.getBrandByName(name);
         return ResponseEntity.ok(brandMapper.toResponse(brand));
     }
@@ -60,7 +60,7 @@ public class BrandController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<BrandResponse> updateBrand(
-            @PathVariable UUID id,
+            @PathVariable(value = "id") UUID id,
             @Valid @RequestBody UpdateBrandRequest request
     ) {
         Brand brand = brandService.updateBrand(id, request);
@@ -69,14 +69,14 @@ public class BrandController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteBrand(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteBrand(@PathVariable(value = "id") UUID id) {
         brandService.deleteBrand(id);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<BrandResponse> activateBrand(@PathVariable UUID id) {
+    public ResponseEntity<BrandResponse> activateBrand(@PathVariable(value = "id") UUID id) {
         brandService.activateBrand(id);
         Brand brand = brandService.getBrandById(id);
         return ResponseEntity.ok(brandMapper.toResponse(brand));

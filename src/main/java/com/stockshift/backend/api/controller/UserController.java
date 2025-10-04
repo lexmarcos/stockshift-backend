@@ -45,14 +45,14 @@ public class UserController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<UserResponse> getUserById(@PathVariable UUID id) {
+    public ResponseEntity<UserResponse> getUserById(@PathVariable(value = "id") UUID id) {
         User user = userService.getUserById(id);
         return ResponseEntity.ok(userMapper.toResponse(user));
     }
 
     @GetMapping("/username/{username}")
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<UserResponse> getUserByUsername(@PathVariable String username) {
+    public ResponseEntity<UserResponse> getUserByUsername(@PathVariable(value = "username") String username) {
         User user = userService.getUserByUsername(username);
         return ResponseEntity.ok(userMapper.toResponse(user));
     }
@@ -60,7 +60,7 @@ public class UserController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponse> updateUser(
-            @PathVariable UUID id,
+            @PathVariable(value = "id") UUID id,
             @Valid @RequestBody UpdateUserRequest request
     ) {
         User user = userService.updateUser(id, request);
@@ -69,14 +69,14 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteUser(@PathVariable(value = "id") UUID id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/activate")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<UserResponse> activateUser(@PathVariable UUID id) {
+    public ResponseEntity<UserResponse> activateUser(@PathVariable(value = "id") UUID id) {
         userService.activateUser(id);
         User user = userService.getUserById(id);
         return ResponseEntity.ok(userMapper.toResponse(user));
