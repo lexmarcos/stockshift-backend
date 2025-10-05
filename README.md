@@ -111,6 +111,17 @@ curl -X GET http://localhost:8080/api/v1/test/authenticated \
   -H "Authorization: Bearer {seu_access_token}"
 ```
 
+## 📘 Documentação Swagger
+
+Com a aplicação em execução, a documentação interativa está disponível em:
+
+- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+- Esquema OpenAPI (JSON): `http://localhost:8080/v3/api-docs`
+
+Requisições protegidas exigem incluir o header `Authorization: Bearer <token>` após realizar login.
+
+Para ambientes diferentes, ajuste a URL do servidor diretamente pela interface do Swagger UI.
+
 ## 🧪 Testes
 
 ### Executar testes automatizados

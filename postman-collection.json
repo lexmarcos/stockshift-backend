@@ -708,7 +708,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"name\": \"Color\",\n  \"description\": \"Product color options\"\n}",
+          "raw": "{\n  \"name\": \"Color\",\n  \"code\": \"COLOR\",\n  \"type\": \"ENUM\",\n  \"description\": \"Product color options\",\n  \"isVariantDefining\": true,\n  \"isRequired\": false,\n  \"applicableCategoryIds\": [],\n  \"sortOrder\": 0\n}",
           "options": { "raw": { "language": "json" } }
         }
       }
@@ -758,14 +758,14 @@
       }
     },
     {
-      "name": "40. Get Attribute Definition by Name",
+      "name": "40. Get Attribute Definition by Code",
       "request": {
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/api/v1/attributes/definitions/name/Color",
+          "raw": "{{baseUrl}}/api/v1/attributes/definitions/code/{{attribute_definition_code}}",
           "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","name","Color"]
+          "path": ["api","v1","attributes","definitions","code","{{attribute_definition_code}}"]
         }
       }
     },
@@ -784,7 +784,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"name\": \"Product Color\",\n  \"description\": \"Updated description\"\n}",
+          "raw": "{\n  \"name\": \"Product Color\",\n  \"description\": \"Updated description\",\n  \"isVariantDefining\": false,\n  \"isRequired\": true,\n  \"applicableCategoryIds\": [],\n  \"sortOrder\": 10\n}",
           "options": { "raw": { "language": "json" } }
         }
       }
@@ -832,7 +832,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"value\": \"Blue\",\n  \"description\": \"Blue color option\"\n}",
+          "raw": "{\n  \"value\": \"Blue\",\n  \"code\": \"COLOR_BLUE\",\n  \"description\": \"Blue color option\",\n  \"swatchHex\": \"#1E90FF\"\n}",
           "options": { "raw": { "language": "json" } }
         }
       }
@@ -881,7 +881,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"value\": \"Dark Blue\",\n  \"description\": \"Updated description\"\n}",
+          "raw": "{\n  \"value\": \"Dark Blue\",\n  \"description\": \"Updated description\",\n  \"swatchHex\": \"#104E8B\"\n}",
           "options": { "raw": { "language": "json" } }
         }
       }
@@ -1418,6 +1418,7 @@
     { "key": "test_username", "value": "testuser" },
     { "key": "test_password", "value": "testpass123" },
     { "key": "test_email", "value": "test@stockshift.com" },
+    { "key": "attribute_definition_code", "value": "ATTRIBUTE_DEFINITION_CODE_HERE" },
     { "key": "brand_id", "value": "BRAND_ID_HERE" },
     { "key": "category_id", "value": "CATEGORY_ID_HERE" },
     { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },
