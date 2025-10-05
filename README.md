@@ -80,6 +80,22 @@ A API usa JWT (JSON Web Tokens) para autenticação. Consulte a documentação c
 | manager  | manager123  | MANAGER |
 | seller   | seller123   | SELLER  |
 
+### 🧪 Usuário de Teste (Desenvolvimento)
+
+Para facilitar testes de API e E2E, existe um usuário especial criado automaticamente em desenvolvimento:
+
+- **Username:** `testuser`
+- **Password:** `testpass123`
+- **Role:** `ADMIN`
+- **Tokens Fixos:** Disponíveis para automação de testes
+
+📖 **Documentação completa:** [TEST_USER.md](TEST_USER.md)
+
+🔧 **Endpoint para obter credenciais:**
+```bash
+curl http://localhost:8080/api/v1/dev/test-user
+```
+
 ### Quick Start
 
 1. **Login**:
@@ -99,11 +115,22 @@ curl -X GET http://localhost:8080/api/v1/test/authenticated \
 
 ### Executar testes automatizados
 ```bash
-./test-auth.sh
+./test-api.sh
 ```
 
 ### Usar coleção Postman/Insomnia
-Importe o arquivo `postman-collection.json`
+
+#### 🚀 Configuração Rápida do Postman
+1. **Importe a collection:** `postman-collection.json`
+2. **Importe o environment:** `postman.enviroment.json`
+3. **Selecione o environment "Stockshift - Local"**
+
+#### 🤖 Testes E2E Automatizados
+- **Credenciais pré-configuradas:** Usuário de teste com tokens fixos já incluídos
+- **Scripts automáticos:** Todos os logins atualizam tokens automaticamente
+- **Execute "0. Get Test User Credentials (Dev)"** para configuração dinâmica
+
+📖 **Guia completo:** [setup-postman-e2e.md](setup-postman-e2e.md)
 
 ## 📁 Estrutura do Projeto
 

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Stockshift API",
-    "description": "Complete API endpoints for Stockshift Backend",
+    "description": "Complete API endpoints for Stockshift Backend\n\n## Test Users for E2E Testing\n\n### Development Test User (Auto-generated)\n- **Username:** testuser\n- **Password:** testpass123\n- **Email:** test@stockshift.com\n- **Role:** ADMIN\n- **Access Token:** dev-access-token-12345678901234567890123456789012345678901234567890\n- **Refresh Token:** dev-refresh-token-12345678901234567890123456789012345678901234567890\n\n### Manual Test Users\n- **Admin:** admin / admin123\n- **Manager:** manager / manager123\n- **Seller:** seller / seller123\n\n### Usage Instructions\n1. First run \"0. Get Test User Credentials (Dev)\" to automatically set up environment variables\n2. Use \"1A. Login - Test User (E2E)\" for automated testing\n3. Use \"1. Login - Admin/Manager/Seller\" for manual testing\n4. All login requests automatically update access_token and refresh_token variables\n\n### Environment Variables\nThe collection uses these environment variables:\n- `{{baseUrl}}` - API base URL (default: http://localhost:8080)\n- `{{access_token}}` - JWT access token (auto-updated by login requests)\n- `{{refresh_token}}` - JWT refresh token (auto-updated by login requests)\n- `{{test_username}}` - Test user username (auto-updated by credentials request)\n- `{{test_password}}` - Test user password (auto-updated by credentials request)",
     "_postman_id": "8e2f7f9b-9c9f-4f0f-86b0-000000000001",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -23,7 +23,24 @@
           "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
           "options": { "raw": { "language": "json" } }
         }
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.environment.set('access_token', response.accessToken);",
+              "    pm.environment.set('refresh_token', response.refreshToken);",
+              "    pm.environment.set('user_id', response.user.id);",
+              "    console.log('Admin tokens updated');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
     },
     {
       "name": "2. Login - Manager",
@@ -42,7 +59,24 @@
           "raw": "{\n  \"username\": \"manager\",\n  \"password\": \"manager123\"\n}",
           "options": { "raw": { "language": "json" } }
         }
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.environment.set('access_token', response.accessToken);",
+              "    pm.environment.set('refresh_token', response.refreshToken);",
+              "    pm.environment.set('user_id', response.user.id);",
+              "    console.log('Manager tokens updated');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
     },
     {
       "name": "3. Login - Seller",
@@ -61,7 +95,24 @@
           "raw": "{\n  \"username\": \"seller\",\n  \"password\": \"seller123\"\n}",
           "options": { "raw": { "language": "json" } }
         }
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.environment.set('access_token', response.accessToken);",
+              "    pm.environment.set('refresh_token', response.refreshToken);",
+              "    pm.environment.set('user_id', response.user.id);",
+              "    console.log('Seller tokens updated');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
     },
     {
       "name": "4. Refresh Token",
@@ -80,7 +131,23 @@
           "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}",
           "options": { "raw": { "language": "json" } }
         }
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.environment.set('access_token', response.accessToken);",
+              "    pm.environment.set('refresh_token', response.refreshToken);",
+              "    console.log('Tokens refreshed successfully');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
     },
     {
       "name": "5. Logout",
@@ -100,6 +167,71 @@
           "options": { "raw": { "language": "json" } }
         }
       }
+    },
+    {
+      "name": "0. Get Test User Credentials (Dev)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/dev/test-user",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","dev","test-user"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.environment.set('test_username', response.username);",
+              "    pm.environment.set('test_password', response.password);",
+              "    pm.environment.set('access_token', response.accessToken);",
+              "    pm.environment.set('refresh_token', response.refreshToken);",
+              "    console.log('Test user credentials updated in environment');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1A. Login - Test User (E2E)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","v1","auth","login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{test_username}}\",\n  \"password\": \"{{test_password}}\"\n}",
+          "options": { "raw": { "language": "json" } }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    const response = pm.response.json();",
+              "    pm.environment.set('access_token', response.accessToken);",
+              "    pm.environment.set('refresh_token', response.refreshToken);",
+              "    pm.environment.set('user_id', response.user.id);",
+              "    console.log('Tokens updated for test user');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
     },
     {
       "name": "6. Test - Public Endpoint",
@@ -1280,9 +1412,12 @@
   ],
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "access_token", "value": "" },
-    { "key": "refresh_token", "value": "" },
+    { "key": "access_token", "value": "dev-access-token-12345678901234567890123456789012345678901234567890" },
+    { "key": "refresh_token", "value": "dev-refresh-token-12345678901234567890123456789012345678901234567890" },
     { "key": "user_id", "value": "USER_ID_HERE" },
+    { "key": "test_username", "value": "testuser" },
+    { "key": "test_password", "value": "testpass123" },
+    { "key": "test_email", "value": "test@stockshift.com" },
     { "key": "brand_id", "value": "BRAND_ID_HERE" },
     { "key": "category_id", "value": "CATEGORY_ID_HERE" },
     { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },

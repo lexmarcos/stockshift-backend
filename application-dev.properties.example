@@ -28,6 +28,15 @@ server.error.include-stacktrace=never
 # Logging
 logging.level.root=INFO
 logging.level.com.stockshift.backend=DEBUG
+
+# Test User Configuration (Development Only)
+app.test-user.enabled=true
+app.test-user.username=testuser
+app.test-user.email=test@stockshift.com
+app.test-user.password=testpass123
+app.test-user.role=ADMIN
+app.test-user.access-token=dev-access-token-12345678901234567890123456789012345678901234567890
+app.test-user.refresh-token=dev-refresh-token-12345678901234567890123456789012345678901234567890
 logging.level.org.springframework.security=DEBUG
 logging.level.org.hibernate.SQL=DEBUG
 logging.level.org.hibernate.type.descriptor.sql.BasicBinder=TRACE
