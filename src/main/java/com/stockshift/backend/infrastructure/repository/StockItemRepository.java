@@ -2,12 +2,13 @@ package com.stockshift.backend.infrastructure.repository;
 
 import com.stockshift.backend.domain.stock.StockItem;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface StockItemRepository extends JpaRepository<StockItem, UUID> {
+public interface StockItemRepository extends JpaRepository<StockItem, UUID>, JpaSpecificationExecutor<StockItem> {
 
     Optional<StockItem> findByWarehouseIdAndVariantId(UUID warehouseId, UUID variantId);
 
