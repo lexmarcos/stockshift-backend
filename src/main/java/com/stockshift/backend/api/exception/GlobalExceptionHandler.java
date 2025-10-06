@@ -14,6 +14,17 @@ import com.stockshift.backend.domain.product.exception.ProductAlreadyExistsExcep
 import com.stockshift.backend.domain.product.exception.ProductNotFoundException;
 import com.stockshift.backend.domain.product.exception.ProductVariantAlreadyExistsException;
 import com.stockshift.backend.domain.product.exception.ProductVariantNotFoundException;
+import com.stockshift.backend.domain.stock.exception.StockConcurrencyConflictException;
+import com.stockshift.backend.domain.stock.exception.StockEventNotFoundException;
+import com.stockshift.backend.domain.stock.exception.StockExpiredItemMovementBlockedException;
+import com.stockshift.backend.domain.stock.exception.StockForbiddenException;
+import com.stockshift.backend.domain.stock.exception.StockIdempotencyConflictException;
+import com.stockshift.backend.domain.stock.exception.StockInsufficientQuantityException;
+import com.stockshift.backend.domain.stock.exception.StockInvalidPayloadException;
+import com.stockshift.backend.domain.stock.exception.StockVariantInactiveException;
+import com.stockshift.backend.domain.stock.exception.StockVariantNotFoundException;
+import com.stockshift.backend.domain.stock.exception.StockWarehouseInactiveException;
+import com.stockshift.backend.domain.stock.exception.StockWarehouseNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -318,6 +329,83 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    @ExceptionHandler({
+            StockInvalidPayloadException.class,
+            StockVariantInactiveException.class,
+            StockWarehouseInactiveException.class
+    })
+    public ResponseEntity<ErrorResponse> handleStockBadRequest(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Invalid Stock Payload",
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(StockForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleStockForbidden(
+            StockForbiddenException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Forbidden",
+                HttpStatus.FORBIDDEN.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+    }
+
+    @ExceptionHandler({
+            StockWarehouseNotFoundException.class,
+            StockVariantNotFoundException.class,
+            StockEventNotFoundException.class
+    })
+    public ResponseEntity<ErrorResponse> handleStockNotFound(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Stock Resource Not Found",
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler({
+            StockInsufficientQuantityException.class,
+            StockIdempotencyConflictException.class,
+            StockConcurrencyConflictException.class,
+            StockExpiredItemMovementBlockedException.class
+    })
+    public ResponseEntity<ErrorResponse> handleStockConflict(
+            RuntimeException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Stock Conflict",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(
             RuntimeException ex,
@@ -520,4 +608,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 }
-

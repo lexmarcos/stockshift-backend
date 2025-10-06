@@ -11,17 +11,31 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","auth","login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       },
       "event": [
@@ -47,17 +61,31 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","auth","login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"username\": \"manager\",\n  \"password\": \"manager123\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       },
       "event": [
@@ -83,17 +111,31 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","auth","login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"username\": \"seller\",\n  \"password\": \"seller123\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       },
       "event": [
@@ -119,17 +161,31 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/refresh",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","auth","refresh"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "refresh"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       },
       "event": [
@@ -154,17 +210,31 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/logout",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","auth","logout"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "logout"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -174,8 +244,15 @@
         "method": "GET",
         "url": {
           "raw": "{{baseUrl}}/api/v1/dev/test-user",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","dev","test-user"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "dev",
+            "test-user"
+          ]
         }
       },
       "event": [
@@ -202,17 +279,31 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","auth","login"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"username\": \"{{test_username}}\",\n  \"password\": \"{{test_password}}\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       },
       "event": [
@@ -239,8 +330,15 @@
         "method": "GET",
         "url": {
           "raw": "{{baseUrl}}/api/v1/test/public",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","test","public"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "test",
+            "public"
+          ]
         }
       }
     },
@@ -249,12 +347,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/test/authenticated",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","test","authenticated"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "test",
+            "authenticated"
+          ]
         }
       }
     },
@@ -263,12 +371,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/test/admin",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","test","admin"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "test",
+            "admin"
+          ]
         }
       }
     },
@@ -277,12 +395,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/test/manager",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","test","manager"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "test",
+            "manager"
+          ]
         }
       }
     },
@@ -291,18 +419,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"username\": \"newuser\",\n  \"email\": \"newuser@example.com\",\n  \"password\": \"senha123\",\n  \"role\": \"SELLER\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -311,15 +455,30 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users?page=0&size=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
           ]
         }
       }
@@ -329,12 +488,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users/{{user_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users","{{user_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{user_id}}"
+          ]
         }
       }
     },
@@ -343,12 +512,23 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users/username/admin",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users","username","admin"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "username",
+            "admin"
+          ]
         }
       }
     },
@@ -357,18 +537,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users/{{user_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users","{{user_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{user_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"newemail@example.com\",\n  \"role\": \"MANAGER\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -377,12 +574,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users/{{user_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users","{{user_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{user_id}}"
+          ]
         }
       }
     },
@@ -391,12 +598,23 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/users/{{user_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","users","{{user_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{user_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -405,18 +623,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Nike\",\n  \"description\": \"American multinational corporation that designs, develops, manufactures, and sells footwear, apparel, equipment, accessories, and services.\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -427,11 +661,23 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands?page=0&size=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
           ]
         }
       }
@@ -443,12 +689,27 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands?onlyActive=true&page=0&size=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "true" },
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" }
+            {
+              "key": "onlyActive",
+              "value": "true"
+            },
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
           ]
         }
       }
@@ -460,8 +721,15 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands/{{brand_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands","{{brand_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands",
+            "{{brand_id}}"
+          ]
         }
       }
     },
@@ -472,8 +740,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands/name/Nike",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands","name","Nike"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands",
+            "name",
+            "Nike"
+          ]
         }
       }
     },
@@ -482,18 +758,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands/{{brand_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands","{{brand_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands",
+            "{{brand_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Nike Updated\",\n  \"description\": \"Just Do It - Leading sports brand worldwide\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -502,12 +795,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands/{{brand_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands","{{brand_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands",
+            "{{brand_id}}"
+          ]
         }
       }
     },
@@ -516,12 +819,23 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/brands/{{brand_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","brands","{{brand_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "brands",
+            "{{brand_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -530,18 +844,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Electronics\",\n  \"description\": \"Electronic products\",\n  \"parentId\": null\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -552,12 +882,27 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories?page=0&size=20&onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" },
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -569,10 +914,19 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories?onlyActive=true",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "true" }
+            {
+              "key": "onlyActive",
+              "value": "true"
+            }
           ]
         }
       }
@@ -584,11 +938,24 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/root?page=0&size=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","root"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "root"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
           ]
         }
       }
@@ -600,8 +967,15 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","{{category_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "{{category_id}}"
+          ]
         }
       }
     },
@@ -612,8 +986,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/name/Electronics",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","name","Electronics"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "name",
+            "Electronics"
+          ]
         }
       }
     },
@@ -624,11 +1006,25 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}/subcategories?page=0&size=20",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","{{category_id}}","subcategories"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "{{category_id}}",
+            "subcategories"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
           ]
         }
       }
@@ -640,8 +1036,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}/descendants",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","{{category_id}}","descendants"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "{{category_id}}",
+            "descendants"
+          ]
         }
       }
     },
@@ -650,18 +1054,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","{{category_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "{{category_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Consumer Electronics\",\n  \"description\": \"Updated description\",\n  \"parentId\": null\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -670,12 +1091,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","{{category_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "{{category_id}}"
+          ]
         }
       }
     },
@@ -684,12 +1115,23 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/categories/{{category_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","categories","{{category_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "categories",
+            "{{category_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -698,18 +1140,35 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Color\",\n  \"code\": \"COLOR\",\n  \"type\": \"ENUM\",\n  \"description\": \"Product color options\",\n  \"isVariantDefining\": true,\n  \"isRequired\": false,\n  \"applicableCategoryIds\": [],\n  \"sortOrder\": 0\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -720,12 +1179,28 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions?page=0&size=20&onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" },
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -737,10 +1212,20 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions?onlyActive=true",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "true" }
+            {
+              "key": "onlyActive",
+              "value": "true"
+            }
           ]
         }
       }
@@ -752,8 +1237,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "{{attribute_definition_id}}"
+          ]
         }
       }
     },
@@ -764,8 +1257,17 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/code/{{attribute_definition_code}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","code","{{attribute_definition_code}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "code",
+            "{{attribute_definition_code}}"
+          ]
         }
       }
     },
@@ -774,18 +1276,36 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "{{attribute_definition_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Product Color\",\n  \"description\": \"Updated description\",\n  \"isVariantDefining\": false,\n  \"isRequired\": true,\n  \"applicableCategoryIds\": [],\n  \"sortOrder\": 10\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -794,12 +1314,23 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "{{attribute_definition_id}}"
+          ]
         }
       }
     },
@@ -808,12 +1339,24 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "{{attribute_definition_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -822,18 +1365,37 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}/values",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}","values"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "{{attribute_definition_id}}",
+            "values"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"value\": \"Blue\",\n  \"code\": \"COLOR_BLUE\",\n  \"description\": \"Blue color option\",\n  \"swatchHex\": \"#1E90FF\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -844,12 +1406,30 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/definitions/{{attribute_definition_id}}/values?page=0&size=20&onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","definitions","{{attribute_definition_id}}","values"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "definitions",
+            "{{attribute_definition_id}}",
+            "values"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" },
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -861,8 +1441,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","values","{{attribute_value_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "values",
+            "{{attribute_value_id}}"
+          ]
         }
       }
     },
@@ -871,18 +1459,36 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","values","{{attribute_value_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "values",
+            "{{attribute_value_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"value\": \"Dark Blue\",\n  \"description\": \"Updated description\",\n  \"swatchHex\": \"#104E8B\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -891,12 +1497,23 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","values","{{attribute_value_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "values",
+            "{{attribute_value_id}}"
+          ]
         }
       }
     },
@@ -905,12 +1522,24 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/attributes/values/{{attribute_value_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","attributes","values","{{attribute_value_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "attributes",
+            "values",
+            "{{attribute_value_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -919,18 +1548,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Smartphone XYZ\",\n  \"description\": \"Latest smartphone model\",\n  \"brandId\": null,\n  \"categoryId\": null,\n  \"basePrice\": 99999,\n  \"expiryDate\": null\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -941,12 +1586,27 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products?page=0&size=20&onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" },
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -958,10 +1618,19 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products?onlyActive=true",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "true" }
+            {
+              "key": "onlyActive",
+              "value": "true"
+            }
           ]
         }
       }
@@ -973,10 +1642,20 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/search?q=smartphone",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","search"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "search"
+          ],
           "query": [
-            { "key": "q", "value": "smartphone" }
+            {
+              "key": "q",
+              "value": "smartphone"
+            }
           ]
         }
       }
@@ -988,8 +1667,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/brand/{{brand_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","brand","{{brand_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "brand",
+            "{{brand_id}}"
+          ]
         }
       }
     },
@@ -1000,8 +1687,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/category/{{category_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","category","{{category_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "category",
+            "{{category_id}}"
+          ]
         }
       }
     },
@@ -1012,8 +1707,15 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/expired",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","expired"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "expired"
+          ]
         }
       }
     },
@@ -1024,10 +1726,20 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/expiring-soon?days=30",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","expiring-soon"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "expiring-soon"
+          ],
           "query": [
-            { "key": "days", "value": "30" }
+            {
+              "key": "days",
+              "value": "30"
+            }
           ]
         }
       }
@@ -1039,8 +1751,15 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/{{product_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","{{product_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "{{product_id}}"
+          ]
         }
       }
     },
@@ -1051,8 +1770,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/name/Smartphone XYZ",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","name","Smartphone XYZ"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "name",
+            "Smartphone XYZ"
+          ]
         }
       }
     },
@@ -1061,18 +1788,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/{{product_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","{{product_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "{{product_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Smartphone XYZ Pro\",\n  \"description\": \"Updated description\",\n  \"basePrice\": 109999\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -1081,12 +1825,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/{{product_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","{{product_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "{{product_id}}"
+          ]
         }
       }
     },
@@ -1095,12 +1849,23 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/{{product_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","{{product_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "{{product_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -1109,18 +1874,36 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/{{product_id}}/variants",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","{{product_id}}","variants"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "{{product_id}}",
+            "variants"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"sku\": \"PHONE-XYZ-128GB-BLACK\",\n  \"gtin\": \"1234567890123\",\n  \"attributeValueIds\": [],\n  \"price\": 99999,\n  \"weight\": 200,\n  \"length\": 15,\n  \"width\": 7,\n  \"height\": 1\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -1131,10 +1914,21 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/products/{{product_id}}/variants?onlyActive=true",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","products","{{product_id}}","variants"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "products",
+            "{{product_id}}",
+            "variants"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "true" }
+            {
+              "key": "onlyActive",
+              "value": "true"
+            }
           ]
         }
       }
@@ -1146,12 +1940,27 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants?page=0&size=20&onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" },
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -1163,10 +1972,20 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/by-attributes?attributeValueIds={{attribute_value_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","by-attributes"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "by-attributes"
+          ],
           "query": [
-            { "key": "attributeValueIds", "value": "{{attribute_value_id}}" }
+            {
+              "key": "attributeValueIds",
+              "value": "{{attribute_value_id}}"
+            }
           ]
         }
       }
@@ -1178,8 +1997,15 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","{{variant_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "{{variant_id}}"
+          ]
         }
       }
     },
@@ -1190,8 +2016,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/sku/PHONE-XYZ-128GB-BLACK",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","sku","PHONE-XYZ-128GB-BLACK"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "sku",
+            "PHONE-XYZ-128GB-BLACK"
+          ]
         }
       }
     },
@@ -1202,8 +2036,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/gtin/1234567890123",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","gtin","1234567890123"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "gtin",
+            "1234567890123"
+          ]
         }
       }
     },
@@ -1212,18 +2054,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","{{variant_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "{{variant_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"price\": 109999,\n  \"weight\": 210\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -1232,12 +2091,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","{{variant_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "{{variant_id}}"
+          ]
         }
       }
     },
@@ -1246,12 +2115,23 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/variants/{{variant_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","variants","{{variant_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "variants",
+            "{{variant_id}}",
+            "activate"
+          ]
         }
       }
     },
@@ -1260,18 +2140,34 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses"
+          ]
         },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"code\": \"WH-MAIN\",\n  \"name\": \"Main Warehouse\",\n  \"description\": \"Central warehouse for inventory management\",\n  \"type\": \"MAIN\",\n  \"address\": \"123 Industrial Ave\",\n  \"city\": \"São Paulo\",\n  \"state\": \"SP\",\n  \"postalCode\": \"01234-567\",\n  \"country\": \"Brazil\",\n  \"phone\": \"+55 11 98765-4321\",\n  \"email\": \"warehouse@stockshift.com\",\n  \"managerName\": \"John Doe\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "raw": "{\n  \"code\": \"WH-MAIN\",\n  \"name\": \"Main Warehouse\",\n  \"description\": \"Central warehouse for inventory management\",\n  \"type\": \"MAIN\",\n  \"address\": \"123 Industrial Ave\",\n  \"city\": \"S\u00e3o Paulo\",\n  \"state\": \"SP\",\n  \"postalCode\": \"01234-567\",\n  \"country\": \"Brazil\",\n  \"phone\": \"+55 11 98765-4321\",\n  \"email\": \"warehouse@stockshift.com\",\n  \"managerName\": \"John Doe\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -1282,12 +2178,27 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses?page=0&size=20&onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses"
+          ],
           "query": [
-            { "key": "page", "value": "0" },
-            { "key": "size", "value": "20" },
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -1299,10 +2210,19 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses?onlyActive=true",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "true" }
+            {
+              "key": "onlyActive",
+              "value": "true"
+            }
           ]
         }
       }
@@ -1314,10 +2234,21 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/type/MAIN?onlyActive=false",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","type","MAIN"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "type",
+            "MAIN"
+          ],
           "query": [
-            { "key": "onlyActive", "value": "false" }
+            {
+              "key": "onlyActive",
+              "value": "false"
+            }
           ]
         }
       }
@@ -1329,10 +2260,20 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/search?query=main",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","search"],
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "search"
+          ],
           "query": [
-            { "key": "query", "value": "main" }
+            {
+              "key": "query",
+              "value": "main"
+            }
           ]
         }
       }
@@ -1344,8 +2285,15 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","{{warehouse_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "{{warehouse_id}}"
+          ]
         }
       }
     },
@@ -1356,8 +2304,16 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/code/WH-MAIN",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","code","WH-MAIN"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "code",
+            "WH-MAIN"
+          ]
         }
       }
     },
@@ -1366,18 +2322,35 @@
       "request": {
         "method": "PUT",
         "header": [
-          { "key": "Content-Type", "value": "application/json" },
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","{{warehouse_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "{{warehouse_id}}"
+          ]
         },
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Main Warehouse - Updated\",\n  \"description\": \"Updated description\",\n  \"phone\": \"+55 11 98765-9999\",\n  \"managerName\": \"Jane Smith\"\n}",
-          "options": { "raw": { "language": "json" } }
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -1386,12 +2359,22 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","{{warehouse_id}}"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "{{warehouse_id}}"
+          ]
         }
       }
     },
@@ -1400,31 +2383,200 @@
       "request": {
         "method": "PATCH",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{access_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
         ],
         "url": {
           "raw": "{{baseUrl}}/api/v1/warehouses/{{warehouse_id}}/activate",
-          "host": ["{{baseUrl}}"],
-          "path": ["api","v1","warehouses","{{warehouse_id}}","activate"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "warehouses",
+            "{{warehouse_id}}",
+            "activate"
+          ]
+        }
+      }
+    },
+    {
+      "name": "83. Create Stock Event",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "demo-key-123"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stock-events",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "stock-events"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"INBOUND\",\n  \"warehouseId\": \"{{warehouse_id}}\",\n  \"occurredAt\": \"2024-05-01T12:00:00Z\",\n  \"reasonCode\": \"PURCHASE\",\n  \"notes\": \"Initial replenishment\",\n  \"lines\": [\n    {\n      \"variantId\": \"{{variant_id}}\",\n      \"quantity\": 10\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "84. Get Stock Event by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stock-events/{{stock_event_id}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "stock-events",
+            "{{stock_event_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "85. List Stock Events",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/stock-events?warehouseId={{warehouse_id}}&type=INBOUND&reasonCode=PURCHASE&page=0&size=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "stock-events"
+          ],
+          "query": [
+            {
+              "key": "warehouseId",
+              "value": "{{warehouse_id}}"
+            },
+            {
+              "key": "type",
+              "value": "INBOUND"
+            },
+            {
+              "key": "reasonCode",
+              "value": "PURCHASE"
+            },
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
+          ]
         }
       }
     }
   ],
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" },
-    { "key": "access_token", "value": "dev-access-token-12345678901234567890123456789012345678901234567890" },
-    { "key": "refresh_token", "value": "dev-refresh-token-12345678901234567890123456789012345678901234567890" },
-    { "key": "user_id", "value": "USER_ID_HERE" },
-    { "key": "test_username", "value": "testuser" },
-    { "key": "test_password", "value": "testpass123" },
-    { "key": "test_email", "value": "test@stockshift.com" },
-    { "key": "attribute_definition_code", "value": "ATTRIBUTE_DEFINITION_CODE_HERE" },
-    { "key": "brand_id", "value": "BRAND_ID_HERE" },
-    { "key": "category_id", "value": "CATEGORY_ID_HERE" },
-    { "key": "attribute_definition_id", "value": "ATTRIBUTE_DEFINITION_ID_HERE" },
-    { "key": "attribute_value_id", "value": "ATTRIBUTE_VALUE_ID_HERE" },
-    { "key": "product_id", "value": "PRODUCT_ID_HERE" },
-    { "key": "variant_id", "value": "VARIANT_ID_HERE" },
-    { "key": "warehouse_id", "value": "WAREHOUSE_ID_HERE" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "access_token",
+      "value": "dev-access-token-12345678901234567890123456789012345678901234567890"
+    },
+    {
+      "key": "refresh_token",
+      "value": "dev-refresh-token-12345678901234567890123456789012345678901234567890"
+    },
+    {
+      "key": "user_id",
+      "value": "USER_ID_HERE"
+    },
+    {
+      "key": "test_username",
+      "value": "testuser"
+    },
+    {
+      "key": "test_password",
+      "value": "testpass123"
+    },
+    {
+      "key": "test_email",
+      "value": "test@stockshift.com"
+    },
+    {
+      "key": "attribute_definition_code",
+      "value": "ATTRIBUTE_DEFINITION_CODE_HERE"
+    },
+    {
+      "key": "brand_id",
+      "value": "BRAND_ID_HERE"
+    },
+    {
+      "key": "category_id",
+      "value": "CATEGORY_ID_HERE"
+    },
+    {
+      "key": "attribute_definition_id",
+      "value": "ATTRIBUTE_DEFINITION_ID_HERE"
+    },
+    {
+      "key": "attribute_value_id",
+      "value": "ATTRIBUTE_VALUE_ID_HERE"
+    },
+    {
+      "key": "product_id",
+      "value": "PRODUCT_ID_HERE"
+    },
+    {
+      "key": "variant_id",
+      "value": "VARIANT_ID_HERE"
+    },
+    {
+      "key": "warehouse_id",
+      "value": "WAREHOUSE_ID_HERE"
+    },
+    {
+      "key": "stock_event_id",
+      "value": "STOCK_EVENT_ID_HERE"
+    }
   ]
 }
