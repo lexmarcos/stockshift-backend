@@ -592,6 +592,72 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
     }
 
+    // Stock Transfer Exception Handlers
+
+    @ExceptionHandler(com.stockshift.backend.domain.stock.exception.TransferNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTransferNotFound(
+            com.stockshift.backend.domain.stock.exception.TransferNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Transfer Not Found",
+                HttpStatus.NOT_FOUND.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.domain.stock.exception.TransferNotDraftException.class)
+    public ResponseEntity<ErrorResponse> handleTransferNotDraft(
+            com.stockshift.backend.domain.stock.exception.TransferNotDraftException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Transfer Not Draft",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.domain.stock.exception.SameWarehouseTransferException.class)
+    public ResponseEntity<ErrorResponse> handleSameWarehouseTransfer(
+            com.stockshift.backend.domain.stock.exception.SameWarehouseTransferException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Same Warehouse Transfer",
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(com.stockshift.backend.domain.stock.exception.TransferIdempotencyConflictException.class)
+    public ResponseEntity<ErrorResponse> handleTransferIdempotencyConflict(
+            com.stockshift.backend.domain.stock.exception.TransferIdempotencyConflictException ex,
+            HttpServletRequest request
+    ) {
+        ErrorResponse error = new ErrorResponse(
+                "about:blank",
+                "Transfer Idempotency Conflict",
+                HttpStatus.CONFLICT.value(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                OffsetDateTime.now()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex,

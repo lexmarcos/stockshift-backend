@@ -252,6 +252,15 @@ server:
 * Use `TestRestTemplate` (already configured in current suites) with JSON headers + bearer token helper methods. Keep lifecycle tests idempotent by generating unique suffixes (`UUID.randomUUID()` etc.).
 * Guardrail: never assume these credentials exist in production or CI prod-like runs; wrap usage in dev-only toggles where appropriate.
 
+**Critical: Controller `@PathVariable` and `@RequestParam` annotations**
+
+* **Always specify the parameter name explicitly** in `@PathVariable` and `@RequestParam` annotations in controllers.
+* ✅ **Correct:** `@PathVariable("id") UUID id` or `@RequestParam("name") String name`
+* ❌ **Wrong:** `@PathVariable UUID id` or `@RequestParam String name`
+* **Reason:** VS Code uses the Eclipse JDT compiler, which does not preserve parameter names by default even with Gradle's `-parameters` flag. Omitting the explicit name causes a runtime error: `"Name for argument of type [java.util.UUID] not specified, and parameter name information not available via reflection"`.
+* **Impact:** Tests pass in Gradle CLI but fail when run from VS Code's test runner with `400 BAD_REQUEST`.
+* **Rule:** When creating or modifying controllers, always include explicit names in Spring MVC annotations to ensure compatibility across all compilation environments.
+
 > **Agents: pay special attention to the following rules whenever modifying or generating code in the `application/service` layer:**
 
 1. **Whenever you modify an existing service** (e.g., adding, renaming, or changing business logic in `src/main/java/com/stockshift/backend/application/service`), you must **immediately run all unit tests** under:
@@ -290,6 +299,14 @@ Use the Spring Boot plugin and Spring BOM. When asked to add libs, prefer:
 * **Testcontainers:** `org.testcontainers:junit-jupiter`, `org.testcontainers:postgresql`
 
 Common tasks: `./gradlew bootRun`, `test`, `build`
+
+**Gradle execution rules:**
+
+* **Always use `--no-daemon` flag** when running Gradle commands in terminal tools.
+* ✅ **Correct:** `./gradlew test --no-daemon` or `./gradlew build --no-daemon`
+* ❌ **Wrong:** `./gradlew test` (without `--no-daemon`)
+* **Reason:** The Gradle daemon can cause resource leaks and conflicts in development environments, especially when running tests or builds from automated agents.
+* **Rule:** All Gradle commands executed via terminal tools must include the `--no-daemon` flag to ensure clean, isolated builds.
 
 ---
 

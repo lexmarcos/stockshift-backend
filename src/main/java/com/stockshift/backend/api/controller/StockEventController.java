@@ -44,8 +44,7 @@ public class StockEventController {
     public ResponseEntity<StockEventResponse> createStockEvent(
             @Valid @RequestBody CreateStockEventRequest request,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         User currentUser = extractUser(authentication);
         StockEvent event = stockEventService.createStockEvent(request, idempotencyKey, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(stockEventMapper.toResponse(event));
@@ -55,8 +54,7 @@ public class StockEventController {
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'SELLER')")
     public ResponseEntity<StockEventResponse> getStockEvent(
             @PathVariable("id") UUID id,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         User currentUser = extractUser(authentication);
         StockEvent event = stockEventService.getStockEvent(id, currentUser);
         return ResponseEntity.ok(stockEventMapper.toResponse(event));
@@ -72,8 +70,7 @@ public class StockEventController {
             @RequestParam(value = "occurredTo", required = false) OffsetDateTime occurredTo,
             @RequestParam(value = "reasonCode", required = false) StockReasonCode reasonCode,
             @PageableDefault(size = 20, sort = "occurredAt", direction = Sort.Direction.DESC) Pageable pageable,
-            Authentication authentication
-    ) {
+            Authentication authentication) {
         User currentUser = extractUser(authentication);
         Page<StockEvent> events = stockEventService.listStockEvents(
                 type,
@@ -83,8 +80,7 @@ public class StockEventController {
                 occurredTo,
                 reasonCode,
                 pageable,
-                currentUser
-        );
+                currentUser);
         Page<StockEventResponse> responsePage = events.map(stockEventMapper::toResponse);
         return ResponseEntity.ok(responsePage);
     }
