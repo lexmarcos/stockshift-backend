@@ -43,6 +43,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/variants/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/warehouses/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                        // Swagger UI e OpenAPI
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
@@ -55,6 +58,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @SuppressWarnings("deprecation")
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
         authProvider.setUserDetailsService(userDetailsService);
