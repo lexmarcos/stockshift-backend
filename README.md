@@ -1,238 +1,45 @@
-# Stockshift Backend
+# Stockshift Study Project
 
-Sistema de gerenciamento de estoque desenvolvido com Spring Boot seguindo princípios de Domain-Driven Design (DDD-lite) e arquitetura hexagonal.
+This repository is a learning experiment: we want to see how far a full **backend + frontend** stack can go when built entirely with AI assistance. Expect rough edges; the goal is to stress workflows, find gaps, and iterate.
+To boost confidence while iterating with agents, every route is backed by unit tests and end-to-end coverage where feasible.
 
-## 🏗️ Stack Tecnológica
+## Tech Snapshot
 
-- **Java**: 21
-- **Spring Boot**: 3.5.6
-- **Spring Security**: JWT Authentication
-- **Spring Data JPA**: Persistência com PostgreSQL
-- **Lombok**: Redução de boilerplate
-- **Gradle**: Build tool
-- **PostgreSQL**: Database
+- **Java:** 17
+- **Spring Boot:** 3.3.5
+- **Gradle (Groovy DSL)**
 
-## 📋 Pré-requisitos
+## Why the Extra Docs?
 
-- Java 21
-- PostgreSQL 12+
-- Gradle 8+ (ou use o wrapper incluído `./gradlew`)
+To help future agents (and humans) produce consistent changes, we keep two concise guides in the repo:
 
-## ⚙️ Configuração
+- `AGENTS.md` — architecture & process instructions (layers, invariants, testing rules).
+- `front-instructions/` — endpoint cheat sheets for frontend consumers (one Markdown per route group).
 
-### 1. Banco de Dados
+Read both before automating updates; they drastically reduce guesswork.
 
-Crie o banco de dados PostgreSQL:
+## Running the Backend
 
-```sql
-CREATE DATABASE stockshift;
-CREATE USER stockshift WITH PASSWORD 'stockshift';
-GRANT ALL PRIVILEGES ON DATABASE stockshift TO stockshift;
-```
+Assuming Java 17 is installed and PostgreSQL is reachable (defaults: `jdbc:postgresql://localhost:5432/stockshift`, user/password `stockshift`):
 
-### 2. Configuração da Aplicação
-
-As configurações estão em `src/main/resources/application.properties`:
-
-```properties
-spring.datasource.url=jdbc:postgresql://localhost:5432/stockshift
-spring.datasource.username=stockshift
-spring.datasource.password=stockshift
-
-jwt.secret=your-256-bit-secret-key-change-this-in-production
-jwt.access-token-expiration=3600000  # 1 hour
-jwt.refresh-token-expiration=86400000  # 24 hours
-```
-
-⚠️ **IMPORTANTE**: Altere o `jwt.secret` antes de colocar em produção!
-
-## 🚀 Executando a Aplicação
-
-### Via Gradle Wrapper (recomendado)
 ```bash
-./gradlew bootRun
-```
+# Run with the Gradle wrapper (recommended)
+./gradlew bootRun --no-daemon
 
-### Via Gradle instalado
-```bash
-gradle bootRun
-```
-
-### Build e Run do JAR
-```bash
-./gradlew build
+# Or package + run the jar
+./gradlew build --no-daemon
 java -jar build/libs/backend-0.0.1-SNAPSHOT.jar
 ```
 
-A aplicação estará disponível em: `http://localhost:8080`
+The API listens on `http://localhost:8080` by default.
 
-## 🔐 Autenticação
+## Test & Docs Routines
 
-A API usa JWT (JSON Web Tokens) para autenticação. Consulte a documentação completa em:
-- [AUTH_API.md](AUTH_API.md) - Guia de uso da API
-- [IMPLEMENTACAO_AUTH.md](IMPLEMENTACAO_AUTH.md) - Detalhes da implementação
+- **Unit tests** — `./gradlew test --no-daemon`
+  - Focus on services and controllers; kept comprehensive so agents instantly spot regressions.
+- **E2E API suites (JUnit)** — `./gradlew test --no-daemon --tests 'com.stockshift.backend.api.*'`
+  - Live under `src/test/java/com/stockshift/backend/api/`; they exercise the HTTP surface end-to-end using `TestRestTemplate`.
+- **Swagger UI** — `http://localhost:8080/swagger-ui/index.html`
+  - Run the app, then explore the interactive docs (remember to add `Authorization: Bearer <token>` after logging in).
 
-### Usuários Padrão
-
-| Username | Password    | Role    |
-|----------|-------------|---------|
-| admin    | admin123    | ADMIN   |
-| manager  | manager123  | MANAGER |
-| seller   | seller123   | SELLER  |
-
-### 🧪 Usuário de Teste (Desenvolvimento)
-
-Para facilitar testes de API e E2E, existe um usuário especial criado automaticamente em desenvolvimento:
-
-- **Username:** `testuser`
-- **Password:** `testpass123`
-- **Role:** `ADMIN`
-- **Tokens Fixos:** Disponíveis para automação de testes
-
-📖 **Documentação completa:** [TEST_USER.md](TEST_USER.md)
-
-🔧 **Endpoint para obter credenciais:**
-```bash
-curl http://localhost:8080/api/v1/dev/test-user
-```
-
-### Quick Start
-
-1. **Login**:
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
-```
-
-2. **Usar o token nas requisições**:
-```bash
-curl -X GET http://localhost:8080/api/v1/test/authenticated \
-  -H "Authorization: Bearer {seu_access_token}"
-```
-
-## 📘 Documentação Swagger
-
-Com a aplicação em execução, a documentação interativa está disponível em:
-
-- Swagger UI: `http://localhost:8080/swagger-ui/index.html`
-- Esquema OpenAPI (JSON): `http://localhost:8080/v3/api-docs`
-
-Requisições protegidas exigem incluir o header `Authorization: Bearer <token>` após realizar login.
-
-Para ambientes diferentes, ajuste a URL do servidor diretamente pela interface do Swagger UI.
-
-## 🧪 Testes
-
-### Executar testes automatizados
-```bash
-./test-api.sh
-```
-
-### Usar coleção Postman/Insomnia
-
-#### 🚀 Configuração Rápida do Postman
-1. **Importe a collection:** `postman-collection.json`
-2. **Importe o environment:** `postman.enviroment.json`
-3. **Selecione o environment "Stockshift - Local"**
-
-#### 🤖 Testes E2E Automatizados
-- **Credenciais pré-configuradas:** Usuário de teste com tokens fixos já incluídos
-- **Scripts automáticos:** Todos os logins atualizam tokens automaticamente
-- **Execute "0. Get Test User Credentials (Dev)"** para configuração dinâmica
-
-📖 **Guia completo:** [setup-postman-e2e.md](setup-postman-e2e.md)
-
-## 📁 Estrutura do Projeto
-
-```
-src/main/java/com/stockshift/backend/
-├── api/                    # Controllers e DTOs
-│   ├── controller/
-│   ├── dto/
-│   └── exception/
-├── application/            # Use cases e serviços
-│   └── service/
-├── domain/                 # Entidades e lógica de negócio
-│   └── user/
-└── infrastructure/         # Configurações e adaptadores
-    ├── config/
-    ├── repository/
-    └── security/
-```
-
-## 📚 Endpoints Disponíveis
-
-### Autenticação
-- `POST /api/v1/auth/login` - Login
-- `POST /api/v1/auth/refresh` - Renovar access token
-- `POST /api/v1/auth/logout` - Logout
-
-### Teste (Debug)
-- `GET /api/v1/test/public` - Endpoint público
-- `GET /api/v1/test/authenticated` - Requer autenticação
-- `GET /api/v1/test/admin` - Requer role ADMIN
-- `GET /api/v1/test/manager` - Requer role ADMIN ou MANAGER
-
-## 🏗️ Arquitetura
-
-Este projeto segue os princípios de:
-
-- **Domain-Driven Design (DDD)**: Separação clara entre domínio, aplicação e infraestrutura
-- **Arquitetura Hexagonal**: Isolamento da lógica de negócio
-- **SOLID**: Princípios de design orientado a objetos
-- **Clean Code**: Código limpo e manutenível
-
-Consulte [.github/copilot-instructions.md](.github/copilot-instructions.md) para detalhes completos da arquitetura.
-
-## 🔧 Build
-
-```bash
-# Compilar
-./gradlew build
-
-# Compilar sem testes
-./gradlew build -x test
-
-# Limpar e compilar
-./gradlew clean build
-
-# Executar testes
-./gradlew test
-```
-
-## 📝 Logs
-
-Os logs são configurados para:
-- Mostrar SQL formatado (desenvolvimento)
-- Timezone UTC
-- Incluir mensagens de erro e binding errors
-
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto é privado e proprietário.
-
-## 👥 Autores
-
-- Desenvolvimento inicial - Stockshift Team
-
-## 🐛 Reportando Bugs
-
-Encontrou um bug? Abra uma issue com:
-- Descrição detalhada
-- Steps to reproduce
-- Comportamento esperado vs atual
-- Screenshots (se aplicável)
-- Versão do Java e OS
-
-## 📞 Suporte
-
-Para suporte, entre em contato através do repositório do projeto.
+Creating and maintaining these checks was intentional: they act as guardrails so automated contributors can detect breaking changes quickly.

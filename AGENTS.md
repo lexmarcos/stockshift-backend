@@ -359,5 +359,6 @@ Common tasks: `./gradlew bootRun`, `test`, `build`
 
 ## 14) Workflow & communication rules
 
-* Do **not** create standalone Markdown documents (e.g., README updates, CHANGELOG entries, or new *.md files) to explain or summarize your changes. Provide a short summary of what you generated/modified **in the agent response only**.
+* Do **not** create standalone Markdown documents (e.g., README updates, CHANGELOG entries, or new *.md files) unless the user **explicitly requests** their creation. For regular tasks, provide a short summary of what you generated/modified **in the agent response only**.
+
 * After **any modification or addition** within `application/service`, **run all unit tests** in `src/test/java/com/stockshift/backend/application/service` and **ensure coverage for the modified logic** before committing changes.
