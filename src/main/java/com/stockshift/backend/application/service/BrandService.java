@@ -2,9 +2,9 @@ package com.stockshift.backend.application.service;
 
 import com.stockshift.backend.api.dto.brand.CreateBrandRequest;
 import com.stockshift.backend.api.dto.brand.UpdateBrandRequest;
-import com.stockshift.backend.api.exception.BrandAlreadyExistsException;
-import com.stockshift.backend.api.exception.BrandNotFoundException;
 import com.stockshift.backend.domain.brand.Brand;
+import com.stockshift.backend.domain.brand.exception.BrandAlreadyExistsException;
+import com.stockshift.backend.domain.brand.exception.BrandNotFoundException;
 import com.stockshift.backend.infrastructure.repository.BrandRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,7 +24,7 @@ public class BrandService {
     public Brand createBrand(CreateBrandRequest request) {
         // Verify if brand name already exists
         if (brandRepository.existsByName(request.getName())) {
-            throw new BrandAlreadyExistsException("Brand already exists: " + request.getName());
+            throw new BrandAlreadyExistsException(request.getName());
         }
 
         Brand brand = new Brand();
@@ -38,13 +38,13 @@ public class BrandService {
     @Transactional(readOnly = true)
     public Brand getBrandById(UUID id) {
         return brandRepository.findById(id)
-                .orElseThrow(() -> new BrandNotFoundException("Brand not found with id: " + id));
+                .orElseThrow(() -> new BrandNotFoundException(id));
     }
 
     @Transactional(readOnly = true)
     public Brand getBrandByName(String name) {
         return brandRepository.findByName(name)
-                .orElseThrow(() -> new BrandNotFoundException("Brand not found with name: " + name));
+                .orElseThrow(() -> new BrandNotFoundException(name));
     }
 
     @Transactional(readOnly = true)
@@ -63,9 +63,9 @@ public class BrandService {
 
         if (request.getName() != null) {
             // Check if name is already used by another brand
-            if (brandRepository.existsByName(request.getName()) && 
+            if (brandRepository.existsByName(request.getName()) &&
                 !brand.getName().equals(request.getName())) {
-                throw new BrandAlreadyExistsException("Brand already exists: " + request.getName());
+                throw new BrandAlreadyExistsException(request.getName());
             }
             brand.setName(request.getName());
         }

@@ -2,9 +2,9 @@ package com.stockshift.backend.application.service;
 
 import com.stockshift.backend.api.dto.brand.CreateBrandRequest;
 import com.stockshift.backend.api.dto.brand.UpdateBrandRequest;
-import com.stockshift.backend.api.exception.BrandAlreadyExistsException;
-import com.stockshift.backend.api.exception.BrandNotFoundException;
 import com.stockshift.backend.domain.brand.Brand;
+import com.stockshift.backend.domain.brand.exception.BrandAlreadyExistsException;
+import com.stockshift.backend.domain.brand.exception.BrandNotFoundException;
 import com.stockshift.backend.infrastructure.repository.BrandRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,7 +70,7 @@ class BrandServiceTest {
 
         assertThatThrownBy(() -> brandService.createBrand(request))
                 .isInstanceOf(BrandAlreadyExistsException.class)
-                .hasMessageContaining("Brand already exists");
+                .hasMessageContaining("Brand already exists with name");
 
         verify(brandRepository).existsByName(request.getName());
         verify(brandRepository, never()).save(any(Brand.class));
@@ -176,7 +176,7 @@ class BrandServiceTest {
 
         assertThatThrownBy(() -> brandService.updateBrand(id, request))
                 .isInstanceOf(BrandAlreadyExistsException.class)
-                .hasMessageContaining("Brand already exists");
+                .hasMessageContaining("Brand already exists with name");
 
         verify(brandRepository).findById(id);
         verify(brandRepository).existsByName(request.getName());

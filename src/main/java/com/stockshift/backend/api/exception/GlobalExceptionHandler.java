@@ -411,6 +411,10 @@ public class GlobalExceptionHandler {
             RuntimeException ex,
             HttpServletRequest request
     ) {
+        if (ex instanceof BrandAlreadyExistsException brandAlreadyExistsException) {
+            return handleBrandAlreadyExists(brandAlreadyExistsException, request);
+        }
+
         ErrorResponse error = new ErrorResponse(
                 "about:blank",
                 "Error",
