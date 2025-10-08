@@ -12,6 +12,7 @@ import {
   deleteProduct,
   generateProductPayload,
   provisionProductDependencies,
+  type ProductPayload,
 } from './product-fixtures';
 
 export interface VariantAttributeInput {
@@ -40,7 +41,7 @@ export interface VariantSetup {
 export async function createVariantTestContext(
   request: APIRequestContext,
   token: string,
-  options: { withGtin?: boolean } = {},
+  options: { withGtin?: boolean; productOverrides?: Partial<ProductPayload> } = {},
 ): Promise<VariantSetup> {
   const cleanups: Array<() => Promise<void>> = [];
 
@@ -50,10 +51,13 @@ export async function createVariantTestContext(
   });
   cleanups.push(deps.cleanup);
 
-  const product = await createProduct(request, token, generateProductPayload({
+  const productPayload = generateProductPayload({
     brandId: deps.brandId,
     categoryId: deps.categoryId,
-  }));
+    ...options.productOverrides,
+  });
+
+  const product = await createProduct(request, token, productPayload);
   cleanups.push(() => deleteProduct(request, token, product.id));
 
   const definition = await createAttributeDefinition(
