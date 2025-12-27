@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    url: jdbc:tc:postgresql:16:///testdb
+  jpa:
+    hibernate:
+      ddl-auto: validate
