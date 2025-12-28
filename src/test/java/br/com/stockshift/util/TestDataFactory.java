@@ -73,6 +73,7 @@ public class TestDataFactory {
         batch.setBatchCode("BATCH-" + UUID.randomUUID().toString().substring(0, 8));
         batch.setQuantity(quantity);
         batch.setCostPrice(BigDecimal.valueOf(10.00));
+        batch.setSellingPrice(BigDecimal.valueOf(15.00));
         batch.setExpirationDate(LocalDate.now().plusMonths(6));
         return repo.save(batch);
     }
