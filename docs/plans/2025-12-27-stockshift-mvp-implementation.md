@@ -1563,18 +1563,199 @@ git commit -m "feat: add custom UserDetails implementation"
 
 ---
 
+### Task 4.5: Create JWT Authentication Filter
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/security/JwtAuthenticationFilter.java`
+
+**Step 1: Create JwtAuthenticationFilter**
+
+Create `src/main/java/br/com/stockshift/security/JwtAuthenticationFilter.java`:
+
+```java
+package br.com.stockshift.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtTokenProvider tokenProvider;
+    private final CustomUserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
+        try {
+            String jwt = getJwtFromRequest(request);
+
+            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                UUID userId = tokenProvider.getUserIdFromToken(jwt);
+                UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
+
+                // Set tenant context
+                TenantContext.setTenantId(tenantId);
+
+                UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception ex) {
+            log.error("Could not set user authentication in security context", ex);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/security/JwtAuthenticationFilter.java
+git commit -m "feat: add JWT authentication filter"
+```
+
+---
+
+### Task 4.6: Integrate JWT Filter into Security Configuration
+
+**Files:**
+- Modify: `src/main/java/br/com/stockshift/config/SecurityConfig.java`
+
+**Step 1: Add JWT filter to security chain**
+
+Update `SecurityConfig.java` to add the JWT filter:
+
+```java
+package br.com.stockshift.config;
+
+import br.com.stockshift.security.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                // Swagger UI
+                .requestMatchers(
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/v3/api-docs/**",
+                    "/swagger-resources/**",
+                    "/webjars/**"
+                ).permitAll()
+                // Health check
+                .requestMatchers("/actuator/health/**").permitAll()
+                // Auth endpoints
+                .requestMatchers("/api/auth/**").permitAll()
+                // All other requests require authentication
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/config/SecurityConfig.java
+git commit -m "feat: integrate JWT filter into security chain"
+```
+
+---
+
 ## Note on Plan Execution
 
 This implementation plan covers the foundational phases of the StockShift MVP:
 
 **Completed Sections:**
-- Phase 1: Project Setup and Configuration
-- Phase 2: Database Schema (Flyway Migrations)
-- Phase 3: Core Entities and Enums
-- Phase 4: Authentication and Security (partial)
+- Phase 1: Project Setup and Configuration (Tasks 1.1-1.3) ✅
+- Phase 2: Database Schema (Tasks 2.1-2.8) ✅
+- Phase 3: Core Entities and Enums (Tasks 3.1-3.6) ✅
+- Phase 4: Authentication and Security (Tasks 4.1-4.6) ✅ COMPLETE
 
 **Remaining Work (to be added incrementally):**
-- Complete Phase 4: JWT Filter, Security Config
 - Phase 5: Exception Handling and DTOs
 - Phase 6: Authentication Service and Controller
 - Phase 7: Product Management
