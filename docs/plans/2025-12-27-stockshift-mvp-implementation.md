@@ -3673,6 +3673,2752 @@ git commit -m "feat: add Category and Product REST controllers"
 
 ---
 
+## Phase 8: Warehouse and Batch Management
+
+### Task 8.1: Create Warehouse and Batch Entities
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/model/entity/Warehouse.java`
+- Create: `src/main/java/br/com/stockshift/model/entity/Batch.java`
+
+**Step 1: Create Warehouse Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/Warehouse.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "warehouses", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"tenant_id", "name"})
+})
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class Warehouse extends TenantAwareEntity {
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "city", nullable = false, length = 100)
+    private String city;
+
+    @Column(name = "state", nullable = false, length = 2)
+    private String state;
+
+    @Column(name = "address", columnDefinition = "TEXT")
+    private String address;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = true;
+}
+```
+
+**Step 2: Create Batch Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/Batch.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "batches", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"tenant_id", "batch_code"})
+})
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class Batch extends TenantAwareEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id", nullable = false)
+    private Warehouse warehouse;
+
+    @Column(name = "batch_code", nullable = false, length = 100)
+    private String batchCode;
+
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version = 0L;
+
+    @Column(name = "manufactured_date")
+    private LocalDate manufacturedDate;
+
+    @Column(name = "expiration_date")
+    private LocalDate expirationDate;
+
+    @Column(name = "cost_price", precision = 15, scale = 2)
+    private BigDecimal costPrice;
+
+    @Column(name = "selling_price", precision = 15, scale = 2)
+    private BigDecimal sellingPrice;
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/model/entity/Warehouse.java src/main/java/br/com/stockshift/model/entity/Batch.java
+git commit -m "feat: add Warehouse and Batch entities with optimistic locking"
+```
+
+---
+
+### Task 8.2: Create Warehouse and Batch Repositories
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/repository/WarehouseRepository.java`
+- Create: `src/main/java/br/com/stockshift/repository/BatchRepository.java`
+
+**Step 1: Create WarehouseRepository**
+
+Create `src/main/java/br/com/stockshift/repository/WarehouseRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.Warehouse;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
+
+    @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId")
+    List<Warehouse> findAllByTenantId(UUID tenantId);
+
+    @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.id = :id")
+    Optional<Warehouse> findByTenantIdAndId(UUID tenantId, UUID id);
+
+    @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.isActive = :isActive")
+    List<Warehouse> findByTenantIdAndIsActive(UUID tenantId, Boolean isActive);
+
+    @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.name = :name")
+    Optional<Warehouse> findByTenantIdAndName(UUID tenantId, String name);
+}
+```
+
+**Step 2: Create BatchRepository**
+
+Create `src/main/java/br/com/stockshift/repository/BatchRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.Batch;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface BatchRepository extends JpaRepository<Batch, UUID> {
+
+    @Query("SELECT b FROM Batch b WHERE b.tenantId = :tenantId")
+    List<Batch> findAllByTenantId(UUID tenantId);
+
+    @Query("SELECT b FROM Batch b WHERE b.tenantId = :tenantId AND b.id = :id")
+    Optional<Batch> findByTenantIdAndId(UUID tenantId, UUID id);
+
+    @Query("SELECT b FROM Batch b WHERE b.tenantId = :tenantId AND b.batchCode = :batchCode")
+    Optional<Batch> findByTenantIdAndBatchCode(UUID tenantId, String batchCode);
+
+    @Query("SELECT b FROM Batch b WHERE b.warehouse.id = :warehouseId AND b.tenantId = :tenantId")
+    List<Batch> findByWarehouseIdAndTenantId(UUID warehouseId, UUID tenantId);
+
+    @Query("SELECT b FROM Batch b WHERE b.product.id = :productId AND b.tenantId = :tenantId")
+    List<Batch> findByProductIdAndTenantId(UUID productId, UUID tenantId);
+
+    @Query("SELECT b FROM Batch b WHERE b.product.id = :productId AND b.warehouse.id = :warehouseId AND b.tenantId = :tenantId")
+    List<Batch> findByProductIdAndWarehouseIdAndTenantId(UUID productId, UUID warehouseId, UUID tenantId);
+
+    @Query("SELECT b FROM Batch b WHERE b.expirationDate IS NOT NULL AND b.expirationDate BETWEEN :startDate AND :endDate AND b.tenantId = :tenantId ORDER BY b.expirationDate ASC")
+    List<Batch> findExpiringBatches(LocalDate startDate, LocalDate endDate, UUID tenantId);
+
+    @Query("SELECT b FROM Batch b WHERE b.quantity <= :threshold AND b.tenantId = :tenantId")
+    List<Batch> findLowStock(Integer threshold, UUID tenantId);
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/repository/
+git commit -m "feat: add Warehouse and Batch repositories with stock queries"
+```
+
+---
+
+### Task 8.3: Create Warehouse and Batch DTOs
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/dto/warehouse/WarehouseRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/warehouse/WarehouseResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/warehouse/BatchRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/warehouse/BatchResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/warehouse/StockSummaryResponse.java`
+
+**Step 1: Create warehouse DTO directory**
+
+```bash
+mkdir -p src/main/java/br/com/stockshift/dto/warehouse
+```
+
+**Step 2: Create WarehouseRequest**
+
+Create `src/main/java/br/com/stockshift/dto/warehouse/WarehouseRequest.java`:
+
+```java
+package br.com.stockshift.dto.warehouse;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class WarehouseRequest {
+    @NotBlank(message = "Warehouse name is required")
+    private String name;
+
+    @NotBlank(message = "City is required")
+    @Size(max = 100)
+    private String city;
+
+    @NotBlank(message = "State is required")
+    @Pattern(regexp = "[A-Z]{2}", message = "State must be 2 uppercase letters")
+    private String state;
+
+    private String address;
+
+    @Builder.Default
+    private Boolean isActive = true;
+}
+```
+
+**Step 3: Create WarehouseResponse**
+
+Create `src/main/java/br/com/stockshift/dto/warehouse/WarehouseResponse.java`:
+
+```java
+package br.com.stockshift.dto.warehouse;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class WarehouseResponse {
+    private UUID id;
+    private String name;
+    private String city;
+    private String state;
+    private String address;
+    private Boolean isActive;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+**Step 4: Create BatchRequest**
+
+Create `src/main/java/br/com/stockshift/dto/warehouse/BatchRequest.java`:
+
+```java
+package br.com.stockshift.dto.warehouse;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class BatchRequest {
+    @NotNull(message = "Product ID is required")
+    private UUID productId;
+
+    @NotNull(message = "Warehouse ID is required")
+    private UUID warehouseId;
+
+    @NotBlank(message = "Batch code is required")
+    private String batchCode;
+
+    @NotNull(message = "Quantity is required")
+    @PositiveOrZero(message = "Quantity must be zero or positive")
+    private Integer quantity;
+
+    private LocalDate manufacturedDate;
+    private LocalDate expirationDate;
+
+    @PositiveOrZero(message = "Cost price must be zero or positive")
+    private BigDecimal costPrice;
+
+    @PositiveOrZero(message = "Selling price must be zero or positive")
+    private BigDecimal sellingPrice;
+}
+```
+
+**Step 5: Create BatchResponse**
+
+Create `src/main/java/br/com/stockshift/dto/warehouse/BatchResponse.java`:
+
+```java
+package br.com.stockshift.dto.warehouse;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class BatchResponse {
+    private UUID id;
+    private UUID productId;
+    private String productName;
+    private UUID warehouseId;
+    private String warehouseName;
+    private String batchCode;
+    private Integer quantity;
+    private LocalDate manufacturedDate;
+    private LocalDate expirationDate;
+    private BigDecimal costPrice;
+    private BigDecimal sellingPrice;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+**Step 6: Create StockSummaryResponse**
+
+Create `src/main/java/br/com/stockshift/dto/warehouse/StockSummaryResponse.java`:
+
+```java
+package br.com.stockshift.dto.warehouse;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockSummaryResponse {
+    private UUID productId;
+    private String productName;
+    private UUID warehouseId;
+    private String warehouseName;
+    private Integer totalQuantity;
+    private LocalDate nearestExpiration;
+    private BigDecimal avgCostPrice;
+    private BigDecimal avgSellingPrice;
+}
+```
+
+**Step 7: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 8: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/dto/warehouse/
+git commit -m "feat: add Warehouse and Batch DTOs with validation"
+```
+
+---
+
+### Task 8.4: Create Warehouse and Batch Services
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/service/WarehouseService.java`
+- Create: `src/main/java/br/com/stockshift/service/BatchService.java`
+
+**Step 1: Create WarehouseService**
+
+Create `src/main/java/br/com/stockshift/service/WarehouseService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.dto.warehouse.WarehouseRequest;
+import br.com.stockshift.dto.warehouse.WarehouseResponse;
+import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.model.entity.Warehouse;
+import br.com.stockshift.repository.WarehouseRepository;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class WarehouseService {
+
+    private final WarehouseRepository warehouseRepository;
+
+    @Transactional
+    public WarehouseResponse create(WarehouseRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate unique name
+        warehouseRepository.findByTenantIdAndName(tenantId, request.getName())
+                .ifPresent(w -> {
+                    throw new BusinessException("Warehouse with name " + request.getName() + " already exists");
+                });
+
+        Warehouse warehouse = new Warehouse();
+        warehouse.setTenantId(tenantId);
+        warehouse.setName(request.getName());
+        warehouse.setCity(request.getCity());
+        warehouse.setState(request.getState());
+        warehouse.setAddress(request.getAddress());
+        warehouse.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
+
+        Warehouse saved = warehouseRepository.save(warehouse);
+        log.info("Created warehouse {} for tenant {}", saved.getId(), tenantId);
+
+        return mapToResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WarehouseResponse> findAll() {
+        UUID tenantId = TenantContext.getTenantId();
+        return warehouseRepository.findAllByTenantId(tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public WarehouseResponse findById(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+        Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+        return mapToResponse(warehouse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WarehouseResponse> findActive(Boolean isActive) {
+        UUID tenantId = TenantContext.getTenantId();
+        return warehouseRepository.findByTenantIdAndIsActive(tenantId, isActive).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public WarehouseResponse update(UUID id, WarehouseRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+
+        // Validate unique name if changed
+        if (!warehouse.getName().equals(request.getName())) {
+            warehouseRepository.findByTenantIdAndName(tenantId, request.getName())
+                    .ifPresent(w -> {
+                        throw new BusinessException("Warehouse with name " + request.getName() + " already exists");
+                    });
+        }
+
+        warehouse.setName(request.getName());
+        warehouse.setCity(request.getCity());
+        warehouse.setState(request.getState());
+        warehouse.setAddress(request.getAddress());
+        warehouse.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
+
+        Warehouse updated = warehouseRepository.save(warehouse);
+        log.info("Updated warehouse {} for tenant {}", id, tenantId);
+
+        return mapToResponse(updated);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+
+        warehouseRepository.delete(warehouse);
+        log.info("Deleted warehouse {} for tenant {}", id, tenantId);
+    }
+
+    private WarehouseResponse mapToResponse(Warehouse warehouse) {
+        return WarehouseResponse.builder()
+                .id(warehouse.getId())
+                .name(warehouse.getName())
+                .city(warehouse.getCity())
+                .state(warehouse.getState())
+                .address(warehouse.getAddress())
+                .isActive(warehouse.getIsActive())
+                .createdAt(warehouse.getCreatedAt())
+                .updatedAt(warehouse.getUpdatedAt())
+                .build();
+    }
+}
+```
+
+**Step 2: Create BatchService**
+
+Create `src/main/java/br/com/stockshift/service/BatchService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.dto.warehouse.BatchRequest;
+import br.com.stockshift.dto.warehouse.BatchResponse;
+import br.com.stockshift.dto.warehouse.StockSummaryResponse;
+import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.model.entity.Batch;
+import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.Warehouse;
+import br.com.stockshift.repository.BatchRepository;
+import br.com.stockshift.repository.ProductRepository;
+import br.com.stockshift.repository.WarehouseRepository;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class BatchService {
+
+    private final BatchRepository batchRepository;
+    private final ProductRepository productRepository;
+    private final WarehouseRepository warehouseRepository;
+
+    @Transactional
+    public BatchResponse create(BatchRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate unique batch code
+        batchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode())
+                .ifPresent(b -> {
+                    throw new BusinessException("Batch with code " + request.getBatchCode() + " already exists");
+                });
+
+        // Validate product
+        Product product = productRepository.findByTenantIdAndId(tenantId, request.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
+
+        // Validate warehouse
+        Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getWarehouseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+
+        // Validate expiration date if product has expiration
+        if (product.getHasExpiration() && request.getExpirationDate() == null) {
+            throw new BusinessException("Expiration date is required for products with expiration tracking");
+        }
+
+        Batch batch = new Batch();
+        batch.setTenantId(tenantId);
+        batch.setProduct(product);
+        batch.setWarehouse(warehouse);
+        batch.setBatchCode(request.getBatchCode());
+        batch.setQuantity(request.getQuantity());
+        batch.setManufacturedDate(request.getManufacturedDate());
+        batch.setExpirationDate(request.getExpirationDate());
+        batch.setCostPrice(request.getCostPrice());
+        batch.setSellingPrice(request.getSellingPrice());
+
+        Batch saved = batchRepository.save(batch);
+        log.info("Created batch {} for tenant {}", saved.getId(), tenantId);
+
+        return mapToResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BatchResponse> findAll() {
+        UUID tenantId = TenantContext.getTenantId();
+        return batchRepository.findAllByTenantId(tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public BatchResponse findById(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+        Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
+        return mapToResponse(batch);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BatchResponse> findByWarehouse(UUID warehouseId) {
+        UUID tenantId = TenantContext.getTenantId();
+        return batchRepository.findByWarehouseIdAndTenantId(warehouseId, tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<BatchResponse> findByProduct(UUID productId) {
+        UUID tenantId = TenantContext.getTenantId();
+        return batchRepository.findByProductIdAndTenantId(productId, tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<BatchResponse> findExpiringBatches(Integer daysAhead) {
+        UUID tenantId = TenantContext.getTenantId();
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(daysAhead);
+
+        return batchRepository.findExpiringBatches(startDate, endDate, tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<BatchResponse> findLowStock(Integer threshold) {
+        UUID tenantId = TenantContext.getTenantId();
+        return batchRepository.findLowStock(threshold, tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public BatchResponse update(UUID id, BatchRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
+
+        // Validate unique batch code if changed
+        if (!batch.getBatchCode().equals(request.getBatchCode())) {
+            batchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode())
+                    .ifPresent(b -> {
+                        throw new BusinessException("Batch with code " + request.getBatchCode() + " already exists");
+                    });
+        }
+
+        // Validate product if changed
+        if (!batch.getProduct().getId().equals(request.getProductId())) {
+            Product product = productRepository.findByTenantIdAndId(tenantId, request.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
+            batch.setProduct(product);
+        }
+
+        // Validate warehouse if changed
+        if (!batch.getWarehouse().getId().equals(request.getWarehouseId())) {
+            Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getWarehouseId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+            batch.setWarehouse(warehouse);
+        }
+
+        batch.setBatchCode(request.getBatchCode());
+        batch.setQuantity(request.getQuantity());
+        batch.setManufacturedDate(request.getManufacturedDate());
+        batch.setExpirationDate(request.getExpirationDate());
+        batch.setCostPrice(request.getCostPrice());
+        batch.setSellingPrice(request.getSellingPrice());
+
+        try {
+            Batch updated = batchRepository.save(batch);
+            log.info("Updated batch {} for tenant {}", id, tenantId);
+            return mapToResponse(updated);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new BusinessException("Batch was modified by another transaction. Please retry.");
+        }
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
+
+        batchRepository.delete(batch);
+        log.info("Deleted batch {} for tenant {}", id, tenantId);
+    }
+
+    private BatchResponse mapToResponse(Batch batch) {
+        return BatchResponse.builder()
+                .id(batch.getId())
+                .productId(batch.getProduct().getId())
+                .productName(batch.getProduct().getName())
+                .warehouseId(batch.getWarehouse().getId())
+                .warehouseName(batch.getWarehouse().getName())
+                .batchCode(batch.getBatchCode())
+                .quantity(batch.getQuantity())
+                .manufacturedDate(batch.getManufacturedDate())
+                .expirationDate(batch.getExpirationDate())
+                .costPrice(batch.getCostPrice())
+                .sellingPrice(batch.getSellingPrice())
+                .createdAt(batch.getCreatedAt())
+                .updatedAt(batch.getUpdatedAt())
+                .build();
+    }
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/service/WarehouseService.java src/main/java/br/com/stockshift/service/BatchService.java
+git commit -m "feat: add Warehouse and Batch services with optimistic locking"
+```
+
+---
+
+### Task 8.5: Create Warehouse and Batch Controllers
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/controller/WarehouseController.java`
+- Create: `src/main/java/br/com/stockshift/controller/BatchController.java`
+
+**Step 1: Create WarehouseController**
+
+Create `src/main/java/br/com/stockshift/controller/WarehouseController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.warehouse.WarehouseRequest;
+import br.com.stockshift.dto.warehouse.WarehouseResponse;
+import br.com.stockshift.service.WarehouseService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/warehouses")
+@RequiredArgsConstructor
+@Tag(name = "Warehouses", description = "Warehouse management endpoints")
+public class WarehouseController {
+
+    private final WarehouseService warehouseService;
+
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_CREATE', 'ADMIN')")
+    @Operation(summary = "Create a new warehouse")
+    public ResponseEntity<ApiResponse<WarehouseResponse>> create(@Valid @RequestBody WarehouseRequest request) {
+        WarehouseResponse response = warehouseService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Warehouse created successfully", response));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ADMIN')")
+    @Operation(summary = "Get all warehouses")
+    public ResponseEntity<ApiResponse<List<WarehouseResponse>>> findAll() {
+        List<WarehouseResponse> warehouses = warehouseService.findAll();
+        return ResponseEntity.ok(ApiResponse.success(warehouses));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ADMIN')")
+    @Operation(summary = "Get warehouse by ID")
+    public ResponseEntity<ApiResponse<WarehouseResponse>> findById(@PathVariable UUID id) {
+        WarehouseResponse response = warehouseService.findById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/active/{isActive}")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ADMIN')")
+    @Operation(summary = "Get warehouses by active status")
+    public ResponseEntity<ApiResponse<List<WarehouseResponse>>> findActive(@PathVariable Boolean isActive) {
+        List<WarehouseResponse> warehouses = warehouseService.findActive(isActive);
+        return ResponseEntity.ok(ApiResponse.success(warehouses));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_UPDATE', 'ADMIN')")
+    @Operation(summary = "Update warehouse")
+    public ResponseEntity<ApiResponse<WarehouseResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody WarehouseRequest request) {
+        WarehouseResponse response = warehouseService.update(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Warehouse updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_DELETE', 'ADMIN')")
+    @Operation(summary = "Delete warehouse")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        warehouseService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Warehouse deleted successfully", null));
+    }
+}
+```
+
+**Step 2: Create BatchController**
+
+Create `src/main/java/br/com/stockshift/controller/BatchController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.warehouse.BatchRequest;
+import br.com.stockshift.dto.warehouse.BatchResponse;
+import br.com.stockshift.service.BatchService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/batches")
+@RequiredArgsConstructor
+@Tag(name = "Batches", description = "Batch and stock management endpoints")
+public class BatchController {
+
+    private final BatchService batchService;
+
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('BATCH_CREATE', 'ADMIN')")
+    @Operation(summary = "Create a new batch")
+    public ResponseEntity<ApiResponse<BatchResponse>> create(@Valid @RequestBody BatchRequest request) {
+        BatchResponse response = batchService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Batch created successfully", response));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('BATCH_READ', 'ADMIN')")
+    @Operation(summary = "Get all batches")
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> findAll() {
+        List<BatchResponse> batches = batchService.findAll();
+        return ResponseEntity.ok(ApiResponse.success(batches));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('BATCH_READ', 'ADMIN')")
+    @Operation(summary = "Get batch by ID")
+    public ResponseEntity<ApiResponse<BatchResponse>> findById(@PathVariable UUID id) {
+        BatchResponse response = batchService.findById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/warehouse/{warehouseId}")
+    @PreAuthorize("hasAnyAuthority('BATCH_READ', 'ADMIN')")
+    @Operation(summary = "Get batches by warehouse")
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> findByWarehouse(@PathVariable UUID warehouseId) {
+        List<BatchResponse> batches = batchService.findByWarehouse(warehouseId);
+        return ResponseEntity.ok(ApiResponse.success(batches));
+    }
+
+    @GetMapping("/product/{productId}")
+    @PreAuthorize("hasAnyAuthority('BATCH_READ', 'ADMIN')")
+    @Operation(summary = "Get batches by product")
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> findByProduct(@PathVariable UUID productId) {
+        List<BatchResponse> batches = batchService.findByProduct(productId);
+        return ResponseEntity.ok(ApiResponse.success(batches));
+    }
+
+    @GetMapping("/expiring/{daysAhead}")
+    @PreAuthorize("hasAnyAuthority('BATCH_READ', 'ADMIN')")
+    @Operation(summary = "Get batches expiring in next N days")
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> findExpiringBatches(@PathVariable Integer daysAhead) {
+        List<BatchResponse> batches = batchService.findExpiringBatches(daysAhead);
+        return ResponseEntity.ok(ApiResponse.success(batches));
+    }
+
+    @GetMapping("/low-stock/{threshold}")
+    @PreAuthorize("hasAnyAuthority('BATCH_READ', 'ADMIN')")
+    @Operation(summary = "Get batches with quantity below threshold")
+    public ResponseEntity<ApiResponse<List<BatchResponse>>> findLowStock(@PathVariable Integer threshold) {
+        List<BatchResponse> batches = batchService.findLowStock(threshold);
+        return ResponseEntity.ok(ApiResponse.success(batches));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('BATCH_UPDATE', 'ADMIN')")
+    @Operation(summary = "Update batch")
+    public ResponseEntity<ApiResponse<BatchResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody BatchRequest request) {
+        BatchResponse response = batchService.update(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Batch updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('BATCH_DELETE', 'ADMIN')")
+    @Operation(summary = "Delete batch")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        batchService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Batch deleted successfully", null));
+    }
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/controller/WarehouseController.java src/main/java/br/com/stockshift/controller/BatchController.java
+git commit -m "feat: add Warehouse and Batch REST controllers"
+```
+
+---
+
+## Phase 9: Stock Movements
+
+### Task 9.1: Create Stock Movement Entities
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/model/entity/StockMovement.java`
+- Create: `src/main/java/br/com/stockshift/model/entity/StockMovementItem.java`
+
+**Step 1: Create StockMovement Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/StockMovement.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "stock_movements")
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockMovement extends TenantAwareEntity {
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "movement_type", nullable = false, length = 20)
+    private MovementType movementType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private MovementStatus status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_warehouse_id")
+    private Warehouse sourceWarehouse;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "destination_warehouse_id")
+    private Warehouse destinationWarehouse;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @OneToMany(mappedBy = "movement", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<StockMovementItem> items = new ArrayList<>();
+}
+```
+
+**Step 2: Create StockMovementItem Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/StockMovementItem.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+
+@Entity
+@Table(name = "stock_movement_items")
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockMovementItem extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "movement_id", nullable = false)
+    private StockMovement movement;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "product_id", nullable = false)
+    private Product product;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "batch_id")
+    private Batch batch;
+
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
+
+    @Column(name = "unit_price", precision = 15, scale = 2)
+    private BigDecimal unitPrice;
+
+    @Column(name = "total_price", precision = 15, scale = 2)
+    private BigDecimal totalPrice;
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/model/entity/StockMovement.java src/main/java/br/com/stockshift/model/entity/StockMovementItem.java
+git commit -m "feat: add StockMovement and StockMovementItem entities"
+```
+
+---
+
+### Task 9.2: Create Stock Movement Repositories
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/repository/StockMovementRepository.java`
+- Create: `src/main/java/br/com/stockshift/repository/StockMovementItemRepository.java`
+
+**Step 1: Create StockMovementRepository**
+
+Create `src/main/java/br/com/stockshift/repository/StockMovementRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.StockMovement;
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface StockMovementRepository extends JpaRepository<StockMovement, UUID> {
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId ORDER BY m.createdAt DESC")
+    List<StockMovement> findAllByTenantId(UUID tenantId);
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId AND m.id = :id")
+    Optional<StockMovement> findByTenantIdAndId(UUID tenantId, UUID id);
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId AND m.movementType = :movementType ORDER BY m.createdAt DESC")
+    List<StockMovement> findByTenantIdAndMovementType(UUID tenantId, MovementType movementType);
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId AND m.status = :status ORDER BY m.createdAt DESC")
+    List<StockMovement> findByTenantIdAndStatus(UUID tenantId, MovementStatus status);
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId AND (m.sourceWarehouse.id = :warehouseId OR m.destinationWarehouse.id = :warehouseId) ORDER BY m.createdAt DESC")
+    List<StockMovement> findByTenantIdAndWarehouse(UUID tenantId, UUID warehouseId);
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId AND m.user.id = :userId ORDER BY m.createdAt DESC")
+    List<StockMovement> findByTenantIdAndUser(UUID tenantId, UUID userId);
+
+    @Query("SELECT m FROM StockMovement m WHERE m.tenantId = :tenantId AND m.createdAt BETWEEN :startDate AND :endDate ORDER BY m.createdAt DESC")
+    List<StockMovement> findByTenantIdAndDateRange(UUID tenantId, LocalDateTime startDate, LocalDateTime endDate);
+}
+```
+
+**Step 2: Create StockMovementItemRepository**
+
+Create `src/main/java/br/com/stockshift/repository/StockMovementItemRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.StockMovementItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface StockMovementItemRepository extends JpaRepository<StockMovementItem, UUID> {
+
+    @Query("SELECT i FROM StockMovementItem i WHERE i.movement.id = :movementId")
+    List<StockMovementItem> findByMovementId(UUID movementId);
+
+    @Query("SELECT i FROM StockMovementItem i WHERE i.product.id = :productId")
+    List<StockMovementItem> findByProductId(UUID productId);
+
+    @Query("SELECT i FROM StockMovementItem i WHERE i.batch.id = :batchId")
+    List<StockMovementItem> findByBatchId(UUID batchId);
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/repository/
+git commit -m "feat: add StockMovement and StockMovementItem repositories"
+```
+
+---
+
+### Task 9.3: Create Stock Movement DTOs
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/dto/movement/StockMovementItemRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/movement/StockMovementRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/movement/StockMovementItemResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/movement/StockMovementResponse.java`
+
+**Step 1: Create movement DTO directory**
+
+```bash
+mkdir -p src/main/java/br/com/stockshift/dto/movement
+```
+
+**Step 2: Create StockMovementItemRequest**
+
+Create `src/main/java/br/com/stockshift/dto/movement/StockMovementItemRequest.java`:
+
+```java
+package br.com.stockshift.dto.movement;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockMovementItemRequest {
+    @NotNull(message = "Product ID is required")
+    private UUID productId;
+
+    private UUID batchId;
+
+    @NotNull(message = "Quantity is required")
+    @Positive(message = "Quantity must be positive")
+    private Integer quantity;
+
+    private BigDecimal unitPrice;
+}
+```
+
+**Step 3: Create StockMovementRequest**
+
+Create `src/main/java/br/com/stockshift/dto/movement/StockMovementRequest.java`:
+
+```java
+package br.com.stockshift.dto.movement;
+
+import br.com.stockshift.model.enums.MovementType;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockMovementRequest {
+    @NotNull(message = "Movement type is required")
+    private MovementType movementType;
+
+    private UUID sourceWarehouseId;
+    private UUID destinationWarehouseId;
+
+    private String notes;
+
+    @NotEmpty(message = "Items list cannot be empty")
+    @Valid
+    private List<StockMovementItemRequest> items;
+}
+```
+
+**Step 4: Create StockMovementItemResponse**
+
+Create `src/main/java/br/com/stockshift/dto/movement/StockMovementItemResponse.java`:
+
+```java
+package br.com.stockshift.dto.movement;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockMovementItemResponse {
+    private UUID id;
+    private UUID productId;
+    private String productName;
+    private UUID batchId;
+    private String batchCode;
+    private Integer quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
+}
+```
+
+**Step 5: Create StockMovementResponse**
+
+Create `src/main/java/br/com/stockshift/dto/movement/StockMovementResponse.java`:
+
+```java
+package br.com.stockshift.dto.movement;
+
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockMovementResponse {
+    private UUID id;
+    private MovementType movementType;
+    private MovementStatus status;
+    private UUID sourceWarehouseId;
+    private String sourceWarehouseName;
+    private UUID destinationWarehouseId;
+    private String destinationWarehouseName;
+    private UUID userId;
+    private String userName;
+    private String notes;
+    private List<StockMovementItemResponse> items;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime completedAt;
+}
+```
+
+**Step 6: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 7: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/dto/movement/
+git commit -m "feat: add StockMovement DTOs with validation"
+```
+
+---
+
+### Task 9.4: Create Stock Movement Service
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/service/StockMovementService.java`
+
+**Step 1: Create StockMovementService**
+
+Create `src/main/java/br/com/stockshift/service/StockMovementService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.dto.movement.StockMovementItemRequest;
+import br.com.stockshift.dto.movement.StockMovementItemResponse;
+import br.com.stockshift.dto.movement.StockMovementRequest;
+import br.com.stockshift.dto.movement.StockMovementResponse;
+import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.model.entity.*;
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import br.com.stockshift.repository.*;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class StockMovementService {
+
+    private final StockMovementRepository stockMovementRepository;
+    private final StockMovementItemRepository stockMovementItemRepository;
+    private final ProductRepository productRepository;
+    private final BatchRepository batchRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final UserRepository userRepository;
+
+    @Transactional
+    public StockMovementResponse create(StockMovementRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Get current user
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("User not found"));
+
+        // Validate warehouses based on movement type
+        validateWarehouses(request, tenantId);
+
+        StockMovement movement = new StockMovement();
+        movement.setTenantId(tenantId);
+        movement.setMovementType(request.getMovementType());
+        movement.setStatus(MovementStatus.PENDING);
+        movement.setUser(user);
+        movement.setNotes(request.getNotes());
+
+        if (request.getSourceWarehouseId() != null) {
+            Warehouse source = warehouseRepository.findByTenantIdAndId(tenantId, request.getSourceWarehouseId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Source warehouse", "id", request.getSourceWarehouseId()));
+            movement.setSourceWarehouse(source);
+        }
+
+        if (request.getDestinationWarehouseId() != null) {
+            Warehouse destination = warehouseRepository.findByTenantIdAndId(tenantId, request.getDestinationWarehouseId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Destination warehouse", "id", request.getDestinationWarehouseId()));
+            movement.setDestinationWarehouse(destination);
+        }
+
+        // Create movement items
+        List<StockMovementItem> items = new ArrayList<>();
+        for (StockMovementItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findByTenantIdAndId(tenantId, itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemRequest.getProductId()));
+
+            Batch batch = null;
+            if (itemRequest.getBatchId() != null) {
+                batch = batchRepository.findByTenantIdAndId(tenantId, itemRequest.getBatchId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", itemRequest.getBatchId()));
+            }
+
+            StockMovementItem item = new StockMovementItem();
+            item.setMovement(movement);
+            item.setProduct(product);
+            item.setBatch(batch);
+            item.setQuantity(itemRequest.getQuantity());
+            item.setUnitPrice(itemRequest.getUnitPrice());
+
+            if (itemRequest.getUnitPrice() != null) {
+                item.setTotalPrice(itemRequest.getUnitPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+            }
+
+            items.add(item);
+        }
+
+        movement.setItems(items);
+        StockMovement saved = stockMovementRepository.save(movement);
+
+        log.info("Created stock movement {} of type {} for tenant {}", saved.getId(), saved.getMovementType(), tenantId);
+
+        return mapToResponse(saved);
+    }
+
+    @Transactional
+    public StockMovementResponse executeMovement(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        StockMovement movement = stockMovementRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("StockMovement", "id", id));
+
+        if (movement.getStatus() != MovementStatus.PENDING) {
+            throw new BusinessException("Only pending movements can be executed");
+        }
+
+        try {
+            // Apply stock changes based on movement type
+            for (StockMovementItem item : movement.getItems()) {
+                applyStockChanges(movement, item);
+            }
+
+            movement.setStatus(MovementStatus.COMPLETED);
+            movement.setCompletedAt(LocalDateTime.now());
+
+            StockMovement updated = stockMovementRepository.save(movement);
+            log.info("Executed stock movement {} for tenant {}", id, tenantId);
+
+            return mapToResponse(updated);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new BusinessException("Batch was modified by another transaction. Please retry.");
+        }
+    }
+
+    @Transactional
+    public StockMovementResponse cancelMovement(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        StockMovement movement = stockMovementRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("StockMovement", "id", id));
+
+        if (movement.getStatus() == MovementStatus.COMPLETED) {
+            throw new BusinessException("Cannot cancel completed movements");
+        }
+
+        movement.setStatus(MovementStatus.CANCELLED);
+        StockMovement updated = stockMovementRepository.save(movement);
+
+        log.info("Cancelled stock movement {} for tenant {}", id, tenantId);
+        return mapToResponse(updated);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockMovementResponse> findAll() {
+        UUID tenantId = TenantContext.getTenantId();
+        return stockMovementRepository.findAllByTenantId(tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public StockMovementResponse findById(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+        StockMovement movement = stockMovementRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("StockMovement", "id", id));
+        return mapToResponse(movement);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockMovementResponse> findByType(MovementType movementType) {
+        UUID tenantId = TenantContext.getTenantId();
+        return stockMovementRepository.findByTenantIdAndMovementType(tenantId, movementType).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockMovementResponse> findByStatus(MovementStatus status) {
+        UUID tenantId = TenantContext.getTenantId();
+        return stockMovementRepository.findByTenantIdAndStatus(tenantId, status).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    private void validateWarehouses(StockMovementRequest request, UUID tenantId) {
+        MovementType type = request.getMovementType();
+
+        if (type == MovementType.TRANSFER) {
+            if (request.getSourceWarehouseId() == null || request.getDestinationWarehouseId() == null) {
+                throw new BusinessException("TRANSFER movements require both source and destination warehouses");
+            }
+            if (request.getSourceWarehouseId().equals(request.getDestinationWarehouseId())) {
+                throw new BusinessException("Source and destination warehouses must be different");
+            }
+        } else if (type == MovementType.PURCHASE) {
+            if (request.getDestinationWarehouseId() == null) {
+                throw new BusinessException("PURCHASE movements require a destination warehouse");
+            }
+        } else if (type == MovementType.SALE) {
+            if (request.getSourceWarehouseId() == null) {
+                throw new BusinessException("SALE movements require a source warehouse");
+            }
+        }
+    }
+
+    private void applyStockChanges(StockMovement movement, StockMovementItem item) {
+        MovementType type = movement.getMovementType();
+
+        if (item.getBatch() == null) {
+            throw new BusinessException("Batch is required to execute stock movements");
+        }
+
+        Batch batch = item.getBatch();
+
+        switch (type) {
+            case PURCHASE:
+                // Increase stock in destination warehouse
+                batch.setQuantity(batch.getQuantity() + item.getQuantity());
+                batchRepository.save(batch);
+                break;
+
+            case SALE:
+            case ADJUSTMENT:
+                // Decrease stock from source warehouse
+                if (batch.getQuantity() < item.getQuantity()) {
+                    throw new BusinessException("Insufficient stock for product " + item.getProduct().getName());
+                }
+                batch.setQuantity(batch.getQuantity() - item.getQuantity());
+                batchRepository.save(batch);
+                break;
+
+            case TRANSFER:
+                // Decrease from source, create/increase in destination
+                if (batch.getQuantity() < item.getQuantity()) {
+                    throw new BusinessException("Insufficient stock for product " + item.getProduct().getName());
+                }
+                batch.setQuantity(batch.getQuantity() - item.getQuantity());
+                batchRepository.save(batch);
+
+                // Find or create batch in destination warehouse
+                List<Batch> destBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
+                        item.getProduct().getId(),
+                        movement.getDestinationWarehouse().getId(),
+                        movement.getTenantId()
+                );
+
+                Batch destBatch;
+                if (!destBatches.isEmpty()) {
+                    destBatch = destBatches.get(0);
+                    destBatch.setQuantity(destBatch.getQuantity() + item.getQuantity());
+                } else {
+                    destBatch = new Batch();
+                    destBatch.setTenantId(movement.getTenantId());
+                    destBatch.setProduct(item.getProduct());
+                    destBatch.setWarehouse(movement.getDestinationWarehouse());
+                    destBatch.setBatchCode(batch.getBatchCode() + "-TRANSFER");
+                    destBatch.setQuantity(item.getQuantity());
+                    destBatch.setManufacturedDate(batch.getManufacturedDate());
+                    destBatch.setExpirationDate(batch.getExpirationDate());
+                    destBatch.setCostPrice(batch.getCostPrice());
+                    destBatch.setSellingPrice(batch.getSellingPrice());
+                }
+                batchRepository.save(destBatch);
+                break;
+
+            case RETURN:
+                // Increase stock (return to warehouse)
+                batch.setQuantity(batch.getQuantity() + item.getQuantity());
+                batchRepository.save(batch);
+                break;
+        }
+    }
+
+    private StockMovementResponse mapToResponse(StockMovement movement) {
+        List<StockMovementItemResponse> itemResponses = movement.getItems().stream()
+                .map(this::mapItemToResponse)
+                .collect(Collectors.toList());
+
+        return StockMovementResponse.builder()
+                .id(movement.getId())
+                .movementType(movement.getMovementType())
+                .status(movement.getStatus())
+                .sourceWarehouseId(movement.getSourceWarehouse() != null ? movement.getSourceWarehouse().getId() : null)
+                .sourceWarehouseName(movement.getSourceWarehouse() != null ? movement.getSourceWarehouse().getName() : null)
+                .destinationWarehouseId(movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getId() : null)
+                .destinationWarehouseName(movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getName() : null)
+                .userId(movement.getUser().getId())
+                .userName(movement.getUser().getFullName())
+                .notes(movement.getNotes())
+                .items(itemResponses)
+                .createdAt(movement.getCreatedAt())
+                .updatedAt(movement.getUpdatedAt())
+                .completedAt(movement.getCompletedAt())
+                .build();
+    }
+
+    private StockMovementItemResponse mapItemToResponse(StockMovementItem item) {
+        return StockMovementItemResponse.builder()
+                .id(item.getId())
+                .productId(item.getProduct().getId())
+                .productName(item.getProduct().getName())
+                .batchId(item.getBatch() != null ? item.getBatch().getId() : null)
+                .batchCode(item.getBatch() != null ? item.getBatch().getBatchCode() : null)
+                .quantity(item.getQuantity())
+                .unitPrice(item.getUnitPrice())
+                .totalPrice(item.getTotalPrice())
+                .build();
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/service/StockMovementService.java
+git commit -m "feat: add StockMovement service with stock update logic"
+```
+
+---
+
+### Task 9.5: Create Stock Movement Controller
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/controller/StockMovementController.java`
+
+**Step 1: Create StockMovementController**
+
+Create `src/main/java/br/com/stockshift/controller/StockMovementController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.movement.StockMovementRequest;
+import br.com.stockshift.dto.movement.StockMovementResponse;
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import br.com.stockshift.service.StockMovementService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/stock-movements")
+@RequiredArgsConstructor
+@Tag(name = "Stock Movements", description = "Stock movement management endpoints")
+public class StockMovementController {
+
+    private final StockMovementService stockMovementService;
+
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_CREATE', 'ADMIN')")
+    @Operation(summary = "Create a new stock movement")
+    public ResponseEntity<ApiResponse<StockMovementResponse>> create(@Valid @RequestBody StockMovementRequest request) {
+        StockMovementResponse response = stockMovementService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Stock movement created successfully", response));
+    }
+
+    @PostMapping("/{id}/execute")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_EXECUTE', 'ADMIN')")
+    @Operation(summary = "Execute a pending stock movement")
+    public ResponseEntity<ApiResponse<StockMovementResponse>> execute(@PathVariable UUID id) {
+        StockMovementResponse response = stockMovementService.executeMovement(id);
+        return ResponseEntity.ok(ApiResponse.success("Stock movement executed successfully", response));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_UPDATE', 'ADMIN')")
+    @Operation(summary = "Cancel a stock movement")
+    public ResponseEntity<ApiResponse<StockMovementResponse>> cancel(@PathVariable UUID id) {
+        StockMovementResponse response = stockMovementService.cancelMovement(id);
+        return ResponseEntity.ok(ApiResponse.success("Stock movement cancelled successfully", response));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @Operation(summary = "Get all stock movements")
+    public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findAll() {
+        List<StockMovementResponse> movements = stockMovementService.findAll();
+        return ResponseEntity.ok(ApiResponse.success(movements));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @Operation(summary = "Get stock movement by ID")
+    public ResponseEntity<ApiResponse<StockMovementResponse>> findById(@PathVariable UUID id) {
+        StockMovementResponse response = stockMovementService.findById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/type/{movementType}")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @Operation(summary = "Get stock movements by type")
+    public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findByType(@PathVariable MovementType movementType) {
+        List<StockMovementResponse> movements = stockMovementService.findByType(movementType);
+        return ResponseEntity.ok(ApiResponse.success(movements));
+    }
+
+    @GetMapping("/status/{status}")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @Operation(summary = "Get stock movements by status")
+    public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findByStatus(@PathVariable MovementStatus status) {
+        List<StockMovementResponse> movements = stockMovementService.findByStatus(status);
+        return ResponseEntity.ok(ApiResponse.success(movements));
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/controller/StockMovementController.java
+git commit -m "feat: add StockMovement REST controller"
+```
+
+---
+
+## Phase 10: Basic Reports and Dashboard
+
+### Task 10.1: Create Report DTOs and Service
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/dto/report/StockReportResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/report/DashboardResponse.java`
+- Create: `src/main/java/br/com/stockshift/service/ReportService.java`
+
+**Step 1: Create report DTO directory**
+
+```bash
+mkdir -p src/main/java/br/com/stockshift/dto/report
+```
+
+**Step 2: Create StockReportResponse**
+
+Create `src/main/java/br/com/stockshift/dto/report/StockReportResponse.java`:
+
+```java
+package br.com.stockshift.dto.report;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class StockReportResponse {
+    private UUID productId;
+    private String productName;
+    private UUID warehouseId;
+    private String warehouseName;
+    private Integer totalQuantity;
+    private BigDecimal totalValue;
+    private LocalDate nearestExpiration;
+    private Integer batchCount;
+}
+```
+
+**Step 3: Create DashboardResponse**
+
+Create `src/main/java/br/com/stockshift/dto/report/DashboardResponse.java`:
+
+```java
+package br.com.stockshift.dto.report;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class DashboardResponse {
+    private Long totalProducts;
+    private Long totalWarehouses;
+    private Integer totalStockQuantity;
+    private BigDecimal totalStockValue;
+    private Long pendingMovements;
+    private Long completedMovementsToday;
+    private List<StockReportResponse> lowStockProducts;
+    private List<StockReportResponse> expiringProducts;
+}
+```
+
+**Step 4: Create ReportService**
+
+Create `src/main/java/br/com/stockshift/service/ReportService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.dto.report.DashboardResponse;
+import br.com.stockshift.dto.report.StockReportResponse;
+import br.com.stockshift.model.entity.Batch;
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.repository.*;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ReportService {
+
+    private final ProductRepository productRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final BatchRepository batchRepository;
+    private final StockMovementRepository stockMovementRepository;
+
+    @Transactional(readOnly = true)
+    public DashboardResponse getDashboard() {
+        UUID tenantId = TenantContext.getTenantId();
+
+        long totalProducts = productRepository.findAllByTenantId(tenantId).size();
+        long totalWarehouses = warehouseRepository.findAllByTenantId(tenantId).size();
+
+        List<Batch> allBatches = batchRepository.findAllByTenantId(tenantId);
+
+        int totalStockQuantity = allBatches.stream()
+                .mapToInt(Batch::getQuantity)
+                .sum();
+
+        BigDecimal totalStockValue = allBatches.stream()
+                .filter(b -> b.getCostPrice() != null)
+                .map(b -> b.getCostPrice().multiply(BigDecimal.valueOf(b.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long pendingMovements = stockMovementRepository.findByTenantIdAndStatus(tenantId, MovementStatus.PENDING).size();
+
+        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime todayEnd = todayStart.plusDays(1);
+        long completedMovementsToday = stockMovementRepository.findByTenantIdAndDateRange(tenantId, todayStart, todayEnd)
+                .stream()
+                .filter(m -> m.getStatus() == MovementStatus.COMPLETED)
+                .count();
+
+        List<StockReportResponse> lowStockProducts = getLowStockReport(10, 10);
+        List<StockReportResponse> expiringProducts = getExpiringProductsReport(30, 10);
+
+        return DashboardResponse.builder()
+                .totalProducts(totalProducts)
+                .totalWarehouses(totalWarehouses)
+                .totalStockQuantity(totalStockQuantity)
+                .totalStockValue(totalStockValue)
+                .pendingMovements(pendingMovements)
+                .completedMovementsToday(completedMovementsToday)
+                .lowStockProducts(lowStockProducts)
+                .expiringProducts(expiringProducts)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockReportResponse> getStockReport() {
+        UUID tenantId = TenantContext.getTenantId();
+        List<Batch> batches = batchRepository.findAllByTenantId(tenantId);
+
+        Map<String, List<Batch>> groupedBatches = batches.stream()
+                .collect(Collectors.groupingBy(b ->
+                    b.getProduct().getId().toString() + "_" + b.getWarehouse().getId().toString()
+                ));
+
+        return groupedBatches.values().stream()
+                .map(this::aggregateBatches)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockReportResponse> getLowStockReport(Integer threshold, Integer limit) {
+        UUID tenantId = TenantContext.getTenantId();
+        List<Batch> lowStockBatches = batchRepository.findLowStock(threshold, tenantId);
+
+        return lowStockBatches.stream()
+                .limit(limit != null ? limit : Long.MAX_VALUE)
+                .map(this::batchToReport)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<StockReportResponse> getExpiringProductsReport(Integer daysAhead, Integer limit) {
+        UUID tenantId = TenantContext.getTenantId();
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(daysAhead);
+
+        List<Batch> expiringBatches = batchRepository.findExpiringBatches(startDate, endDate, tenantId);
+
+        return expiringBatches.stream()
+                .limit(limit != null ? limit : Long.MAX_VALUE)
+                .map(this::batchToReport)
+                .collect(Collectors.toList());
+    }
+
+    private StockReportResponse aggregateBatches(List<Batch> batches) {
+        Batch first = batches.get(0);
+
+        int totalQuantity = batches.stream()
+                .mapToInt(Batch::getQuantity)
+                .sum();
+
+        BigDecimal totalValue = batches.stream()
+                .filter(b -> b.getCostPrice() != null)
+                .map(b -> b.getCostPrice().multiply(BigDecimal.valueOf(b.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        LocalDate nearestExpiration = batches.stream()
+                .map(Batch::getExpirationDate)
+                .filter(date -> date != null)
+                .min(LocalDate::compareTo)
+                .orElse(null);
+
+        return StockReportResponse.builder()
+                .productId(first.getProduct().getId())
+                .productName(first.getProduct().getName())
+                .warehouseId(first.getWarehouse().getId())
+                .warehouseName(first.getWarehouse().getName())
+                .totalQuantity(totalQuantity)
+                .totalValue(totalValue)
+                .nearestExpiration(nearestExpiration)
+                .batchCount(batches.size())
+                .build();
+    }
+
+    private StockReportResponse batchToReport(Batch batch) {
+        BigDecimal totalValue = batch.getCostPrice() != null ?
+                batch.getCostPrice().multiply(BigDecimal.valueOf(batch.getQuantity())) :
+                BigDecimal.ZERO;
+
+        return StockReportResponse.builder()
+                .productId(batch.getProduct().getId())
+                .productName(batch.getProduct().getName())
+                .warehouseId(batch.getWarehouse().getId())
+                .warehouseName(batch.getWarehouse().getName())
+                .totalQuantity(batch.getQuantity())
+                .totalValue(totalValue)
+                .nearestExpiration(batch.getExpirationDate())
+                .batchCount(1)
+                .build();
+    }
+}
+```
+
+**Step 5: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 6: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/dto/report/ src/main/java/br/com/stockshift/service/ReportService.java
+git commit -m "feat: add Report service with dashboard and stock reports"
+```
+
+---
+
+### Task 10.2: Create Report Controller
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/controller/ReportController.java`
+
+**Step 1: Create ReportController**
+
+Create `src/main/java/br/com/stockshift/controller/ReportController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.report.DashboardResponse;
+import br.com.stockshift.dto.report.StockReportResponse;
+import br.com.stockshift.service.ReportService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/reports")
+@RequiredArgsConstructor
+@Tag(name = "Reports", description = "Reporting and dashboard endpoints")
+public class ReportController {
+
+    private final ReportService reportService;
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyAuthority('REPORT_READ', 'ADMIN')")
+    @Operation(summary = "Get dashboard summary")
+    public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard() {
+        DashboardResponse response = reportService.getDashboard();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/stock")
+    @PreAuthorize("hasAnyAuthority('REPORT_READ', 'ADMIN')")
+    @Operation(summary = "Get complete stock report")
+    public ResponseEntity<ApiResponse<List<StockReportResponse>>> getStockReport() {
+        List<StockReportResponse> report = reportService.getStockReport();
+        return ResponseEntity.ok(ApiResponse.success(report));
+    }
+
+    @GetMapping("/stock/low-stock")
+    @PreAuthorize("hasAnyAuthority('REPORT_READ', 'ADMIN')")
+    @Operation(summary = "Get low stock report")
+    public ResponseEntity<ApiResponse<List<StockReportResponse>>> getLowStockReport(
+            @RequestParam(defaultValue = "10") Integer threshold,
+            @RequestParam(required = false) Integer limit) {
+        List<StockReportResponse> report = reportService.getLowStockReport(threshold, limit);
+        return ResponseEntity.ok(ApiResponse.success(report));
+    }
+
+    @GetMapping("/stock/expiring")
+    @PreAuthorize("hasAnyAuthority('REPORT_READ', 'ADMIN')")
+    @Operation(summary = "Get expiring products report")
+    public ResponseEntity<ApiResponse<List<StockReportResponse>>> getExpiringProductsReport(
+            @RequestParam(defaultValue = "30") Integer daysAhead,
+            @RequestParam(required = false) Integer limit) {
+        List<StockReportResponse> report = reportService.getExpiringProductsReport(daysAhead, limit);
+        return ResponseEntity.ok(ApiResponse.success(report));
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/controller/ReportController.java
+git commit -m "feat: add Report REST controller with dashboard endpoints"
+```
+
+---
+
+## Phase 11: Integration Tests
+
+### Task 11.1: Setup Test Infrastructure
+
+**Files:**
+- Create: `src/test/java/br/com/stockshift/BaseIntegrationTest.java`
+- Create: `src/test/resources/application-test.yml`
+
+**Step 1: Create BaseIntegrationTest**
+
+Create `src/test/java/br/com/stockshift/BaseIntegrationTest.java`:
+
+```java
+package br.com.stockshift;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@Testcontainers
+@ActiveProfiles("test")
+@Transactional
+public abstract class BaseIntegrationTest {
+
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+            .withDatabaseName("stockshift_test")
+            .withUsername("test")
+            .withPassword("test");
+
+    @Autowired
+    protected MockMvc mockMvc;
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.flyway.enabled", () -> "true");
+    }
+
+    @BeforeEach
+    void setUp() {
+        // Common setup for all integration tests
+    }
+}
+```
+
+**Step 2: Create test configuration**
+
+Create `src/test/resources/application-test.yml`:
+
+```yaml
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    clean-disabled: false
+
+jwt:
+  secret: test-secret-key-for-integration-tests-minimum-256-bits
+  access-expiration: 900000
+  refresh-expiration: 604800000
+
+logging:
+  level:
+    br.com.stockshift: DEBUG
+    org.springframework.security: DEBUG
+```
+
+**Step 3: Verify tests run**
+
+Run: `./gradlew test`
+Expected: Tests run successfully with Testcontainers
+
+**Step 4: Commit**
+
+```bash
+git add src/test/java/br/com/stockshift/BaseIntegrationTest.java src/test/resources/application-test.yml
+git commit -m "test: add integration test infrastructure with Testcontainers"
+```
+
+---
+
+### Task 11.2: Create Product Integration Tests
+
+**Files:**
+- Create: `src/test/java/br/com/stockshift/controller/ProductControllerIntegrationTest.java`
+
+**Step 1: Create ProductControllerIntegrationTest**
+
+Create `src/test/java/br/com/stockshift/controller/ProductControllerIntegrationTest.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.BaseIntegrationTest;
+import br.com.stockshift.dto.product.CategoryRequest;
+import br.com.stockshift.dto.product.ProductRequest;
+import br.com.stockshift.model.entity.Category;
+import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.Tenant;
+import br.com.stockshift.model.entity.User;
+import br.com.stockshift.model.enums.BarcodeType;
+import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.ProductRepository;
+import br.com.stockshift.repository.TenantRepository;
+import br.com.stockshift.repository.UserRepository;
+import br.com.stockshift.security.TenantContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.web.servlet.ResultActions;
+
+import java.util.UUID;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+class ProductControllerIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private Tenant testTenant;
+    private User testUser;
+    private Category testCategory;
+
+    @BeforeEach
+    void setUpTestData() {
+        // Create test tenant
+        testTenant = new Tenant();
+        testTenant.setName("Test Tenant");
+        testTenant.setActive(true);
+        testTenant = tenantRepository.save(testTenant);
+
+        // Create test user
+        testUser = new User();
+        testUser.setTenantId(testTenant.getId());
+        testUser.setEmail("test@example.com");
+        testUser.setPassword(passwordEncoder.encode("password"));
+        testUser.setFullName("Test User");
+        testUser.setIsActive(true);
+        testUser = userRepository.save(testUser);
+
+        // Set security context
+        TenantContext.setTenantId(testTenant.getId());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(testUser.getEmail(), null)
+        );
+
+        // Create test category
+        testCategory = new Category();
+        testCategory.setTenantId(testTenant.getId());
+        testCategory.setName("Test Category");
+        testCategory = categoryRepository.save(testCategory);
+    }
+
+    @Test
+    void shouldCreateProduct() throws Exception {
+        ProductRequest request = ProductRequest.builder()
+                .name("Test Product")
+                .description("Test Description")
+                .categoryId(testCategory.getId())
+                .barcode("1234567890")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("TEST-SKU-001")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        mockMvc.perform(post("/api/products")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Test Product"))
+                .andExpect(jsonPath("$.data.barcode").value("1234567890"))
+                .andExpect(jsonPath("$.data.sku").value("TEST-SKU-001"));
+    }
+
+    @Test
+    void shouldGetProductById() throws Exception {
+        Product product = createTestProduct("Get Test Product", "BARCODE-001", "SKU-001");
+
+        mockMvc.perform(get("/api/products/{id}", product.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(product.getId().toString()))
+                .andExpect(jsonPath("$.data.name").value("Get Test Product"));
+    }
+
+    @Test
+    void shouldFindProductByBarcode() throws Exception {
+        Product product = createTestProduct("Barcode Test", "BARCODE-FIND", "SKU-002");
+
+        mockMvc.perform(get("/api/products/barcode/{barcode}", "BARCODE-FIND"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.barcode").value("BARCODE-FIND"));
+    }
+
+    @Test
+    void shouldUpdateProduct() throws Exception {
+        Product product = createTestProduct("Update Test", "BARCODE-UPDATE", "SKU-UPDATE");
+
+        ProductRequest updateRequest = ProductRequest.builder()
+                .name("Updated Product Name")
+                .description("Updated Description")
+                .categoryId(testCategory.getId())
+                .barcode("BARCODE-UPDATE")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("SKU-UPDATE")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(false)
+                .build();
+
+        mockMvc.perform(put("/api/products/{id}", product.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Updated Product Name"))
+                .andExpect(jsonPath("$.data.active").value(false));
+    }
+
+    @Test
+    void shouldDeleteProduct() throws Exception {
+        Product product = createTestProduct("Delete Test", "BARCODE-DELETE", "SKU-DELETE");
+
+        mockMvc.perform(delete("/api/products/{id}", product.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // Verify soft delete
+        Product deletedProduct = productRepository.findById(product.getId()).orElseThrow();
+        assert deletedProduct.getDeletedAt() != null;
+    }
+
+    @Test
+    void shouldSearchProducts() throws Exception {
+        createTestProduct("Searchable Product 1", "SEARCH-001", "SEARCH-SKU-001");
+        createTestProduct("Searchable Product 2", "SEARCH-002", "SEARCH-SKU-002");
+
+        mockMvc.perform(get("/api/products/search")
+                        .param("q", "Searchable"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    private Product createTestProduct(String name, String barcode, String sku) {
+        Product product = new Product();
+        product.setTenantId(testTenant.getId());
+        product.setName(name);
+        product.setCategory(testCategory);
+        product.setBarcode(barcode);
+        product.setBarcodeType(BarcodeType.EXTERNAL);
+        product.setSku(sku);
+        product.setIsKit(false);
+        product.setHasExpiration(false);
+        product.setActive(true);
+        return productRepository.save(product);
+    }
+}
+```
+
+**Step 2: Run integration tests**
+
+Run: `./gradlew test --tests ProductControllerIntegrationTest`
+Expected: All tests pass
+
+**Step 3: Commit**
+
+```bash
+git add src/test/java/br/com/stockshift/controller/ProductControllerIntegrationTest.java
+git commit -m "test: add Product controller integration tests"
+```
+
+---
+
+### Task 11.3: Create Stock Movement Integration Tests
+
+**Files:**
+- Create: `src/test/java/br/com/stockshift/controller/StockMovementControllerIntegrationTest.java`
+
+**Step 1: Create StockMovementControllerIntegrationTest**
+
+Create `src/test/java/br/com/stockshift/controller/StockMovementControllerIntegrationTest.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.BaseIntegrationTest;
+import br.com.stockshift.dto.movement.StockMovementItemRequest;
+import br.com.stockshift.dto.movement.StockMovementRequest;
+import br.com.stockshift.model.entity.*;
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import br.com.stockshift.repository.*;
+import br.com.stockshift.security.TenantContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.math.BigDecimal;
+import java.util.Arrays;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+class StockMovementControllerIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @Autowired
+    private TenantRepository tenantRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private Tenant testTenant;
+    private User testUser;
+    private Warehouse sourceWarehouse;
+    private Warehouse destinationWarehouse;
+    private Product testProduct;
+    private Batch testBatch;
+
+    @BeforeEach
+    void setUpTestData() {
+        // Create test tenant
+        testTenant = new Tenant();
+        testTenant.setName("Test Tenant");
+        testTenant.setActive(true);
+        testTenant = tenantRepository.save(testTenant);
+
+        // Create test user
+        testUser = new User();
+        testUser.setTenantId(testTenant.getId());
+        testUser.setEmail("test@example.com");
+        testUser.setPassword(passwordEncoder.encode("password"));
+        testUser.setFullName("Test User");
+        testUser.setIsActive(true);
+        testUser = userRepository.save(testUser);
+
+        // Set security context
+        TenantContext.setTenantId(testTenant.getId());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(testUser.getEmail(), null)
+        );
+
+        // Create warehouses
+        sourceWarehouse = new Warehouse();
+        sourceWarehouse.setTenantId(testTenant.getId());
+        sourceWarehouse.setName("Source Warehouse");
+        sourceWarehouse.setCity("São Paulo");
+        sourceWarehouse.setState("SP");
+        sourceWarehouse.setIsActive(true);
+        sourceWarehouse = warehouseRepository.save(sourceWarehouse);
+
+        destinationWarehouse = new Warehouse();
+        destinationWarehouse.setTenantId(testTenant.getId());
+        destinationWarehouse.setName("Destination Warehouse");
+        destinationWarehouse.setCity("Rio de Janeiro");
+        destinationWarehouse.setState("RJ");
+        destinationWarehouse.setIsActive(true);
+        destinationWarehouse = warehouseRepository.save(destinationWarehouse);
+
+        // Create test product
+        testProduct = new Product();
+        testProduct.setTenantId(testTenant.getId());
+        testProduct.setName("Test Product");
+        testProduct.setSku("TEST-SKU");
+        testProduct.setIsKit(false);
+        testProduct.setActive(true);
+        testProduct = productRepository.save(testProduct);
+
+        // Create test batch
+        testBatch = new Batch();
+        testBatch.setTenantId(testTenant.getId());
+        testBatch.setProduct(testProduct);
+        testBatch.setWarehouse(sourceWarehouse);
+        testBatch.setBatchCode("BATCH-001");
+        testBatch.setQuantity(100);
+        testBatch.setCostPrice(BigDecimal.valueOf(10.00));
+        testBatch = batchRepository.save(testBatch);
+    }
+
+    @Test
+    void shouldCreatePurchaseMovement() throws Exception {
+        StockMovementItemRequest item = StockMovementItemRequest.builder()
+                .productId(testProduct.getId())
+                .batchId(testBatch.getId())
+                .quantity(50)
+                .unitPrice(BigDecimal.valueOf(10.00))
+                .build();
+
+        StockMovementRequest request = StockMovementRequest.builder()
+                .movementType(MovementType.PURCHASE)
+                .destinationWarehouseId(destinationWarehouse.getId())
+                .notes("Test purchase")
+                .items(Arrays.asList(item))
+                .build();
+
+        mockMvc.perform(post("/api/stock-movements")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.movementType").value("PURCHASE"))
+                .andExpect(jsonPath("$.data.status").value("PENDING"));
+    }
+
+    @Test
+    void shouldExecuteTransferMovement() throws Exception {
+        // Create transfer movement
+        StockMovementItemRequest item = StockMovementItemRequest.builder()
+                .productId(testProduct.getId())
+                .batchId(testBatch.getId())
+                .quantity(30)
+                .build();
+
+        StockMovementRequest request = StockMovementRequest.builder()
+                .movementType(MovementType.TRANSFER)
+                .sourceWarehouseId(sourceWarehouse.getId())
+                .destinationWarehouseId(destinationWarehouse.getId())
+                .notes("Test transfer")
+                .items(Arrays.asList(item))
+                .build();
+
+        String createResponse = mockMvc.perform(post("/api/stock-movements")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String movementId = objectMapper.readTree(createResponse).get("data").get("id").asText();
+
+        // Execute the movement
+        mockMvc.perform(post("/api/stock-movements/{id}/execute", movementId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.completedAt").exists());
+
+        // Verify stock was updated
+        Batch updatedBatch = batchRepository.findById(testBatch.getId()).orElseThrow();
+        assert updatedBatch.getQuantity() == 70; // 100 - 30
+    }
+
+    @Test
+    void shouldCancelMovement() throws Exception {
+        StockMovementItemRequest item = StockMovementItemRequest.builder()
+                .productId(testProduct.getId())
+                .batchId(testBatch.getId())
+                .quantity(20)
+                .build();
+
+        StockMovementRequest request = StockMovementRequest.builder()
+                .movementType(MovementType.SALE)
+                .sourceWarehouseId(sourceWarehouse.getId())
+                .items(Arrays.asList(item))
+                .build();
+
+        String createResponse = mockMvc.perform(post("/api/stock-movements")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String movementId = objectMapper.readTree(createResponse).get("data").get("id").asText();
+
+        mockMvc.perform(post("/api/stock-movements/{id}/cancel", movementId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.status").value("CANCELLED"));
+    }
+
+    @Test
+    void shouldGetMovementsByStatus() throws Exception {
+        mockMvc.perform(get("/api/stock-movements/status/{status}", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+}
+```
+
+**Step 2: Run integration tests**
+
+Run: `./gradlew test --tests StockMovementControllerIntegrationTest`
+Expected: All tests pass
+
+**Step 3: Commit**
+
+```bash
+git add src/test/java/br/com/stockshift/controller/StockMovementControllerIntegrationTest.java
+git commit -m "test: add StockMovement controller integration tests"
+```
+
+---
+
 ## Note on Plan Execution
 
 This implementation plan covers the foundational phases of the StockShift MVP:
@@ -3683,14 +6429,14 @@ This implementation plan covers the foundational phases of the StockShift MVP:
 - Phase 3: Core Entities and Enums (Tasks 3.1-3.6) ✅
 - Phase 4: Authentication and Security (Tasks 4.1-4.6) ✅
 - Phase 5: Exception Handling and DTOs (Tasks 5.1-5.4) ✅
-- Phase 6: Authentication Service and Controller (Tasks 6.1-6.4) ✅ COMPLETE
-- Phase 7: Product Management (Tasks 7.1-7.5) 🚧 IN PROGRESS (Tasks 7.1-7.3 ✅, Tasks 7.4-7.5 READY)
+- Phase 6: Authentication Service and Controller (Tasks 6.1-6.4) ✅
+- Phase 7: Product Management (Tasks 7.1-7.5) ✅
 
-**Remaining Work (to be added incrementally):**
-- Phase 8: Warehouse and Batch Management
-- Phase 9: Stock Movements
-- Phase 10: Basic Reports and Dashboard
-- Phase 11: Integration Tests
+**Ready for Execution:**
+- Phase 8: Warehouse and Batch Management (Tasks 8.1-8.5) 📋
+- Phase 9: Stock Movements (Tasks 9.1-9.5) 📋
+- Phase 10: Basic Reports and Dashboard (Tasks 10.1-10.2) 📋
+- Phase 11: Integration Tests (Tasks 11.1-11.3) 📋
 
 **Execution Strategy:**
 This plan should be executed incrementally. Start with the completed sections above, test each phase thoroughly, and then extend the plan with additional phases as needed. The bite-sized tasks ensure each step is testable and committable independently.

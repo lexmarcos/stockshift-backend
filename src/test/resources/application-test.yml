@@ -1,0 +1,20 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    clean-disabled: false
+    validate-on-migrate: false
+    out-of-order: true
+
+jwt:
+  secret: test-secret-key-for-integration-tests-minimum-256-bits
+  access-expiration: 900000
+  refresh-expiration: 604800000
+
+logging:
+  level:
+    br.com.stockshift: DEBUG
+    org.springframework.security: DEBUG
