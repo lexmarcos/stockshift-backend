@@ -3,6 +3,7 @@ package br.com.stockshift;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -29,7 +30,6 @@ public abstract class BaseIntegrationTest {
             .withUsername("test")
             .withPassword("test");
 
-    @Autowired
     protected MockMvc mockMvc;
 
     @DynamicPropertySource
@@ -44,6 +44,7 @@ public abstract class BaseIntegrationTest {
     void setUp() {
         mockMvc = MockMvcBuilders
                 .webAppContextSetup(webApplicationContext)
+                .apply(SecurityMockMvcConfigurers.springSecurity())
                 .build();
     }
 }
