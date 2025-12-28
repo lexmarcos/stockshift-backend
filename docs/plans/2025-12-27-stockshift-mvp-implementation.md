@@ -3078,6 +3078,601 @@ git commit -m "feat: add Product and Category DTOs"
 
 ---
 
+### Task 7.4: Create Category and Product Services
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/service/CategoryService.java`
+- Create: `src/main/java/br/com/stockshift/service/ProductService.java`
+
+**Step 1: Create CategoryService**
+
+Create `src/main/java/br/com/stockshift/service/CategoryService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.dto.product.CategoryRequest;
+import br.com.stockshift.dto.product.CategoryResponse;
+import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.model.entity.Category;
+import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CategoryService {
+
+    private final CategoryRepository categoryRepository;
+
+    @Transactional
+    public CategoryResponse create(CategoryRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate parent category if provided
+        Category parentCategory = null;
+        if (request.getParentCategoryId() != null) {
+            parentCategory = categoryRepository.findByTenantIdAndId(tenantId, request.getParentCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent category", "id", request.getParentCategoryId()));
+        }
+
+        Category category = new Category();
+        category.setTenantId(tenantId);
+        category.setName(request.getName());
+        category.setDescription(request.getDescription());
+        category.setParentCategory(parentCategory);
+        category.setAttributesSchema(request.getAttributesSchema());
+
+        Category saved = categoryRepository.save(category);
+        log.info("Created category {} for tenant {}", saved.getId(), tenantId);
+
+        return mapToResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CategoryResponse> findAll() {
+        UUID tenantId = TenantContext.getTenantId();
+        return categoryRepository.findAllByTenantId(tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public CategoryResponse findById(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+        Category category = categoryRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+        return mapToResponse(category);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CategoryResponse> findByParentId(UUID parentId) {
+        return categoryRepository.findByParentCategoryId(parentId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public CategoryResponse update(UUID id, CategoryRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Category category = categoryRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        // Validate parent category if provided
+        if (request.getParentCategoryId() != null) {
+            if (request.getParentCategoryId().equals(id)) {
+                throw new BusinessException("Category cannot be its own parent");
+            }
+            Category parentCategory = categoryRepository.findByTenantIdAndId(tenantId, request.getParentCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent category", "id", request.getParentCategoryId()));
+            category.setParentCategory(parentCategory);
+        } else {
+            category.setParentCategory(null);
+        }
+
+        category.setName(request.getName());
+        category.setDescription(request.getDescription());
+        category.setAttributesSchema(request.getAttributesSchema());
+
+        Category updated = categoryRepository.save(category);
+        log.info("Updated category {} for tenant {}", id, tenantId);
+
+        return mapToResponse(updated);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Category category = categoryRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", id));
+
+        // Soft delete
+        category.setDeletedAt(LocalDateTime.now());
+        categoryRepository.save(category);
+
+        log.info("Soft deleted category {} for tenant {}", id, tenantId);
+    }
+
+    private CategoryResponse mapToResponse(Category category) {
+        return CategoryResponse.builder()
+                .id(category.getId())
+                .name(category.getName())
+                .description(category.getDescription())
+                .parentCategoryId(category.getParentCategory() != null ? category.getParentCategory().getId() : null)
+                .parentCategoryName(category.getParentCategory() != null ? category.getParentCategory().getName() : null)
+                .attributesSchema(category.getAttributesSchema())
+                .createdAt(category.getCreatedAt())
+                .updatedAt(category.getUpdatedAt())
+                .build();
+    }
+}
+```
+
+**Step 2: Create ProductService**
+
+Create `src/main/java/br/com/stockshift/service/ProductService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.dto.product.ProductRequest;
+import br.com.stockshift.dto.product.ProductResponse;
+import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.model.entity.Category;
+import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.ProductRepository;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class ProductService {
+
+    private final ProductRepository productRepository;
+    private final CategoryRepository categoryRepository;
+
+    @Transactional
+    public ProductResponse create(ProductRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate unique barcode if provided
+        if (request.getBarcode() != null) {
+            productRepository.findByBarcodeAndTenantId(request.getBarcode(), tenantId)
+                    .ifPresent(p -> {
+                        throw new BusinessException("Product with barcode " + request.getBarcode() + " already exists");
+                    });
+        }
+
+        // Validate unique SKU if provided
+        if (request.getSku() != null) {
+            productRepository.findBySkuAndTenantId(request.getSku(), tenantId)
+                    .ifPresent(p -> {
+                        throw new BusinessException("Product with SKU " + request.getSku() + " already exists");
+                    });
+        }
+
+        // Validate category if provided
+        Category category = null;
+        if (request.getCategoryId() != null) {
+            category = categoryRepository.findByTenantIdAndId(tenantId, request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
+        }
+
+        Product product = new Product();
+        product.setTenantId(tenantId);
+        product.setName(request.getName());
+        product.setDescription(request.getDescription());
+        product.setCategory(category);
+        product.setBarcode(request.getBarcode());
+        product.setBarcodeType(request.getBarcodeType());
+        product.setSku(request.getSku());
+        product.setIsKit(request.getIsKit() != null ? request.getIsKit() : false);
+        product.setAttributes(request.getAttributes());
+        product.setHasExpiration(request.getHasExpiration() != null ? request.getHasExpiration() : false);
+        product.setActive(request.getActive() != null ? request.getActive() : true);
+
+        Product saved = productRepository.save(product);
+        log.info("Created product {} for tenant {}", saved.getId(), tenantId);
+
+        return mapToResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> findAll() {
+        UUID tenantId = TenantContext.getTenantId();
+        return productRepository.findAllByTenantId(tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ProductResponse findById(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+        Product product = productRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        return mapToResponse(product);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> findByCategory(UUID categoryId) {
+        UUID tenantId = TenantContext.getTenantId();
+        return productRepository.findByTenantIdAndCategoryId(tenantId, categoryId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> findActive(Boolean active) {
+        UUID tenantId = TenantContext.getTenantId();
+        return productRepository.findByTenantIdAndActive(tenantId, active).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> search(String searchTerm) {
+        UUID tenantId = TenantContext.getTenantId();
+        return productRepository.searchByTenantId(tenantId, searchTerm).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ProductResponse findByBarcode(String barcode) {
+        UUID tenantId = TenantContext.getTenantId();
+        Product product = productRepository.findByBarcodeAndTenantId(barcode, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "barcode", barcode));
+        return mapToResponse(product);
+    }
+
+    @Transactional(readOnly = true)
+    public ProductResponse findBySku(String sku) {
+        UUID tenantId = TenantContext.getTenantId();
+        Product product = productRepository.findBySkuAndTenantId(sku, tenantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "sku", sku));
+        return mapToResponse(product);
+    }
+
+    @Transactional
+    public ProductResponse update(UUID id, ProductRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Product product = productRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        // Validate unique barcode if changed
+        if (request.getBarcode() != null && !request.getBarcode().equals(product.getBarcode())) {
+            productRepository.findByBarcodeAndTenantId(request.getBarcode(), tenantId)
+                    .ifPresent(p -> {
+                        throw new BusinessException("Product with barcode " + request.getBarcode() + " already exists");
+                    });
+        }
+
+        // Validate unique SKU if changed
+        if (request.getSku() != null && !request.getSku().equals(product.getSku())) {
+            productRepository.findBySkuAndTenantId(request.getSku(), tenantId)
+                    .ifPresent(p -> {
+                        throw new BusinessException("Product with SKU " + request.getSku() + " already exists");
+                    });
+        }
+
+        // Validate category if provided
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findByTenantIdAndId(tenantId, request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
+            product.setCategory(category);
+        } else {
+            product.setCategory(null);
+        }
+
+        product.setName(request.getName());
+        product.setDescription(request.getDescription());
+        product.setBarcode(request.getBarcode());
+        product.setBarcodeType(request.getBarcodeType());
+        product.setSku(request.getSku());
+        product.setIsKit(request.getIsKit() != null ? request.getIsKit() : false);
+        product.setAttributes(request.getAttributes());
+        product.setHasExpiration(request.getHasExpiration() != null ? request.getHasExpiration() : false);
+        product.setActive(request.getActive() != null ? request.getActive() : true);
+
+        Product updated = productRepository.save(product);
+        log.info("Updated product {} for tenant {}", id, tenantId);
+
+        return mapToResponse(updated);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        Product product = productRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+
+        // Soft delete
+        product.setDeletedAt(LocalDateTime.now());
+        productRepository.save(product);
+
+        log.info("Soft deleted product {} for tenant {}", id, tenantId);
+    }
+
+    private ProductResponse mapToResponse(Product product) {
+        return ProductResponse.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .description(product.getDescription())
+                .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
+                .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .barcode(product.getBarcode())
+                .barcodeType(product.getBarcodeType())
+                .sku(product.getSku())
+                .isKit(product.getIsKit())
+                .attributes(product.getAttributes())
+                .hasExpiration(product.getHasExpiration())
+                .active(product.getActive())
+                .createdAt(product.getCreatedAt())
+                .updatedAt(product.getUpdatedAt())
+                .build();
+    }
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/service/CategoryService.java src/main/java/br/com/stockshift/service/ProductService.java
+git commit -m "feat: add Category and Product services with CRUD operations"
+```
+
+---
+
+### Task 7.5: Create Category and Product Controllers
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/controller/CategoryController.java`
+- Create: `src/main/java/br/com/stockshift/controller/ProductController.java`
+
+**Step 1: Create CategoryController**
+
+Create `src/main/java/br/com/stockshift/controller/CategoryController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.product.CategoryRequest;
+import br.com.stockshift.dto.product.CategoryResponse;
+import br.com.stockshift.service.CategoryService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/categories")
+@RequiredArgsConstructor
+@Tag(name = "Categories", description = "Category management endpoints")
+public class CategoryController {
+
+    private final CategoryService categoryService;
+
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('CATEGORY_CREATE', 'ADMIN')")
+    @Operation(summary = "Create a new category")
+    public ResponseEntity<ApiResponse<CategoryResponse>> create(@Valid @RequestBody CategoryRequest request) {
+        CategoryResponse response = categoryService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Category created successfully", response));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ADMIN')")
+    @Operation(summary = "Get all categories")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> findAll() {
+        List<CategoryResponse> categories = categoryService.findAll();
+        return ResponseEntity.ok(ApiResponse.success(categories));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ADMIN')")
+    @Operation(summary = "Get category by ID")
+    public ResponseEntity<ApiResponse<CategoryResponse>> findById(@PathVariable UUID id) {
+        CategoryResponse response = categoryService.findById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/parent/{parentId}")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ADMIN')")
+    @Operation(summary = "Get categories by parent ID")
+    public ResponseEntity<ApiResponse<List<CategoryResponse>>> findByParentId(@PathVariable UUID parentId) {
+        List<CategoryResponse> categories = categoryService.findByParentId(parentId);
+        return ResponseEntity.ok(ApiResponse.success(categories));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_UPDATE', 'ADMIN')")
+    @Operation(summary = "Update category")
+    public ResponseEntity<ApiResponse<CategoryResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody CategoryRequest request) {
+        CategoryResponse response = categoryService.update(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Category updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_DELETE', 'ADMIN')")
+    @Operation(summary = "Delete category (soft delete)")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        categoryService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Category deleted successfully", null));
+    }
+}
+```
+
+**Step 2: Create ProductController**
+
+Create `src/main/java/br/com/stockshift/controller/ProductController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.product.ProductRequest;
+import br.com.stockshift.dto.product.ProductResponse;
+import br.com.stockshift.service.ProductService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/products")
+@RequiredArgsConstructor
+@Tag(name = "Products", description = "Product management endpoints")
+public class ProductController {
+
+    private final ProductService productService;
+
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ADMIN')")
+    @Operation(summary = "Create a new product")
+    public ResponseEntity<ApiResponse<ProductResponse>> create(@Valid @RequestBody ProductRequest request) {
+        ProductResponse response = productService.create(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Product created successfully", response));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Get all products")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> findAll() {
+        List<ProductResponse> products = productService.findAll();
+        return ResponseEntity.ok(ApiResponse.success(products));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Get product by ID")
+    public ResponseEntity<ApiResponse<ProductResponse>> findById(@PathVariable UUID id) {
+        ProductResponse response = productService.findById(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/category/{categoryId}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Get products by category")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> findByCategory(@PathVariable UUID categoryId) {
+        List<ProductResponse> products = productService.findByCategory(categoryId);
+        return ResponseEntity.ok(ApiResponse.success(products));
+    }
+
+    @GetMapping("/active/{active}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Get products by active status")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> findActive(@PathVariable Boolean active) {
+        List<ProductResponse> products = productService.findActive(active);
+        return ResponseEntity.ok(ApiResponse.success(products));
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Search products by name, SKU or barcode")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> search(@RequestParam String q) {
+        List<ProductResponse> products = productService.search(q);
+        return ResponseEntity.ok(ApiResponse.success(products));
+    }
+
+    @GetMapping("/barcode/{barcode}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Get product by barcode")
+    public ResponseEntity<ApiResponse<ProductResponse>> findByBarcode(@PathVariable String barcode) {
+        ProductResponse response = productService.findByBarcode(barcode);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/sku/{sku}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @Operation(summary = "Get product by SKU")
+    public ResponseEntity<ApiResponse<ProductResponse>> findBySku(@PathVariable String sku) {
+        ProductResponse response = productService.findBySku(sku);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_UPDATE', 'ADMIN')")
+    @Operation(summary = "Update product")
+    public ResponseEntity<ApiResponse<ProductResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody ProductRequest request) {
+        ProductResponse response = productService.update(id, request);
+        return ResponseEntity.ok(ApiResponse.success("Product updated successfully", response));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_DELETE', 'ADMIN')")
+    @Operation(summary = "Delete product (soft delete)")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        productService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
+    }
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/controller/CategoryController.java src/main/java/br/com/stockshift/controller/ProductController.java
+git commit -m "feat: add Category and Product REST controllers"
+```
+
+---
+
 ## Note on Plan Execution
 
 This implementation plan covers the foundational phases of the StockShift MVP:
@@ -3089,7 +3684,7 @@ This implementation plan covers the foundational phases of the StockShift MVP:
 - Phase 4: Authentication and Security (Tasks 4.1-4.6) ✅
 - Phase 5: Exception Handling and DTOs (Tasks 5.1-5.4) ✅
 - Phase 6: Authentication Service and Controller (Tasks 6.1-6.4) ✅ COMPLETE
-- Phase 7: Product Management (Tasks 7.1-7.3) ✅ READY TO EXECUTE
+- Phase 7: Product Management (Tasks 7.1-7.5) 🚧 IN PROGRESS (Tasks 7.1-7.3 ✅, Tasks 7.4-7.5 READY)
 
 **Remaining Work (to be added incrementally):**
 - Phase 8: Warehouse and Batch Management
