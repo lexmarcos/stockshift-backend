@@ -19,28 +19,28 @@ public class CorsConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    
+
     // Parse allowed origins from comma-separated string
     configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-    
+
     // Allow all HTTP methods
     configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-    
+
     // Allow all headers
     configuration.setAllowedHeaders(Arrays.asList("*"));
-    
+
     // Allow credentials (cookies, authorization headers)
     configuration.setAllowCredentials(true);
-    
+
     // Cache preflight response for 1 hour
     configuration.setMaxAge(3600L);
-    
+
     // Expose authorization header
     configuration.setExposedHeaders(Arrays.asList("Authorization"));
-    
+
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
-    
+
     return source;
   }
 }
