@@ -1,12 +1,12 @@
 package br.com.stockshift.dto.product;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -19,7 +19,7 @@ public class CategoryResponse {
     private String description;
     private UUID parentCategoryId;
     private String parentCategoryName;
-    private JsonNode attributesSchema;
+    private Map<String, Object> attributesSchema;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

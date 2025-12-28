@@ -5,6 +5,7 @@ import br.com.stockshift.dto.product.CategoryRequest;
 import br.com.stockshift.dto.product.CategoryResponse;
 import br.com.stockshift.service.CategoryService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +21,13 @@ import java.util.UUID;
 @RequestMapping("/api/categories")
 @RequiredArgsConstructor
 @Tag(name = "Categories", description = "Category management endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
 public class CategoryController {
 
     private final CategoryService categoryService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('CATEGORY_CREATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_CREATE', 'ROLE_ADMIN')")
     @Operation(summary = "Create a new category")
     public ResponseEntity<ApiResponse<CategoryResponse>> create(@Valid @RequestBody CategoryRequest request) {
         CategoryResponse response = categoryService.create(request);
@@ -34,7 +36,7 @@ public class CategoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get all categories")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> findAll() {
         List<CategoryResponse> categories = categoryService.findAll();
@@ -42,7 +44,7 @@ public class CategoryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get category by ID")
     public ResponseEntity<ApiResponse<CategoryResponse>> findById(@PathVariable UUID id) {
         CategoryResponse response = categoryService.findById(id);
@@ -50,7 +52,7 @@ public class CategoryController {
     }
 
     @GetMapping("/parent/{parentId}")
-    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get categories by parent ID")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> findByParentId(@PathVariable UUID parentId) {
         List<CategoryResponse> categories = categoryService.findByParentId(parentId);
@@ -58,7 +60,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CATEGORY_UPDATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_UPDATE', 'ROLE_ADMIN')")
     @Operation(summary = "Update category")
     public ResponseEntity<ApiResponse<CategoryResponse>> update(
             @PathVariable UUID id,
@@ -68,7 +70,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('CATEGORY_DELETE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('CATEGORY_DELETE', 'ROLE_ADMIN')")
     @Operation(summary = "Delete category (soft delete)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         categoryService.delete(id);

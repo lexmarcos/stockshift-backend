@@ -1,7 +1,6 @@
 package br.com.stockshift.model.entity;
 
 import br.com.stockshift.model.enums.BarcodeType;
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,8 +11,8 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "products", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"tenant_id", "barcode"}),
-    @UniqueConstraint(columnNames = {"tenant_id", "sku"})
+        @UniqueConstraint(columnNames = { "tenant_id", "barcode" }),
+        @UniqueConstraint(columnNames = { "tenant_id", "sku" })
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -46,7 +45,7 @@ public class Product extends TenantAwareEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "attributes", columnDefinition = "jsonb")
-    private JsonNode attributes;
+    private java.util.Map<String, Object> attributes;
 
     @Column(name = "has_expiration", nullable = false)
     private Boolean hasExpiration = false;

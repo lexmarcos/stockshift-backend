@@ -7,6 +7,7 @@ import br.com.stockshift.model.enums.MovementStatus;
 import br.com.stockshift.model.enums.MovementType;
 import br.com.stockshift.service.StockMovementService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +23,13 @@ import java.util.UUID;
 @RequestMapping("/api/stock-movements")
 @RequiredArgsConstructor
 @Tag(name = "Stock Movements", description = "Stock movement management endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
 public class StockMovementController {
 
     private final StockMovementService stockMovementService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_CREATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_CREATE', 'ROLE_ADMIN')")
     @Operation(summary = "Create a new stock movement")
     public ResponseEntity<ApiResponse<StockMovementResponse>> create(@Valid @RequestBody StockMovementRequest request) {
         StockMovementResponse response = stockMovementService.create(request);
@@ -36,7 +38,7 @@ public class StockMovementController {
     }
 
     @PostMapping("/{id}/execute")
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_EXECUTE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_EXECUTE', 'ROLE_ADMIN')")
     @Operation(summary = "Execute a pending stock movement")
     public ResponseEntity<ApiResponse<StockMovementResponse>> execute(@PathVariable UUID id) {
         StockMovementResponse response = stockMovementService.executeMovement(id);
@@ -44,7 +46,7 @@ public class StockMovementController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_UPDATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_UPDATE', 'ROLE_ADMIN')")
     @Operation(summary = "Cancel a stock movement")
     public ResponseEntity<ApiResponse<StockMovementResponse>> cancel(@PathVariable UUID id) {
         StockMovementResponse response = stockMovementService.cancelMovement(id);
@@ -52,7 +54,7 @@ public class StockMovementController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get all stock movements")
     public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findAll() {
         List<StockMovementResponse> movements = stockMovementService.findAll();
@@ -60,7 +62,7 @@ public class StockMovementController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get stock movement by ID")
     public ResponseEntity<ApiResponse<StockMovementResponse>> findById(@PathVariable UUID id) {
         StockMovementResponse response = stockMovementService.findById(id);
@@ -68,15 +70,16 @@ public class StockMovementController {
     }
 
     @GetMapping("/type/{movementType}")
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get stock movements by type")
-    public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findByType(@PathVariable MovementType movementType) {
+    public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findByType(
+            @PathVariable MovementType movementType) {
         List<StockMovementResponse> movements = stockMovementService.findByType(movementType);
         return ResponseEntity.ok(ApiResponse.success(movements));
     }
 
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get stock movements by status")
     public ResponseEntity<ApiResponse<List<StockMovementResponse>>> findByStatus(@PathVariable MovementStatus status) {
         List<StockMovementResponse> movements = stockMovementService.findByStatus(status);

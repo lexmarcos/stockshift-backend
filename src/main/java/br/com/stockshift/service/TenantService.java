@@ -4,8 +4,10 @@ import br.com.stockshift.dto.auth.RegisterRequest;
 import br.com.stockshift.dto.auth.RegisterResponse;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.model.entity.RefreshToken;
+import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
+import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.JwtTokenProvider;
@@ -16,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -23,6 +27,7 @@ public class TenantService {
 
   private final TenantRepository tenantRepository;
   private final UserRepository userRepository;
+  private final RoleRepository roleRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final RefreshTokenService refreshTokenService;
@@ -57,6 +62,15 @@ public class TenantService {
     tenant = tenantRepository.save(tenant);
     log.info("Created tenant with ID: {}", tenant.getId());
 
+    // Create ADMIN role for the tenant
+    Role adminRole = new Role();
+    adminRole.setTenantId(tenant.getId());
+    adminRole.setName("ADMIN");
+    adminRole.setDescription("Administrator role with full access");
+    adminRole.setIsSystemRole(true);
+    adminRole = roleRepository.save(adminRole);
+    log.info("Created ADMIN role with ID: {} for tenant: {}", adminRole.getId(), tenant.getId());
+
     // Create first admin user
     User user = new User();
     user.setTenantId(tenant.getId());
@@ -64,6 +78,8 @@ public class TenantService {
     user.setPassword(passwordEncoder.encode(request.getPassword()));
     user.setFullName(request.getFullName());
     user.setIsActive(true);
+    user.setRoles(new HashSet<>());
+    user.getRoles().add(adminRole);
     user = userRepository.save(user);
     log.info("Created admin user with ID: {} for tenant: {}", user.getId(), tenant.getId());
 

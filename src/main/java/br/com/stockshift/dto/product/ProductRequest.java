@@ -1,13 +1,13 @@
 package br.com.stockshift.dto.product;
 
 import br.com.stockshift.model.enums.BarcodeType;
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -25,7 +25,7 @@ public class ProductRequest {
     private String sku;
     @Builder.Default
     private Boolean isKit = false;
-    private JsonNode attributes;
+    private Map<String, Object> attributes;
     @Builder.Default
     private Boolean hasExpiration = false;
     @Builder.Default

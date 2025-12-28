@@ -1,12 +1,12 @@
 package br.com.stockshift.dto.product;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -19,5 +19,5 @@ public class CategoryRequest {
 
     private String description;
     private UUID parentCategoryId;
-    private JsonNode attributesSchema;
+    private Map<String, Object> attributesSchema;
 }

@@ -1,6 +1,5 @@
 package br.com.stockshift.model.entity;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,7 +10,7 @@ import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "categories", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"tenant_id", "name"})
+        @UniqueConstraint(columnNames = { "tenant_id", "name" })
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -31,7 +30,7 @@ public class Category extends TenantAwareEntity {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "attributes_schema", columnDefinition = "jsonb")
-    private JsonNode attributesSchema;
+    private java.util.Map<String, Object> attributesSchema;
 
     @Column(name = "deleted_at")
     private java.time.LocalDateTime deletedAt;

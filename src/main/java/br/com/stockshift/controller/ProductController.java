@@ -5,6 +5,7 @@ import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
 import br.com.stockshift.service.ProductService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import java.util.UUID;
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
 @Tag(name = "Products", description = "Product management endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
 public class ProductController {
 
     private final ProductService productService;

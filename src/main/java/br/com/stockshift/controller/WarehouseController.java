@@ -5,6 +5,7 @@ import br.com.stockshift.dto.warehouse.WarehouseRequest;
 import br.com.stockshift.dto.warehouse.WarehouseResponse;
 import br.com.stockshift.service.WarehouseService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +21,13 @@ import java.util.UUID;
 @RequestMapping("/api/warehouses")
 @RequiredArgsConstructor
 @Tag(name = "Warehouses", description = "Warehouse management endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
 public class WarehouseController {
 
     private final WarehouseService warehouseService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('WAREHOUSE_CREATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_CREATE', 'ROLE_ADMIN')")
     @Operation(summary = "Create a new warehouse")
     public ResponseEntity<ApiResponse<WarehouseResponse>> create(@Valid @RequestBody WarehouseRequest request) {
         WarehouseResponse response = warehouseService.create(request);
@@ -34,7 +36,7 @@ public class WarehouseController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get all warehouses")
     public ResponseEntity<ApiResponse<List<WarehouseResponse>>> findAll() {
         List<WarehouseResponse> warehouses = warehouseService.findAll();
@@ -42,7 +44,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get warehouse by ID")
     public ResponseEntity<ApiResponse<WarehouseResponse>> findById(@PathVariable UUID id) {
         WarehouseResponse response = warehouseService.findById(id);
@@ -50,7 +52,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/active/{isActive}")
-    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get warehouses by active status")
     public ResponseEntity<ApiResponse<List<WarehouseResponse>>> findActive(@PathVariable Boolean isActive) {
         List<WarehouseResponse> warehouses = warehouseService.findActive(isActive);
@@ -58,7 +60,7 @@ public class WarehouseController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('WAREHOUSE_UPDATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_UPDATE', 'ROLE_ADMIN')")
     @Operation(summary = "Update warehouse")
     public ResponseEntity<ApiResponse<WarehouseResponse>> update(
             @PathVariable UUID id,
@@ -68,7 +70,7 @@ public class WarehouseController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('WAREHOUSE_DELETE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_DELETE', 'ROLE_ADMIN')")
     @Operation(summary = "Delete warehouse")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         warehouseService.delete(id);
