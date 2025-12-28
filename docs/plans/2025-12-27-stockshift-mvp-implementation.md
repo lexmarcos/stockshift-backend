@@ -2584,6 +2584,500 @@ git commit -m "feat: add repository query methods for authentication"
 
 ---
 
+## Phase 7: Product Management
+
+### Task 7.1: Create Product and Category Entities
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/model/entity/Category.java`
+- Create: `src/main/java/br/com/stockshift/model/entity/Product.java`
+- Create: `src/main/java/br/com/stockshift/model/entity/ProductKit.java`
+
+**Step 1: Create Category Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/Category.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
+
+@Entity
+@Table(name = "categories", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"tenant_id", "name"})
+})
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class Category extends TenantAwareEntity {
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "description")
+    private String description;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_category_id")
+    private Category parentCategory;
+
+    @Type(JsonType.class)
+    @Column(name = "attributes_schema", columnDefinition = "jsonb")
+    private JsonNode attributesSchema;
+
+    @Column(name = "deleted_at")
+    private java.time.LocalDateTime deletedAt;
+}
+```
+
+**Step 2: Create Product Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/Product.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import br.com.stockshift.model.enums.BarcodeType;
+import com.fasterxml.jackson.databind.JsonNode;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
+
+@Entity
+@Table(name = "products", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"tenant_id", "barcode"}),
+    @UniqueConstraint(columnNames = {"tenant_id", "sku"})
+})
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class Product extends TenantAwareEntity {
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "description")
+    private String description;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
+
+    @Column(name = "barcode", length = 100)
+    private String barcode;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "barcode_type", length = 20)
+    private BarcodeType barcodeType;
+
+    @Column(name = "sku", length = 100)
+    private String sku;
+
+    @Column(name = "is_kit", nullable = false)
+    private Boolean isKit = false;
+
+    @Type(JsonType.class)
+    @Column(name = "attributes", columnDefinition = "jsonb")
+    private JsonNode attributes;
+
+    @Column(name = "has_expiration", nullable = false)
+    private Boolean hasExpiration = false;
+
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
+
+    @Column(name = "deleted_at")
+    private java.time.LocalDateTime deletedAt;
+}
+```
+
+**Step 3: Create ProductKit Entity**
+
+Create `src/main/java/br/com/stockshift/model/entity/ProductKit.java`:
+
+```java
+package br.com.stockshift.model.entity;
+
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "product_kits", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"kit_product_id", "component_product_id"})
+})
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProductKit extends BaseEntity {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kit_product_id", nullable = false)
+    private Product kitProduct;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "component_product_id", nullable = false)
+    private Product componentProduct;
+
+    @Column(name = "quantity", nullable = false)
+    private Integer quantity;
+}
+```
+
+**Step 4: Add Hibernate Types dependency to build.gradle**
+
+This step requires adding the `hibernate-types` library for JSONB support.
+
+Edit `build.gradle` and add to dependencies:
+```gradle
+implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.7.0'
+```
+
+**Step 5: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 6: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/model/entity/Category.java src/main/java/br/com/stockshift/model/entity/Product.java src/main/java/br/com/stockshift/model/entity/ProductKit.java build.gradle
+git commit -m "feat: add Product, Category and ProductKit entities"
+```
+
+---
+
+### Task 7.2: Create Product and Category Repositories
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/repository/CategoryRepository.java`
+- Create: `src/main/java/br/com/stockshift/repository/ProductRepository.java`
+- Create: `src/main/java/br/com/stockshift/repository/ProductKitRepository.java`
+
+**Step 1: Create CategoryRepository**
+
+Create `src/main/java/br/com/stockshift/repository/CategoryRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.Category;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface CategoryRepository extends JpaRepository<Category, UUID> {
+
+    @Query("SELECT c FROM Category c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL")
+    List<Category> findAllByTenantId(UUID tenantId);
+
+    @Query("SELECT c FROM Category c WHERE c.tenantId = :tenantId AND c.id = :id AND c.deletedAt IS NULL")
+    Optional<Category> findByTenantIdAndId(UUID tenantId, UUID id);
+
+    @Query("SELECT c FROM Category c WHERE c.parentCategory.id = :parentId AND c.deletedAt IS NULL")
+    List<Category> findByParentCategoryId(UUID parentId);
+}
+```
+
+**Step 2: Create ProductRepository**
+
+Create `src/main/java/br/com/stockshift/repository/ProductRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.Product;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface ProductRepository extends JpaRepository<Product, UUID> {
+
+    @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND p.deletedAt IS NULL")
+    List<Product> findAllByTenantId(UUID tenantId);
+
+    @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND p.id = :id AND p.deletedAt IS NULL")
+    Optional<Product> findByTenantIdAndId(UUID tenantId, UUID id);
+
+    @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND p.active = :active AND p.deletedAt IS NULL")
+    List<Product> findByTenantIdAndActive(UUID tenantId, Boolean active);
+
+    @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND p.category.id = :categoryId AND p.deletedAt IS NULL")
+    List<Product> findByTenantIdAndCategoryId(UUID tenantId, UUID categoryId);
+
+    @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND " +
+           "(LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(p.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "p.deletedAt IS NULL")
+    List<Product> searchByTenantId(@Param("tenantId") UUID tenantId, @Param("search") String search);
+
+    @Query("SELECT p FROM Product p WHERE p.barcode = :barcode AND p.tenantId = :tenantId AND p.deletedAt IS NULL")
+    Optional<Product> findByBarcodeAndTenantId(String barcode, UUID tenantId);
+
+    @Query("SELECT p FROM Product p WHERE p.sku = :sku AND p.tenantId = :tenantId AND p.deletedAt IS NULL")
+    Optional<Product> findBySkuAndTenantId(String sku, UUID tenantId);
+}
+```
+
+**Step 3: Create ProductKitRepository**
+
+Create `src/main/java/br/com/stockshift/repository/ProductKitRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.ProductKit;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.UUID;
+
+@Repository
+public interface ProductKitRepository extends JpaRepository<ProductKit, UUID> {
+
+    @Query("SELECT pk FROM ProductKit pk WHERE pk.kitProduct.id = :kitProductId")
+    List<ProductKit> findByKitProductId(UUID kitProductId);
+
+    @Query("SELECT pk FROM ProductKit pk WHERE pk.componentProduct.id = :componentProductId")
+    List<ProductKit> findByComponentProductId(UUID componentProductId);
+}
+```
+
+**Step 4: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 5: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/repository/
+git commit -m "feat: add Product, Category and ProductKit repositories"
+```
+
+---
+
+### Task 7.3: Create Product DTOs
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/dto/product/CategoryRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/product/CategoryResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/product/ProductRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/product/ProductResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/product/ProductKitRequest.java`
+
+**Step 1: Create CategoryRequest DTO**
+
+Create `src/main/java/br/com/stockshift/dto/product/CategoryRequest.java`:
+
+```java
+package br.com.stockshift.dto.product;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CategoryRequest {
+    @NotBlank(message = "Category name is required")
+    private String name;
+
+    private String description;
+    private UUID parentCategoryId;
+    private JsonNode attributesSchema;
+}
+```
+
+**Step 2: Create CategoryResponse DTO**
+
+Create `src/main/java/br/com/stockshift/dto/product/CategoryResponse.java`:
+
+```java
+package br.com.stockshift.dto.product;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CategoryResponse {
+    private UUID id;
+    private String name;
+    private String description;
+    private UUID parentCategoryId;
+    private String parentCategoryName;
+    private JsonNode attributesSchema;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+**Step 3: Create ProductRequest DTO**
+
+Create `src/main/java/br/com/stockshift/dto/product/ProductRequest.java`:
+
+```java
+package br.com.stockshift.dto.product;
+
+import br.com.stockshift.model.enums.BarcodeType;
+import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProductRequest {
+    @NotBlank(message = "Product name is required")
+    private String name;
+
+    private String description;
+    private UUID categoryId;
+    private String barcode;
+    private BarcodeType barcodeType;
+    private String sku;
+    private Boolean isKit = false;
+    private JsonNode attributes;
+    private Boolean hasExpiration = false;
+    private Boolean active = true;
+}
+```
+
+**Step 4: Create ProductResponse DTO**
+
+Create `src/main/java/br/com/stockshift/dto/product/ProductResponse.java`:
+
+```java
+package br.com.stockshift.dto.product;
+
+import br.com.stockshift.model.enums.BarcodeType;
+import com.fasterxml.jackson.databind.JsonNode;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProductResponse {
+    private UUID id;
+    private String name;
+    private String description;
+    private UUID categoryId;
+    private String categoryName;
+    private String barcode;
+    private BarcodeType barcodeType;
+    private String sku;
+    private Boolean isKit;
+    private JsonNode attributes;
+    private Boolean hasExpiration;
+    private Boolean active;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+```
+
+**Step 5: Create ProductKitRequest DTO**
+
+Create `src/main/java/br/com/stockshift/dto/product/ProductKitRequest.java`:
+
+```java
+package br.com.stockshift.dto.product;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProductKitRequest {
+    @NotNull(message = "Component product ID is required")
+    private UUID componentProductId;
+
+    @NotNull(message = "Quantity is required")
+    @Positive(message = "Quantity must be positive")
+    private Integer quantity;
+}
+```
+
+**Step 6: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 7: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/dto/product/
+git commit -m "feat: add Product and Category DTOs"
+```
+
+---
+
 ## Note on Plan Execution
 
 This implementation plan covers the foundational phases of the StockShift MVP:
@@ -2593,11 +3087,11 @@ This implementation plan covers the foundational phases of the StockShift MVP:
 - Phase 2: Database Schema (Tasks 2.1-2.8) ✅
 - Phase 3: Core Entities and Enums (Tasks 3.1-3.6) ✅
 - Phase 4: Authentication and Security (Tasks 4.1-4.6) ✅
-- Phase 5: Exception Handling and DTOs (Tasks 5.1-5.4) ✅ COMPLETE
+- Phase 5: Exception Handling and DTOs (Tasks 5.1-5.4) ✅
+- Phase 6: Authentication Service and Controller (Tasks 6.1-6.5) 🚧 IN PROGRESS
+- Phase 7: Product Management (Tasks 7.1-7.3) ✅ READY TO EXECUTE
 
 **Remaining Work (to be added incrementally):**
-- Phase 6: Authentication Service and Controller
-- Phase 7: Product Management
 - Phase 8: Warehouse and Batch Management
 - Phase 9: Stock Movements
 - Phase 10: Basic Reports and Dashboard
