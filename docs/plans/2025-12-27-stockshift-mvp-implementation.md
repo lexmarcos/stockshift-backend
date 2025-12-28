@@ -1745,6 +1745,364 @@ git commit -m "feat: integrate JWT filter into security chain"
 
 ---
 
+## Phase 5: Exception Handling and DTOs
+
+### Task 5.1: Create Custom Exception Classes
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/exception/BusinessException.java`
+- Create: `src/main/java/br/com/stockshift/exception/ResourceNotFoundException.java`
+- Create: `src/main/java/br/com/stockshift/exception/UnauthorizedException.java`
+
+**Step 1: Create BusinessException**
+
+Create `src/main/java/br/com/stockshift/exception/BusinessException.java`:
+
+```java
+package br.com.stockshift.exception;
+
+public class BusinessException extends RuntimeException {
+    public BusinessException(String message) {
+        super(message);
+    }
+
+    public BusinessException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+```
+
+**Step 2: Create ResourceNotFoundException**
+
+Create `src/main/java/br/com/stockshift/exception/ResourceNotFoundException.java`:
+
+```java
+package br.com.stockshift.exception;
+
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String resource, String field, Object value) {
+        super(String.format("%s not found with %s: %s", resource, field, value));
+    }
+
+    public ResourceNotFoundException(String message) {
+        super(message);
+    }
+}
+```
+
+**Step 3: Create UnauthorizedException**
+
+Create `src/main/java/br/com/stockshift/exception/UnauthorizedException.java`:
+
+```java
+package br.com.stockshift.exception;
+
+public class UnauthorizedException extends RuntimeException {
+    public UnauthorizedException(String message) {
+        super(message);
+    }
+}
+```
+
+**Step 4: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 5: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/exception/
+git commit -m "feat: add custom exception classes"
+```
+
+---
+
+### Task 5.2: Create Global Exception Handler
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/exception/GlobalExceptionHandler.java`
+
+**Step 1: Create GlobalExceptionHandler**
+
+Create `src/main/java/br/com/stockshift/exception/GlobalExceptionHandler.java`:
+
+```java
+package br.com.stockshift.exception;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
+            ResourceNotFoundException ex,
+            WebRequest request
+    ) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.NOT_FOUND.value())
+                .error("Not Found")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorizedException(
+            UnauthorizedException ex,
+            WebRequest request
+    ) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error("Unauthorized")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException ex,
+            WebRequest request
+    ) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Business Rule Violation")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationExceptions(
+            MethodArgumentNotValidException ex,
+            WebRequest request
+    ) {
+        Map<String, String> validationErrors = new HashMap<>();
+        ex.getBindingResult().getAllErrors().forEach((error) -> {
+            String fieldName = ((FieldError) error).getField();
+            String errorMessage = error.getDefaultMessage();
+            validationErrors.put(fieldName, errorMessage);
+        });
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Validation Failed")
+                .message("Invalid input")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .validationErrors(validationErrors)
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(
+            AccessDeniedException ex,
+            WebRequest request
+    ) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.FORBIDDEN.value())
+                .error("Forbidden")
+                .message("You don't have permission to access this resource")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentialsException(
+            BadCredentialsException ex,
+            WebRequest request
+    ) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .error("Unauthorized")
+                .message("Invalid email or password")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGlobalException(
+            Exception ex,
+            WebRequest request
+    ) {
+        log.error("Unexpected error occurred", ex);
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .error("Internal Server Error")
+                .message("An unexpected error occurred")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+```
+
+**Step 2: Verify compilation (will fail - need ErrorResponse DTO)**
+
+Run: `./gradlew compileJava`
+Expected: FAILED - ErrorResponse class not found
+
+---
+
+### Task 5.3: Create Error Response DTO
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/exception/ErrorResponse.java`
+
+**Step 1: Create ErrorResponse DTO**
+
+Create `src/main/java/br/com/stockshift/exception/ErrorResponse.java`:
+
+```java
+package br.com.stockshift.exception;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+import java.util.Map;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ErrorResponse {
+    private LocalDateTime timestamp;
+    private Integer status;
+    private String error;
+    private String message;
+    private String path;
+    private Map<String, String> validationErrors;
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/exception/
+git commit -m "feat: add global exception handler and error response DTO"
+```
+
+---
+
+### Task 5.4: Create Base API Response DTOs
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/dto/ApiResponse.java`
+
+**Step 1: Create ApiResponse DTO**
+
+Create `src/main/java/br/com/stockshift/dto/ApiResponse.java`:
+
+```java
+package br.com.stockshift.dto;
+
+import com.fasterxml.jackson.annotation.jsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ApiResponse<T> {
+    private Boolean success;
+    private String message;
+    private T data;
+
+    public static <T> ApiResponse<T> success(T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .data(data)
+                .build();
+    }
+
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(true)
+                .message(message)
+                .data(data)
+                .build();
+    }
+
+    public static ApiResponse<Void> success(String message) {
+        return ApiResponse.<Void>builder()
+                .success(true)
+                .message(message)
+                .build();
+    }
+
+    public static ApiResponse<Void> error(String message) {
+        return ApiResponse.<Void>builder()
+                .success(false)
+                .message(message)
+                .build();
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/dto/
+git commit -m "feat: add generic API response DTO"
+```
+
+---
+
 ## Note on Plan Execution
 
 This implementation plan covers the foundational phases of the StockShift MVP:
@@ -1753,10 +2111,10 @@ This implementation plan covers the foundational phases of the StockShift MVP:
 - Phase 1: Project Setup and Configuration (Tasks 1.1-1.3) ✅
 - Phase 2: Database Schema (Tasks 2.1-2.8) ✅
 - Phase 3: Core Entities and Enums (Tasks 3.1-3.6) ✅
-- Phase 4: Authentication and Security (Tasks 4.1-4.6) ✅ COMPLETE
+- Phase 4: Authentication and Security (Tasks 4.1-4.6) ✅
+- Phase 5: Exception Handling and DTOs (Tasks 5.1-5.4) ✅ COMPLETE
 
 **Remaining Work (to be added incrementally):**
-- Phase 5: Exception Handling and DTOs
 - Phase 6: Authentication Service and Controller
 - Phase 7: Product Management
 - Phase 8: Warehouse and Batch Management
