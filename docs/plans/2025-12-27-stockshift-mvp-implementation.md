@@ -2103,6 +2103,487 @@ git commit -m "feat: add generic API response DTO"
 
 ---
 
+## Phase 6: Authentication Service and Controller
+
+### Task 6.1: Create Authentication DTOs
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/dto/auth/LoginRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/auth/LoginResponse.java`
+- Create: `src/main/java/br/com/stockshift/dto/auth/RefreshTokenRequest.java`
+- Create: `src/main/java/br/com/stockshift/dto/auth/RefreshTokenResponse.java`
+
+**Step 1: Create LoginRequest DTO**
+
+Create `src/main/java/br/com/stockshift/dto/auth/LoginRequest.java`:
+
+```java
+package br.com.stockshift.dto.auth;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoginRequest {
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be valid")
+    private String email;
+
+    @NotBlank(message = "Password is required")
+    private String password;
+}
+```
+
+**Step 2: Create LoginResponse DTO**
+
+Create `src/main/java/br/com/stockshift/dto/auth/LoginResponse.java`:
+
+```java
+package br.com.stockshift.dto.auth;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.UUID;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class LoginResponse {
+    private String accessToken;
+    private String refreshToken;
+    private String tokenType = "Bearer";
+    private Long expiresIn; // in milliseconds
+    private UUID userId;
+    private String email;
+    private String fullName;
+}
+```
+
+**Step 3: Create RefreshTokenRequest DTO**
+
+Create `src/main/java/br/com/stockshift/dto/auth/RefreshTokenRequest.java`:
+
+```java
+package br.com.stockshift.dto.auth;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RefreshTokenRequest {
+    @NotBlank(message = "Refresh token is required")
+    private String refreshToken;
+}
+```
+
+**Step 4: Create RefreshTokenResponse DTO**
+
+Create `src/main/java/br/com/stockshift/dto/auth/RefreshTokenResponse.java`:
+
+```java
+package br.com.stockshift.dto.auth;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RefreshTokenResponse {
+    private String accessToken;
+    private String tokenType = "Bearer";
+    private Long expiresIn; // in milliseconds
+}
+```
+
+**Step 5: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 6: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/dto/auth/
+git commit -m "feat: add authentication DTOs"
+```
+
+---
+
+### Task 6.2: Create RefreshToken Service
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/service/RefreshTokenService.java`
+
+**Step 1: Create RefreshTokenService**
+
+Create `src/main/java/br/com/stockshift/service/RefreshTokenService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.config.JwtProperties;
+import br.com.stockshift.exception.UnauthorizedException;
+import br.com.stockshift.model.entity.RefreshToken;
+import br.com.stockshift.model.entity.User;
+import br.com.stockshift.repository.RefreshTokenRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class RefreshTokenService {
+
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final JwtProperties jwtProperties;
+
+    @Transactional
+    public RefreshToken createRefreshToken(User user) {
+        // Revoke existing refresh tokens for this user
+        refreshTokenRepository.deleteByUserId(user.getId());
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setToken(UUID.randomUUID().toString());
+        refreshToken.setUserId(user.getId());
+        refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshExpiration() / 1000));
+
+        return refreshTokenRepository.save(refreshToken);
+    }
+
+    @Transactional(readOnly = true)
+    public RefreshToken validateRefreshToken(String token) {
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
+
+        if (refreshToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new UnauthorizedException("Refresh token expired");
+        }
+
+        return refreshToken;
+    }
+
+    @Transactional
+    public void revokeRefreshToken(String token) {
+        refreshTokenRepository.findByToken(token)
+                .ifPresent(refreshTokenRepository::delete);
+    }
+
+    @Transactional
+    public void revokeAllUserTokens(UUID userId) {
+        refreshTokenRepository.deleteByUserId(userId);
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/service/RefreshTokenService.java
+git commit -m "feat: add refresh token service"
+```
+
+---
+
+### Task 6.3: Create Authentication Service
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/service/AuthService.java`
+
+**Step 1: Create AuthService**
+
+Create `src/main/java/br/com/stockshift/service/AuthService.java`:
+
+```java
+package br.com.stockshift.service;
+
+import br.com.stockshift.config.JwtProperties;
+import br.com.stockshift.dto.auth.LoginRequest;
+import br.com.stockshift.dto.auth.LoginResponse;
+import br.com.stockshift.dto.auth.RefreshTokenRequest;
+import br.com.stockshift.dto.auth.RefreshTokenResponse;
+import br.com.stockshift.exception.UnauthorizedException;
+import br.com.stockshift.model.entity.RefreshToken;
+import br.com.stockshift.model.entity.User;
+import br.com.stockshift.repository.UserRepository;
+import br.com.stockshift.security.JwtTokenProvider;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AuthService {
+
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenService refreshTokenService;
+    private final JwtProperties jwtProperties;
+
+    @Transactional
+    public LoginResponse login(LoginRequest request) {
+        try {
+            // Authenticate user
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(),
+                            request.getPassword()
+                    )
+            );
+
+            // Load user details
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+            if (!user.getIsActive()) {
+                throw new UnauthorizedException("User account is disabled");
+            }
+
+            // Generate tokens
+            String accessToken = jwtTokenProvider.generateAccessToken(
+                    user.getId(),
+                    user.getTenantId(),
+                    user.getEmail()
+            );
+
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+            // Update last login
+            user.setLastLogin(LocalDateTime.now());
+            userRepository.save(user);
+
+            return LoginResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken.getToken())
+                    .tokenType("Bearer")
+                    .expiresIn(jwtProperties.getAccessExpiration())
+                    .userId(user.getId())
+                    .email(user.getEmail())
+                    .fullName(user.getFullName())
+                    .build();
+
+        } catch (AuthenticationException e) {
+            log.error("Authentication failed for user: {}", request.getEmail());
+            throw new UnauthorizedException("Invalid email or password");
+        }
+    }
+
+    @Transactional
+    public RefreshTokenResponse refresh(RefreshTokenRequest request) {
+        // Validate refresh token
+        RefreshToken refreshToken = refreshTokenService.validateRefreshToken(request.getRefreshToken());
+
+        // Load user
+        User user = userRepository.findById(refreshToken.getUserId())
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        if (!user.getIsActive()) {
+            throw new UnauthorizedException("User account is disabled");
+        }
+
+        // Generate new access token
+        String accessToken = jwtTokenProvider.generateAccessToken(
+                user.getId(),
+                user.getTenantId(),
+                user.getEmail()
+        );
+
+        return RefreshTokenResponse.builder()
+                .accessToken(accessToken)
+                .tokenType("Bearer")
+                .expiresIn(jwtProperties.getAccessExpiration())
+                .build();
+    }
+
+    @Transactional
+    public void logout(String refreshTokenValue) {
+        refreshTokenService.revokeRefreshToken(refreshTokenValue);
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/service/AuthService.java
+git commit -m "feat: add authentication service with login/refresh/logout"
+```
+
+---
+
+### Task 6.4: Create Authentication Controller
+
+**Files:**
+- Create: `src/main/java/br/com/stockshift/controller/AuthController.java`
+
+**Step 1: Create AuthController**
+
+Create `src/main/java/br/com/stockshift/controller/AuthController.java`:
+
+```java
+package br.com.stockshift.controller;
+
+import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.auth.LoginRequest;
+import br.com.stockshift.dto.auth.LoginResponse;
+import br.com.stockshift.dto.auth.RefreshTokenRequest;
+import br.com.stockshift.dto.auth.RefreshTokenResponse;
+import br.com.stockshift.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Tag(name = "Authentication", description = "Authentication endpoints")
+public class AuthController {
+
+    private final AuthService authService;
+
+    @PostMapping("/login")
+    @Operation(summary = "Login", description = "Authenticate user and return access token + refresh token")
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh Token", description = "Generate new access token using refresh token")
+    public ResponseEntity<ApiResponse<RefreshTokenResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        RefreshTokenResponse response = authService.refresh(request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout", description = "Revoke refresh token and logout user")
+    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
+    }
+}
+```
+
+**Step 2: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 3: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/controller/AuthController.java
+git commit -m "feat: add authentication REST controller"
+```
+
+---
+
+### Task 6.5: Add Missing Repository Methods
+
+**Files:**
+- Modify: `src/main/java/br/com/stockshift/repository/RefreshTokenRepository.java`
+- Modify: `src/main/java/br/com/stockshift/repository/UserRepository.java`
+
+**Step 1: Add methods to RefreshTokenRepository**
+
+Update `src/main/java/br/com/stockshift/repository/RefreshTokenRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.RefreshToken;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
+    Optional<RefreshToken> findByToken(String token);
+    void deleteByUserId(UUID userId);
+}
+```
+
+**Step 2: Add findByEmail to UserRepository**
+
+Update `src/main/java/br/com/stockshift/repository/UserRepository.java`:
+
+```java
+package br.com.stockshift.repository;
+
+import br.com.stockshift.model.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, UUID> {
+    Optional<User> findByEmail(String email);
+}
+```
+
+**Step 3: Verify compilation**
+
+Run: `./gradlew compileJava`
+Expected: BUILD SUCCESSFUL
+
+**Step 4: Commit**
+
+```bash
+git add src/main/java/br/com/stockshift/repository/
+git commit -m "feat: add repository query methods for authentication"
+```
+
+---
+
 ## Note on Plan Execution
 
 This implementation plan covers the foundational phases of the StockShift MVP:
