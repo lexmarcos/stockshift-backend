@@ -1,5 +1,13 @@
 package br.com.stockshift.service;
 
+import java.time.LocalDateTime;
+
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import br.com.stockshift.config.JwtProperties;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.LoginResponse;
@@ -12,14 +20,6 @@ import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -36,12 +36,10 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         try {
             // Authenticate user
-            Authentication authentication = authenticationManager.authenticate(
+            authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
-                            request.getPassword()
-                    )
-            );
+                            request.getPassword()));
 
             // Load user details
             User user = userRepository.findByEmail(request.getEmail())
@@ -55,8 +53,7 @@ public class AuthService {
             String accessToken = jwtTokenProvider.generateAccessToken(
                     user.getId(),
                     user.getTenantId(),
-                    user.getEmail()
-            );
+                    user.getEmail());
 
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
@@ -99,8 +96,7 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getTenantId(),
-                user.getEmail()
-        );
+                user.getEmail());
 
         return RefreshTokenResponse.builder()
                 .accessToken(accessToken)

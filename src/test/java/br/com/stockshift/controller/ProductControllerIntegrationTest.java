@@ -1,5 +1,21 @@
 package br.com.stockshift.controller;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.test.context.support.WithMockUser;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.model.entity.Category;
@@ -12,18 +28,6 @@ import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.TenantContext;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.test.context.support.WithMockUser;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
@@ -50,6 +54,12 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     @BeforeEach
     void setUpTestData() {
+        // Clear any existing data
+        productRepository.deleteAll();
+        categoryRepository.deleteAll();
+        userRepository.deleteAll();
+        tenantRepository.deleteAll();
+
         // Create test tenant
         testTenant = new Tenant();
         testTenant.setBusinessName("Test Tenant");
@@ -67,11 +77,8 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
         testUser.setIsActive(true);
         testUser = userRepository.save(testUser);
 
-        // Set security context
+        // Set tenant context for current test
         TenantContext.setTenantId(testTenant.getId());
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(testUser.getEmail(), null)
-        );
 
         // Create test category
         testCategory = new Category();
@@ -81,7 +88,7 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com", authorities = {"PRODUCT_CREATE", "ADMIN"})
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
     void shouldCreateProduct() throws Exception {
         ProductRequest request = ProductRequest.builder()
                 .name("Test Product")
@@ -96,8 +103,8 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(post("/api/products")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Test Product"))
@@ -106,7 +113,7 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com", authorities = {"PRODUCT_READ", "ADMIN"})
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
     void shouldGetProductById() throws Exception {
         Product product = createTestProduct("Get Test Product", "BARCODE-001", "SKU-001");
 
@@ -118,9 +125,9 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com", authorities = {"PRODUCT_READ", "ADMIN"})
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
     void shouldFindProductByBarcode() throws Exception {
-        Product product = createTestProduct("Barcode Test", "BARCODE-FIND", "SKU-002");
+        createTestProduct("Barcode Test", "BARCODE-FIND", "SKU-002");
 
         mockMvc.perform(get("/api/products/barcode/{barcode}", "BARCODE-FIND"))
                 .andExpect(status().isOk())
@@ -129,7 +136,7 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com", authorities = {"PRODUCT_UPDATE", "ADMIN"})
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
     void shouldUpdateProduct() throws Exception {
         Product product = createTestProduct("Update Test", "BARCODE-UPDATE", "SKU-UPDATE");
 
@@ -146,8 +153,8 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .build();
 
         mockMvc.perform(put("/api/products/{id}", product.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(updateRequest)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Updated Product Name"))
@@ -155,7 +162,7 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com", authorities = {"PRODUCT_DELETE", "ADMIN"})
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
     void shouldDeleteProduct() throws Exception {
         Product product = createTestProduct("Delete Test", "BARCODE-DELETE", "SKU-DELETE");
 
@@ -169,13 +176,13 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "test@example.com", authorities = {"PRODUCT_READ", "ADMIN"})
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
     void shouldSearchProducts() throws Exception {
         createTestProduct("Searchable Product 1", "SEARCH-001", "SEARCH-SKU-001");
         createTestProduct("Searchable Product 2", "SEARCH-002", "SEARCH-SKU-002");
 
         mockMvc.perform(get("/api/products/search")
-                        .param("q", "Searchable"))
+                .param("q", "Searchable"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())

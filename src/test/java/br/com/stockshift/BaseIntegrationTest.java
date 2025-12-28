@@ -25,6 +25,7 @@ public abstract class BaseIntegrationTest {
     private WebApplicationContext webApplicationContext;
 
     @Container
+    @SuppressWarnings("resource") // Managed by Testcontainers
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
             .withDatabaseName("stockshift_test")
             .withUsername("test")

@@ -25,7 +25,7 @@ public class ProductController {
     private final ProductService productService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
     @Operation(summary = "Create a new product")
     public ResponseEntity<ApiResponse<ProductResponse>> create(@Valid @RequestBody ProductRequest request) {
         ProductResponse response = productService.create(request);
@@ -34,7 +34,7 @@ public class ProductController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get all products")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> findAll() {
         List<ProductResponse> products = productService.findAll();
@@ -42,7 +42,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get product by ID")
     public ResponseEntity<ApiResponse<ProductResponse>> findById(@PathVariable UUID id) {
         ProductResponse response = productService.findById(id);
@@ -50,7 +50,7 @@ public class ProductController {
     }
 
     @GetMapping("/category/{categoryId}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get products by category")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> findByCategory(@PathVariable UUID categoryId) {
         List<ProductResponse> products = productService.findByCategory(categoryId);
@@ -58,7 +58,7 @@ public class ProductController {
     }
 
     @GetMapping("/active/{active}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get products by active status")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> findActive(@PathVariable Boolean active) {
         List<ProductResponse> products = productService.findActive(active);
@@ -66,7 +66,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Search products by name, SKU or barcode")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> search(@RequestParam String q) {
         List<ProductResponse> products = productService.search(q);
@@ -74,7 +74,7 @@ public class ProductController {
     }
 
     @GetMapping("/barcode/{barcode}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get product by barcode")
     public ResponseEntity<ApiResponse<ProductResponse>> findByBarcode(@PathVariable String barcode) {
         ProductResponse response = productService.findByBarcode(barcode);
@@ -82,7 +82,7 @@ public class ProductController {
     }
 
     @GetMapping("/sku/{sku}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get product by SKU")
     public ResponseEntity<ApiResponse<ProductResponse>> findBySku(@PathVariable String sku) {
         ProductResponse response = productService.findBySku(sku);
@@ -90,7 +90,7 @@ public class ProductController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_UPDATE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_UPDATE', 'ROLE_ADMIN')")
     @Operation(summary = "Update product")
     public ResponseEntity<ApiResponse<ProductResponse>> update(
             @PathVariable UUID id,
@@ -100,7 +100,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_DELETE', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PRODUCT_DELETE', 'ROLE_ADMIN')")
     @Operation(summary = "Delete product (soft delete)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         productService.delete(id);

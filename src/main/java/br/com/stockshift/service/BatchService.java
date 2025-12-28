@@ -1,8 +1,16 @@
 package br.com.stockshift.service;
 
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
-import br.com.stockshift.dto.warehouse.StockSummaryResponse;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Batch;
@@ -14,14 +22,6 @@ import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor

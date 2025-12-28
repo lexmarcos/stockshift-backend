@@ -38,7 +38,7 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
 
 	// OpenAPI/Swagger
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
 
 	// Hibernate JSONB support - Hibernate 7.x compatibility
 	implementation 'io.hypersistence:hypersistence-utils-hibernate-70:3.14.1'

@@ -5,11 +5,15 @@ import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.LoginResponse;
 import br.com.stockshift.dto.auth.RefreshTokenRequest;
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
+import br.com.stockshift.dto.auth.RegisterRequest;
+import br.com.stockshift.dto.auth.RegisterResponse;
 import br.com.stockshift.service.AuthService;
+import br.com.stockshift.service.TenantService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final TenantService tenantService;
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate user and return access token + refresh token")
@@ -40,5 +45,13 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
         authService.logout(request.getRefreshToken());
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
+    }
+
+    @PostMapping("/register")
+    @Operation(summary = "Register", description = "Register new tenant with first admin user")
+    public ResponseEntity<ApiResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {
+        RegisterResponse response = tenantService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Registration successful", response));
     }
 }

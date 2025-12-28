@@ -1,23 +1,5 @@
 package br.com.stockshift.service;
 
-import br.com.stockshift.dto.movement.StockMovementItemRequest;
-import br.com.stockshift.dto.movement.StockMovementItemResponse;
-import br.com.stockshift.dto.movement.StockMovementRequest;
-import br.com.stockshift.dto.movement.StockMovementResponse;
-import br.com.stockshift.exception.BusinessException;
-import br.com.stockshift.exception.ResourceNotFoundException;
-import br.com.stockshift.model.entity.*;
-import br.com.stockshift.model.enums.MovementStatus;
-import br.com.stockshift.model.enums.MovementType;
-import br.com.stockshift.repository.*;
-import br.com.stockshift.security.TenantContext;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,12 +7,42 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import br.com.stockshift.dto.movement.StockMovementItemRequest;
+import br.com.stockshift.dto.movement.StockMovementItemResponse;
+import br.com.stockshift.dto.movement.StockMovementRequest;
+import br.com.stockshift.dto.movement.StockMovementResponse;
+import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.model.entity.Batch;
+import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.StockMovement;
+import br.com.stockshift.model.entity.StockMovementItem;
+import br.com.stockshift.model.entity.User;
+import br.com.stockshift.model.entity.Warehouse;
+import br.com.stockshift.model.enums.MovementStatus;
+import br.com.stockshift.model.enums.MovementType;
+import br.com.stockshift.repository.BatchRepository;
+import br.com.stockshift.repository.ProductRepository;
+import br.com.stockshift.repository.StockMovementItemRepository;
+import br.com.stockshift.repository.StockMovementRepository;
+import br.com.stockshift.repository.UserRepository;
+import br.com.stockshift.repository.WarehouseRepository;
+import br.com.stockshift.security.TenantContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class StockMovementService {
 
     private final StockMovementRepository stockMovementRepository;
+    @SuppressWarnings("unused") // Will be used for creating movement items
     private final StockMovementItemRepository stockMovementItemRepository;
     private final ProductRepository productRepository;
     private final BatchRepository batchRepository;
@@ -58,13 +70,16 @@ public class StockMovementService {
 
         if (request.getSourceWarehouseId() != null) {
             Warehouse source = warehouseRepository.findByTenantIdAndId(tenantId, request.getSourceWarehouseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Source warehouse", "id", request.getSourceWarehouseId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Source warehouse", "id",
+                            request.getSourceWarehouseId()));
             movement.setSourceWarehouse(source);
         }
 
         if (request.getDestinationWarehouseId() != null) {
-            Warehouse destination = warehouseRepository.findByTenantIdAndId(tenantId, request.getDestinationWarehouseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Destination warehouse", "id", request.getDestinationWarehouseId()));
+            Warehouse destination = warehouseRepository
+                    .findByTenantIdAndId(tenantId, request.getDestinationWarehouseId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Destination warehouse", "id",
+                            request.getDestinationWarehouseId()));
             movement.setDestinationWarehouse(destination);
         }
 
@@ -97,7 +112,8 @@ public class StockMovementService {
         movement.setItems(items);
         StockMovement saved = stockMovementRepository.save(movement);
 
-        log.info("Created stock movement {} of type {} for tenant {}", saved.getId(), saved.getMovementType(), tenantId);
+        log.info("Created stock movement {} of type {} for tenant {}", saved.getId(), saved.getMovementType(),
+                tenantId);
 
         return mapToResponse(saved);
     }
@@ -240,8 +256,7 @@ public class StockMovementService {
                 List<Batch> destBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
                         item.getProduct().getId(),
                         movement.getDestinationWarehouse().getId(),
-                        movement.getTenantId()
-                );
+                        movement.getTenantId());
 
                 Batch destBatch;
                 if (!destBatches.isEmpty()) {
@@ -280,9 +295,13 @@ public class StockMovementService {
                 .movementType(movement.getMovementType())
                 .status(movement.getStatus())
                 .sourceWarehouseId(movement.getSourceWarehouse() != null ? movement.getSourceWarehouse().getId() : null)
-                .sourceWarehouseName(movement.getSourceWarehouse() != null ? movement.getSourceWarehouse().getName() : null)
-                .destinationWarehouseId(movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getId() : null)
-                .destinationWarehouseName(movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getName() : null)
+                .sourceWarehouseName(
+                        movement.getSourceWarehouse() != null ? movement.getSourceWarehouse().getName() : null)
+                .destinationWarehouseId(
+                        movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getId() : null)
+                .destinationWarehouseName(
+                        movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getName()
+                                : null)
                 .userId(movement.getUser().getId())
                 .userName(movement.getUser().getFullName())
                 .notes(movement.getNotes())
