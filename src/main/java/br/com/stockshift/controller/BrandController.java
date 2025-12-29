@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/brands")
@@ -45,7 +46,7 @@ public class BrandController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('BRAND_READ', 'ROLE_ADMIN')")
     @Operation(summary = "Get brand by ID")
-    public ResponseEntity<ApiResponse<BrandResponse>> findById(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<BrandResponse>> findById(@PathVariable UUID id) {
         BrandResponse response = brandService.findById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -54,7 +55,7 @@ public class BrandController {
     @PreAuthorize("hasAnyAuthority('BRAND_UPDATE', 'ROLE_ADMIN')")
     @Operation(summary = "Update brand")
     public ResponseEntity<ApiResponse<BrandResponse>> update(
-            @PathVariable Long id,
+            @PathVariable UUID id,
             @Valid @RequestBody BrandRequest request) {
         BrandResponse response = brandService.update(id, request);
         return ResponseEntity.ok(ApiResponse.success("Brand updated successfully", response));
@@ -63,7 +64,7 @@ public class BrandController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('BRAND_DELETE', 'ROLE_ADMIN')")
     @Operation(summary = "Delete brand (soft delete)")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         brandService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Brand deleted successfully", null));
     }
