@@ -25,6 +25,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND p.category.id = :categoryId AND p.deletedAt IS NULL")
     List<Product> findByTenantIdAndCategoryId(UUID tenantId, UUID categoryId);
 
+    @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Product p WHERE p.brand.id = :brandId AND p.deletedAt IS NULL")
+    boolean existsByBrandIdAndDeletedAtIsNull(@Param("brandId") UUID brandId);
+
     @Query("SELECT p FROM Product p WHERE p.tenantId = :tenantId AND " +
            "(LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
            "LOWER(p.sku) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
