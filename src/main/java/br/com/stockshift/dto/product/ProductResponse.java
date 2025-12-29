@@ -1,5 +1,6 @@
 package br.com.stockshift.dto.product;
 
+import br.com.stockshift.dto.brand.BrandResponse;
 import br.com.stockshift.model.enums.BarcodeType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -20,6 +21,7 @@ public class ProductResponse {
     private String description;
     private UUID categoryId;
     private String categoryName;
+    private BrandResponse brand;
     private String barcode;
     private BarcodeType barcodeType;
     private String sku;

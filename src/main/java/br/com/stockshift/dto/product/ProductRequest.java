@@ -20,6 +20,7 @@ public class ProductRequest {
 
     private String description;
     private UUID categoryId;
+    private UUID brandId;
     private String barcode;
     private BarcodeType barcodeType;
     private String sku;
