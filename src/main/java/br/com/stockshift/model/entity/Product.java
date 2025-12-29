@@ -30,6 +30,10 @@ public class Product extends TenantAwareEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "brand_id")
+    private Brand brand;
+
     @Column(name = "barcode", length = 100)
     private String barcode;
 

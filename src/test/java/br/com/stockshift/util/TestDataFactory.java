@@ -38,6 +38,13 @@ public class TestDataFactory {
         return repo.save(category);
     }
 
+    public static Brand createBrand(BrandRepository repo, UUID tenantId, String name) {
+        Brand brand = new Brand();
+        brand.setTenantId(tenantId);
+        brand.setName(name);
+        return repo.save(brand);
+    }
+
     public static Product createProduct(ProductRepository repo, UUID tenantId,
                                         Category category, String name, String sku) {
         Product product = new Product();

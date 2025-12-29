@@ -18,16 +18,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.product.ProductRequest;
+import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
 import br.com.stockshift.model.enums.BarcodeType;
+import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.util.TestDataFactory;
 
 class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
@@ -38,6 +41,9 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private CategoryRepository categoryRepository;
+
+    @Autowired
+    private BrandRepository brandRepository;
 
     @Autowired
     private TenantRepository tenantRepository;
@@ -57,6 +63,7 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
         // Clear any existing data
         productRepository.deleteAll();
         categoryRepository.deleteAll();
+        brandRepository.deleteAll();
         userRepository.deleteAll();
         tenantRepository.deleteAll();
 
@@ -187,6 +194,79 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void shouldCreateProductWithBrand() throws Exception {
+        Brand testBrand = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Test Brand");
+
+        ProductRequest request = ProductRequest.builder()
+                .name("Branded Product")
+                .description("Product with brand")
+                .categoryId(testCategory.getId())
+                .brandId(testBrand.getId())
+                .barcode("BRAND-BARCODE-001")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("BRAND-SKU-001")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Branded Product"))
+                .andExpect(jsonPath("$.data.brand.id").value(testBrand.getId().toString()))
+                .andExpect(jsonPath("$.data.brand.name").value("Test Brand"));
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void shouldCreateProductWithoutBrand() throws Exception {
+        ProductRequest request = ProductRequest.builder()
+                .name("Product Without Brand")
+                .categoryId(testCategory.getId())
+                .barcode("NO-BRAND-BARCODE")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("NO-BRAND-SKU")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Product Without Brand"))
+                .andExpect(jsonPath("$.data.brand").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void shouldNotCreateProductWithInvalidBrand() throws Exception {
+        ProductRequest request = ProductRequest.builder()
+                .name("Product With Invalid Brand")
+                .categoryId(testCategory.getId())
+                .brandId(java.util.UUID.randomUUID())
+                .barcode("INVALID-BRAND-BARCODE")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("INVALID-BRAND-SKU")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        mockMvc.perform(post("/api/products")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Not Found"));
     }
 
     private Product createTestProduct(String name, String barcode, String sku) {

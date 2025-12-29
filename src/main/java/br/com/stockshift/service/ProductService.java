@@ -2,11 +2,14 @@ package br.com.stockshift.service;
 
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
+import br.com.stockshift.dto.brand.BrandResponse;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Category;
+import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final BrandRepository brandRepository;
 
     @Transactional
     public ProductResponse create(ProductRequest request) {
@@ -54,11 +58,20 @@ public class ProductService {
                     .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
         }
 
+        // Validate and set brand if provided
+        Brand brand = null;
+        if (request.getBrandId() != null) {
+            brand = brandRepository.findByTenantIdAndId(tenantId, request.getBrandId())
+                    .filter(b -> b.getDeletedAt() == null)
+                    .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", request.getBrandId()));
+        }
+
         Product product = new Product();
         product.setTenantId(tenantId);
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setCategory(category);
+        product.setBrand(brand);
         product.setBarcode(request.getBarcode());
         product.setBarcodeType(request.getBarcodeType());
         product.setSku(request.getSku());
@@ -161,6 +174,16 @@ public class ProductService {
             product.setCategory(null);
         }
 
+        // Validate and set brand if provided
+        if (request.getBrandId() != null) {
+            Brand brand = brandRepository.findByTenantIdAndId(tenantId, request.getBrandId())
+                    .filter(b -> b.getDeletedAt() == null)
+                    .orElseThrow(() -> new ResourceNotFoundException("Brand", "id", request.getBrandId()));
+            product.setBrand(brand);
+        } else {
+            product.setBrand(null);
+        }
+
         product.setName(request.getName());
         product.setDescription(request.getDescription());
         product.setBarcode(request.getBarcode());
@@ -198,6 +221,7 @@ public class ProductService {
                 .description(product.getDescription())
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .brand(product.getBrand() != null ? mapBrandToResponse(product.getBrand()) : null)
                 .barcode(product.getBarcode())
                 .barcodeType(product.getBarcodeType())
                 .sku(product.getSku())
@@ -207,6 +231,16 @@ public class ProductService {
                 .active(product.getActive())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
+                .build();
+    }
+
+    private BrandResponse mapBrandToResponse(Brand brand) {
+        return BrandResponse.builder()
+                .id(brand.getId())
+                .name(brand.getName())
+                .logoUrl(brand.getLogoUrl())
+                .createdAt(brand.getCreatedAt())
+                .updatedAt(brand.getUpdatedAt())
                 .build();
     }
 }
