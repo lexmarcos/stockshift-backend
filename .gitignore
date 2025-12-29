@@ -39,4 +39,5 @@ out/
 # Windows Zone.Identifier files
 *:Zone.Identifier
 .github
-AGENTS.md.worktrees/
+AGENTS.md
+.worktrees/
