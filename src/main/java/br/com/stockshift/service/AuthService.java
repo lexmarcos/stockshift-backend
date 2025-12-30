@@ -78,9 +78,9 @@ public class AuthService {
     }
 
     @Transactional
-    public RefreshTokenResponse refresh(RefreshTokenRequest request) {
+    public RefreshTokenResponse refresh(String refreshTokenValue) {
         // Validate refresh token
-        RefreshToken refreshToken = refreshTokenService.validateRefreshToken(request.getRefreshToken());
+        RefreshToken refreshToken = refreshTokenService.validateRefreshToken(refreshTokenValue);
 
         // Load user
         User user = refreshToken.getUser();
@@ -98,8 +98,12 @@ public class AuthService {
                 user.getTenantId(),
                 user.getEmail());
 
+        // Rotate refresh token - create new one (this deletes the old one)
+        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user);
+
         return RefreshTokenResponse.builder()
                 .accessToken(accessToken)
+                .refreshToken(newRefreshToken.getToken())
                 .tokenType("Bearer")
                 .expiresIn(jwtProperties.getAccessExpiration())
                 .build();

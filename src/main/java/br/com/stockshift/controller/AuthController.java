@@ -9,8 +9,12 @@ import br.com.stockshift.dto.auth.RegisterRequest;
 import br.com.stockshift.dto.auth.RegisterResponse;
 import br.com.stockshift.service.AuthService;
 import br.com.stockshift.service.TenantService;
+import br.com.stockshift.util.CookieUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,25 +29,66 @@ public class AuthController {
 
     private final AuthService authService;
     private final TenantService tenantService;
+    private final CookieUtil cookieUtil;
 
     @PostMapping("/login")
-    @Operation(summary = "Login", description = "Authenticate user and return access token + refresh token")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
-        return ResponseEntity.ok(ApiResponse.success(response));
+    @Operation(summary = "Login", description = "Authenticate user and set HTTP-only cookies")
+    public ResponseEntity<ApiResponse<LoginResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse response) {
+        LoginResponse loginResponse = authService.login(request);
+        
+        // Add tokens to HTTP-only cookies
+        cookieUtil.addAccessTokenCookie(response, loginResponse.getAccessToken());
+        cookieUtil.addRefreshTokenCookie(response, loginResponse.getRefreshToken());
+        
+        // Remove tokens from JSON response for security
+        loginResponse.setAccessToken(null);
+        loginResponse.setRefreshToken(null);
+        
+        return ResponseEntity.ok(ApiResponse.success(loginResponse));
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh Token", description = "Generate new access token using refresh token")
-    public ResponseEntity<ApiResponse<RefreshTokenResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        RefreshTokenResponse response = authService.refresh(request);
-        return ResponseEntity.ok(ApiResponse.success(response));
+    @Operation(summary = "Refresh Token", description = "Generate new tokens from refresh token cookie")
+    public ResponseEntity<ApiResponse<Void>> refresh(
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        
+        // Read refresh token from cookie
+        String refreshTokenValue = cookieUtil.getRefreshTokenFromCookie(request.getCookies());
+        
+        if (refreshTokenValue == null) {
+            throw new br.com.stockshift.exception.UnauthorizedException("Refresh token not found");
+        }
+        
+        // Get new tokens with rotation
+        RefreshTokenResponse tokens = authService.refresh(refreshTokenValue);
+        
+        // Set new cookies
+        cookieUtil.addAccessTokenCookie(response, tokens.getAccessToken());
+        cookieUtil.addRefreshTokenCookie(response, tokens.getRefreshToken());
+        
+        return ResponseEntity.ok(ApiResponse.success("Tokens refreshed successfully"));
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout", description = "Revoke refresh token and logout user")
-    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
-        authService.logout(request.getRefreshToken());
+    @Operation(summary = "Logout", description = "Revoke refresh token and clear cookies")
+    public ResponseEntity<ApiResponse<Void>> logout(
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        
+        // Read refresh token from cookie
+        String refreshTokenValue = cookieUtil.getRefreshTokenFromCookie(request.getCookies());
+        
+        if (refreshTokenValue != null) {
+            authService.logout(refreshTokenValue);
+        }
+        
+        // Remove cookies
+        cookieUtil.removeAccessTokenCookie(response);
+        cookieUtil.removeRefreshTokenCookie(response);
+        
         return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
     }
 
