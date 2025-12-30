@@ -20,6 +20,12 @@ jwt:
   secret: ${JWT_SECRET:dev-secret-key-change-in-production-must-be-at-least-256-bits-long}
   access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  cookie:
+    secure: ${JWT_COOKIE_SECURE:false}
+    same-site: ${JWT_COOKIE_SAME_SITE:Lax}
+    domain: ${JWT_COOKIE_DOMAIN:}
+    path: /api
+    http-only: true
 
 cors:
   allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
