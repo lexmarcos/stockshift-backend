@@ -25,111 +25,110 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
 
-    @Mock
-    private JwtTokenProvider tokenProvider;
+  @Mock
+  private JwtTokenProvider tokenProvider;
 
-    @Mock
-    private CustomUserDetailsService userDetailsService;
+  @Mock
+  private CustomUserDetailsService userDetailsService;
 
-    @Mock
-    private FilterChain filterChain;
+  @Mock
+  private FilterChain filterChain;
 
-    @InjectMocks
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+  @InjectMocks
+  private JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    private MockHttpServletRequest request;
-    private MockHttpServletResponse response;
-    private UserDetails userDetails;
-    private UUID userId;
-    private UUID tenantId;
+  private MockHttpServletRequest request;
+  private MockHttpServletResponse response;
+  private UserDetails userDetails;
+  private UUID userId;
+  private UUID tenantId;
 
-    @BeforeEach
-    void setUp() {
-        request = new MockHttpServletRequest();
-        response = new MockHttpServletResponse();
-        userId = UUID.randomUUID();
-        tenantId = UUID.randomUUID();
-        
-        userDetails = new User(
-                userId.toString(),
-                "password",
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
-        );
-    }
+  @BeforeEach
+  void setUp() {
+    request = new MockHttpServletRequest();
+    response = new MockHttpServletResponse();
+    userId = UUID.randomUUID();
+    tenantId = UUID.randomUUID();
 
-    @Test
-    void shouldAuthenticateWithCookie() throws ServletException, IOException {
-        // Given
-        String token = "valid-jwt-token";
-        Cookie accessTokenCookie = new Cookie("accessToken", token);
-        request.setCookies(accessTokenCookie);
+    userDetails = new User(
+        userId.toString(),
+        "password",
+        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+  }
 
-        when(tokenProvider.validateToken(token)).thenReturn(true);
-        when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
-        when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
-        when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+  @Test
+  void shouldAuthenticateWithCookie() throws ServletException, IOException {
+    // Given
+    String token = "valid-jwt-token";
+    Cookie accessTokenCookie = new Cookie("accessToken", token);
+    request.setCookies(accessTokenCookie);
 
-        // When
-        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+    when(tokenProvider.validateToken(token)).thenReturn(true);
+    when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
+    when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
+    when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
 
-        // Then
-        verify(tokenProvider).validateToken(token);
-        verify(userDetailsService).loadUserById(userId.toString());
-        verify(filterChain).doFilter(request, response);
-    }
+    // When
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
-    @Test
-    void shouldAuthenticateWithAuthorizationHeader() throws ServletException, IOException {
-        // Given
-        String token = "valid-jwt-token";
-        request.addHeader("Authorization", "Bearer " + token);
+    // Then
+    verify(tokenProvider).validateToken(token);
+    verify(userDetailsService).loadUserById(userId.toString());
+    verify(filterChain).doFilter(request, response);
+  }
 
-        when(tokenProvider.validateToken(token)).thenReturn(true);
-        when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
-        when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
-        when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+  @Test
+  void shouldAuthenticateWithAuthorizationHeader() throws ServletException, IOException {
+    // Given
+    String token = "valid-jwt-token";
+    request.addHeader("Authorization", "Bearer " + token);
 
-        // When
-        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+    when(tokenProvider.validateToken(token)).thenReturn(true);
+    when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
+    when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
+    when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
 
-        // Then
-        verify(tokenProvider).validateToken(token);
-        verify(userDetailsService).loadUserById(userId.toString());
-        verify(filterChain).doFilter(request, response);
-    }
+    // When
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
-    @Test
-    void shouldPrioritizeCookieOverHeader() throws ServletException, IOException {
-        // Given
-        String cookieToken = "cookie-token";
-        String headerToken = "header-token";
-        
-        Cookie accessTokenCookie = new Cookie("accessToken", cookieToken);
-        request.setCookies(accessTokenCookie);
-        request.addHeader("Authorization", "Bearer " + headerToken);
+    // Then
+    verify(tokenProvider).validateToken(token);
+    verify(userDetailsService).loadUserById(userId.toString());
+    verify(filterChain).doFilter(request, response);
+  }
 
-        when(tokenProvider.validateToken(cookieToken)).thenReturn(true);
-        when(tokenProvider.getUserIdFromToken(cookieToken)).thenReturn(userId);
-        when(tokenProvider.getTenantIdFromToken(cookieToken)).thenReturn(tenantId);
-        when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+  @Test
+  void shouldPrioritizeCookieOverHeader() throws ServletException, IOException {
+    // Given
+    String cookieToken = "cookie-token";
+    String headerToken = "header-token";
 
-        // When
-        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+    Cookie accessTokenCookie = new Cookie("accessToken", cookieToken);
+    request.setCookies(accessTokenCookie);
+    request.addHeader("Authorization", "Bearer " + headerToken);
 
-        // Then
-        verify(tokenProvider).validateToken(cookieToken);
-        verify(tokenProvider, never()).validateToken(headerToken);
-        verify(filterChain).doFilter(request, response);
-    }
+    when(tokenProvider.validateToken(cookieToken)).thenReturn(true);
+    when(tokenProvider.getUserIdFromToken(cookieToken)).thenReturn(userId);
+    when(tokenProvider.getTenantIdFromToken(cookieToken)).thenReturn(tenantId);
+    when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
 
-    @Test
-    void shouldContinueChainWhenNoTokenProvided() throws ServletException, IOException {
-        // When
-        jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+    // When
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
-        // Then
-        verify(tokenProvider, never()).validateToken(anyString());
-        verify(userDetailsService, never()).loadUserById(anyString());
-        verify(filterChain).doFilter(request, response);
-    }
+    // Then
+    verify(tokenProvider).validateToken(cookieToken);
+    verify(tokenProvider, never()).validateToken(headerToken);
+    verify(filterChain).doFilter(request, response);
+  }
+
+  @Test
+  void shouldContinueChainWhenNoTokenProvided() throws ServletException, IOException {
+    // When
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+    // Then
+    verify(tokenProvider, never()).validateToken(anyString());
+    verify(userDetailsService, never()).loadUserById(anyString());
+    verify(filterChain).doFilter(request, response);
+  }
 }

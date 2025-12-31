@@ -8,9 +8,9 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "jwt.cookie")
 @Data
 public class CookieProperties {
-    private boolean secure = false;
-    private String sameSite = "Lax";
-    private String domain;
-    private String path = "/api";
-    private boolean httpOnly = true;
+  private boolean secure = false;
+  private String sameSite = "Lax";
+  private String domain;
+  private String path = "/api";
+  private boolean httpOnly = true;
 }
