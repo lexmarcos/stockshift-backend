@@ -1,8 +1,12 @@
 package br.com.stockshift.repository;
 
+import br.com.stockshift.dto.warehouse.ProductWithStockProjection;
 import br.com.stockshift.model.entity.Batch;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -36,4 +40,33 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
     @Query("SELECT b FROM Batch b WHERE b.quantity <= :threshold AND b.tenantId = :tenantId")
     List<Batch> findLowStock(Integer threshold, UUID tenantId);
+
+    @Query("""
+        SELECT p.id as id,
+               p.name as name,
+               p.sku as sku,
+               p.barcode as barcode,
+               p.barcodeType as barcodeType,
+               p.description as description,
+               p.category as category,
+               p.brand as brand,
+               p.isKit as isKit,
+               p.attributes as attributes,
+               p.hasExpiration as hasExpiration,
+               p.active as active,
+               COALESCE(SUM(b.quantity), 0) as totalQuantity
+        FROM Batch b
+        JOIN b.product p
+        WHERE b.warehouse.id = :warehouseId
+          AND b.tenantId = :tenantId
+          AND p.deletedAt IS NULL
+        GROUP BY p.id, p.name, p.sku, p.barcode, p.barcodeType,
+                 p.description, p.category, p.brand, p.isKit,
+                 p.attributes, p.hasExpiration, p.active
+        """)
+    Page<ProductWithStockProjection> findProductsWithStockByWarehouse(
+        @Param("warehouseId") UUID warehouseId,
+        @Param("tenantId") UUID tenantId,
+        Pageable pageable
+    );
 }
