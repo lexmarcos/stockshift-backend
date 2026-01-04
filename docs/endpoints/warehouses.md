@@ -118,6 +118,123 @@ These endpoints manage warehouses (physical locations where stock is stored) in 
 
 ---
 
+## GET /api/warehouses/{id}/products
+**Summary**: Get all products with aggregated stock for a specific warehouse
+
+### Authorization
+**Required Permissions**: `WAREHOUSE_READ` or `ROLE_ADMIN`
+
+### Request
+**Method**: `GET`  
+**URL Parameters**: `id` (UUID) - Warehouse identifier
+
+**Query Parameters** (optional):
+- `page`: Page number (default: 0)
+- `size`: Page size (default: 20)
+- `sort`: Sort field and direction (e.g., "name,asc")
+
+### Response
+**Status Code**: `200 OK`
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440001",
+        "name": "Product A",
+        "sku": "SKU-001",
+        "barcode": "1234567890",
+        "barcodeType": "EAN13",
+        "description": "Product description",
+        "categoryId": "550e8400-e29b-41d4-a716-446655440010",
+        "categoryName": "Electronics",
+        "brand": {
+          "id": "550e8400-e29b-41d4-a716-446655440020",
+          "name": "Brand Name",
+          "logoUrl": "https://example.com/logo.png",
+          "createdAt": "2025-12-28T10:00:00Z",
+          "updatedAt": "2025-12-28T10:00:00Z"
+        },
+        "isKit": false,
+        "attributes": {},
+        "hasExpiration": false,
+        "active": true,
+        "totalQuantity": 125.00,
+        "createdAt": "2025-12-28T10:00:00Z",
+        "updatedAt": "2025-12-28T10:00:00Z"
+      }
+    ],
+    "pageable": {
+      "pageNumber": 0,
+      "pageSize": 20,
+      "sort": [],
+      "offset": 0,
+      "unpaged": false,
+      "paged": true
+    },
+    "totalElements": 150,
+    "totalPages": 8,
+    "number": 0,
+    "size": 20,
+    "empty": false
+  }
+}
+```
+
+### Error Responses
+
+#### 404 Not Found
+```json
+{
+  "success": false,
+  "message": "Warehouse not found",
+  "data": null
+}
+```
+
+#### 400 Bad Request - Invalid Pagination
+```json
+{
+  "success": false,
+  "message": "Invalid page size",
+  "data": null
+}
+```
+
+### Features
+- **Aggregated Stock**: Sums quantity across all batches per product
+- **Soft Delete Aware**: Excludes soft-deleted products
+- **Pagination**: Supports configurable page size
+- **Sorting**: Supports sorting by product fields (not aggregated fields)
+- **Zero Stock**: Includes products with zero current inventory
+
+### Frontend Implementation Guide
+1. **Inventory Grid**: Display products in paginated table view
+2. **Stock Display**: Show total quantity with visual indicators (low, normal, high)
+3. **Product Info**: Display name, SKU, barcode, category, brand
+4. **Actions**: Add stock movement, view batch history, edit product details
+5. **Pagination**: Implement page selector (5, 10, 20, 50 items per page)
+6. **Filtering**: Option to hide zero-stock products
+7. **Export**: Export product list with quantities to CSV/PDF
+8. **Real-time**: Refresh button to reload current page data
+9. **Search**: Filter products by name or SKU (frontend side or add API param)
+10. **Batch History**: Click product to view batch-level details with dates/expiration
+
+### Usage Example
+```bash
+# Get first page of products
+curl -H "Authorization: Bearer {token}" \
+  https://api.example.com/api/warehouses/550e8400-e29b-41d4-a716-446655440000/products?page=0&size=20
+
+# Sort by product name ascending
+curl -H "Authorization: Bearer {token}" \
+  https://api.example.com/api/warehouses/550e8400-e29b-41d4-a716-446655440000/products?page=0&size=20&sort=name,asc
+```
+
+---
+
 ## GET /api/warehouses/{id}
 **Summary**: Get warehouse by ID
 
