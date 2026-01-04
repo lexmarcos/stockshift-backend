@@ -263,4 +263,37 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.content.length()").value(5))
                 .andExpect(jsonPath("$.data.number").value(1));
     }
+
+    @Test
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldExcludeSoftDeletedProducts() throws Exception {
+        // Given: warehouse with active and soft-deleted products
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                testTenant.getId(), "Test Warehouse");
+
+        Category category = TestDataFactory.createCategory(categoryRepository,
+                testTenant.getId(), "Category");
+
+        Brand brand = TestDataFactory.createBrand(brandRepository,
+                testTenant.getId(), "Brand");
+
+        Product activeProduct = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Active Product", "SKU-ACTIVE", category, brand);
+
+        Product deletedProduct = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Deleted Product", "SKU-DELETED", category, brand);
+        deletedProduct.setDeletedAt(java.time.LocalDateTime.now());
+        productRepository.save(deletedProduct);
+
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                activeProduct, warehouse, "BATCH-ACTIVE", 100);
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                deletedProduct, warehouse, "BATCH-DELETED", 50);
+
+        // When & Then
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].name").value("Active Product"));
+    }
 }
