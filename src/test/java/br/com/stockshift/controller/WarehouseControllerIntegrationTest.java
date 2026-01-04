@@ -166,4 +166,33 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.content[0].totalQuantity").exists())
                 .andExpect(jsonPath("$.data.totalElements").value(2));
     }
+
+    @Test
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturnProductWithZeroStock() throws Exception {
+        // Given: warehouse and product with batch quantity = 0
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                testTenant.getId(), "Storage A");
+
+        Category category = TestDataFactory.createCategory(categoryRepository,
+                testTenant.getId(), "Category A");
+
+        Brand brand = TestDataFactory.createBrand(brandRepository,
+                testTenant.getId(), "Brand A");
+
+        Product product = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Zero Stock Product", "SKU-ZERO", category, brand);
+
+        // Batch with zero quantity
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                product, warehouse, "BATCH-ZERO", 0);
+
+        // When & Then
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].name").value("Zero Stock Product"))
+                .andExpect(jsonPath("$.data.content[0].totalQuantity").value(0));
+    }
 }
