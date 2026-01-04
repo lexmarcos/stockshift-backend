@@ -15,6 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import br.com.stockshift.dto.warehouse.ProductWithStockResponse;
+import br.com.stockshift.dto.warehouse.ProductWithStockProjection;
+import br.com.stockshift.dto.brand.BrandResponse;
+import br.com.stockshift.repository.BatchRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +28,7 @@ import java.util.stream.Collectors;
 public class WarehouseService {
 
     private final WarehouseRepository warehouseRepository;
+    private final BatchRepository batchRepository;
 
     @Transactional
     public WarehouseResponse create(WarehouseRequest request) {
@@ -119,6 +126,54 @@ public class WarehouseService {
                 .isActive(warehouse.getIsActive())
                 .createdAt(warehouse.getCreatedAt())
                 .updatedAt(warehouse.getUpdatedAt())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductWithStockResponse> getProductsWithStock(UUID warehouseId, Pageable pageable) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate warehouse exists and belongs to tenant
+        warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", warehouseId));
+
+        // Fetch products with aggregated stock
+        Page<ProductWithStockProjection> projections =
+                batchRepository.findProductsWithStockByWarehouse(warehouseId, tenantId, pageable);
+
+        // Map to response DTO
+        return projections.map(this::mapToProductWithStockResponse);
+    }
+
+    private ProductWithStockResponse mapToProductWithStockResponse(ProductWithStockProjection projection) {
+        BrandResponse brandResponse = null;
+        if (projection.getBrand() != null) {
+            brandResponse = BrandResponse.builder()
+                    .id(projection.getBrand().getId())
+                    .name(projection.getBrand().getName())
+                    .logoUrl(projection.getBrand().getLogoUrl())
+                    .createdAt(projection.getBrand().getCreatedAt())
+                    .updatedAt(projection.getBrand().getUpdatedAt())
+                    .build();
+        }
+
+        return ProductWithStockResponse.builder()
+                .id(projection.getId())
+                .name(projection.getName())
+                .sku(projection.getSku())
+                .barcode(projection.getBarcode())
+                .barcodeType(projection.getBarcodeType())
+                .description(projection.getDescription())
+                .categoryId(projection.getCategory() != null ? projection.getCategory().getId() : null)
+                .categoryName(projection.getCategory() != null ? projection.getCategory().getName() : null)
+                .brand(brandResponse)
+                .isKit(projection.getIsKit())
+                .attributes(projection.getAttributes())
+                .hasExpiration(projection.getHasExpiration())
+                .active(projection.getActive())
+                .totalQuantity(projection.getTotalQuantity())
+                .createdAt(projection.getCreatedAt())
+                .updatedAt(projection.getUpdatedAt())
                 .build();
     }
 }
