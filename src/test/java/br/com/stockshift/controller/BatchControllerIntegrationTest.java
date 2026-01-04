@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -191,5 +192,22 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already exists")));
+    }
+
+    @Test
+    @WithMockUser(username = "batch@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturn404WhenWarehouseNotFound() throws Exception {
+        ProductBatchRequest request = ProductBatchRequest.builder()
+                .name("New Product")
+                .sku("SKU-NEW-002")
+                .warehouseId(UUID.randomUUID()) // Non-existent warehouse
+                .batchCode("BATCH-NEW-002")
+                .quantity(50)
+                .build();
+
+        mockMvc.perform(post("/api/batches/with-product")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNotFound());
     }
 }
