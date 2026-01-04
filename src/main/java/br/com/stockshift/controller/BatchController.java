@@ -3,6 +3,8 @@ package br.com.stockshift.controller;
 import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
+import br.com.stockshift.dto.warehouse.ProductBatchRequest;
+import br.com.stockshift.dto.warehouse.ProductBatchResponse;
 import br.com.stockshift.service.BatchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -33,6 +35,16 @@ public class BatchController {
         BatchResponse response = batchService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Batch created successfully", response));
+    }
+
+    @PostMapping("/with-product")
+    @PreAuthorize("hasAnyAuthority('BATCH_CREATE', 'PRODUCT_CREATE', 'ROLE_ADMIN')")
+    @Operation(summary = "Create a new product with initial stock in warehouse")
+    public ResponseEntity<ApiResponse<ProductBatchResponse>> createWithProduct(
+            @Valid @RequestBody ProductBatchRequest request) {
+        ProductBatchResponse response = batchService.createWithProduct(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("Product and batch created successfully", response));
     }
 
     @GetMapping

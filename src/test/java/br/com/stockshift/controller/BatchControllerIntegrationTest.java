@@ -20,6 +20,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.warehouse.BatchRequest;
+import br.com.stockshift.dto.warehouse.ProductBatchRequest;
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.TenantContext;
@@ -147,5 +148,30 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(1));
+    }
+
+    @Test
+    @WithMockUser(username = "batch@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldCreateProductWithBatchSuccessfully() throws Exception {
+        ProductBatchRequest request = ProductBatchRequest.builder()
+                .name("New Product")
+                .sku("SKU-NEW-001")
+                .barcode("9876543210")
+                .warehouseId(testWarehouse.getId())
+                .batchCode("BATCH-NEW-001")
+                .quantity(50)
+                .costPrice(BigDecimal.valueOf(12.00))
+                .sellingPrice(BigDecimal.valueOf(22.00))
+                .build();
+
+        mockMvc.perform(post("/api/batches/with-product")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.product").isNotEmpty())
+                .andExpect(jsonPath("$.data.batch").isNotEmpty())
+                .andExpect(jsonPath("$.data.product.name").value("New Product"))
+                .andExpect(jsonPath("$.data.batch.quantity").value(50));
     }
 }
