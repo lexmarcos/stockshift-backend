@@ -224,4 +224,43 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(get("/api/warehouses/{id}/products", nonExistentId))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldRespectPagination() throws Exception {
+        // Given: warehouse with 10 products
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                testTenant.getId(), "Large Warehouse");
+
+        Category category = TestDataFactory.createCategory(categoryRepository,
+                testTenant.getId(), "Test Category");
+
+        Brand brand = TestDataFactory.createBrand(brandRepository,
+                testTenant.getId(), "Test Brand");
+
+        for (int i = 1; i <= 10; i++) {
+            Product product = TestDataFactory.createProduct(productRepository,
+                    testTenant.getId(), "Product " + i, "SKU" + i, category, brand);
+            TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                    product, warehouse, "BATCH" + i, i * 10);
+        }
+
+        // When & Then: page 0, size 5
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId())
+                .param("page", "0")
+                .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(5))
+                .andExpect(jsonPath("$.data.totalElements").value(10))
+                .andExpect(jsonPath("$.data.totalPages").value(2))
+                .andExpect(jsonPath("$.data.number").value(0));
+
+        // When & Then: page 1, size 5
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId())
+                .param("page", "1")
+                .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(5))
+                .andExpect(jsonPath("$.data.number").value(1));
+    }
 }
