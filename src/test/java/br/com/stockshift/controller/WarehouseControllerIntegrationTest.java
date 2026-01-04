@@ -195,4 +195,20 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.content[0].name").value("Zero Stock Product"))
                 .andExpect(jsonPath("$.data.content[0].totalQuantity").value(0));
     }
+
+    @Test
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturnEmptyPageWhenWarehouseHasNoProducts() throws Exception {
+        // Given: warehouse with no batches
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                testTenant.getId(), "Empty Warehouse");
+
+        // When & Then
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.content.length()").value(0))
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
 }
