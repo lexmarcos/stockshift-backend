@@ -210,4 +210,17 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @WithMockUser(username = "batch@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturn400WhenRequiredFieldsMissing() throws Exception {
+        ProductBatchRequest request = ProductBatchRequest.builder()
+                // Missing name, warehouseId, batchCode, quantity
+                .build();
+
+        mockMvc.perform(post("/api/batches/with-product")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
 }
