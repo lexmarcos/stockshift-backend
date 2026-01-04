@@ -60,6 +60,22 @@ public class TestDataFactory {
         return repo.save(product);
     }
 
+    public static Product createProduct(ProductRepository repo, UUID tenantId,
+                                        String name, String sku, Category category, Brand brand) {
+        Product product = new Product();
+        product.setTenantId(tenantId);
+        product.setName(name);
+        product.setSku(sku);
+        product.setCategory(category);
+        product.setBrand(brand);
+        product.setBarcode(sku + "-BARCODE");
+        product.setBarcodeType(BarcodeType.EXTERNAL);
+        product.setActive(true);
+        product.setIsKit(false);
+        product.setHasExpiration(false);
+        return repo.save(product);
+    }
+
     public static Warehouse createWarehouse(WarehouseRepository repo, UUID tenantId, String name) {
         Warehouse warehouse = new Warehouse();
         warehouse.setTenantId(tenantId);
@@ -78,6 +94,21 @@ public class TestDataFactory {
         batch.setProduct(product);
         batch.setWarehouse(warehouse);
         batch.setBatchCode("BATCH-" + UUID.randomUUID().toString().substring(0, 8));
+        batch.setQuantity(quantity);
+        batch.setCostPrice(BigDecimal.valueOf(10.00));
+        batch.setSellingPrice(BigDecimal.valueOf(15.00));
+        batch.setExpirationDate(LocalDate.now().plusMonths(6));
+        return repo.save(batch);
+    }
+
+    public static Batch createBatch(BatchRepository repo, UUID tenantId,
+                                    Product product, Warehouse warehouse,
+                                    String batchCode, Integer quantity) {
+        Batch batch = new Batch();
+        batch.setTenantId(tenantId);
+        batch.setProduct(product);
+        batch.setWarehouse(warehouse);
+        batch.setBatchCode(batchCode);
         batch.setQuantity(quantity);
         batch.setCostPrice(BigDecimal.valueOf(10.00));
         batch.setSellingPrice(BigDecimal.valueOf(15.00));

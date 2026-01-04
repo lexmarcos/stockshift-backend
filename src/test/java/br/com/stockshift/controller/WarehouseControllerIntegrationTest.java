@@ -16,9 +16,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.warehouse.WarehouseRequest;
+import br.com.stockshift.model.entity.Brand;
+import br.com.stockshift.model.entity.Category;
+import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
 import br.com.stockshift.model.entity.Warehouse;
+import br.com.stockshift.repository.BatchRepository;
+import br.com.stockshift.repository.BrandRepository;
+import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.WarehouseRepository;
@@ -41,11 +48,27 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
+
+    @Autowired
+    private BrandRepository brandRepository;
+
+    @Autowired
+    private BatchRepository batchRepository;
+
     private Tenant testTenant;
     private User testUser;
 
     @BeforeEach
     void setUpTestData() {
+        batchRepository.deleteAll();
+        productRepository.deleteAll();
+        categoryRepository.deleteAll();
+        brandRepository.deleteAll();
         warehouseRepository.deleteAll();
         userRepository.deleteAll();
         tenantRepository.deleteAll();
@@ -101,5 +124,46 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data.length()").value(2));
+    }
+
+    @Test
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturnProductsWithStockForWarehouse() throws Exception {
+        // Given: warehouse, category, brand, products, and batches
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                testTenant.getId(), "Main Warehouse");
+
+        Category category = TestDataFactory.createCategory(categoryRepository,
+                testTenant.getId(), "Electronics");
+
+        Brand brand = TestDataFactory.createBrand(brandRepository,
+                testTenant.getId(), "TestBrand");
+
+        Product product1 = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Product 1", "SKU001", category, brand);
+
+        Product product2 = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Product 2", "SKU002", category, brand);
+
+        // Product 1 has 2 batches: 10 + 15 = 25 total
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                product1, warehouse, "BATCH001", 10);
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                product1, warehouse, "BATCH002", 15);
+
+        // Product 2 has 1 batch: 30 total
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                product2, warehouse, "BATCH003", 30);
+
+        // When & Then
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId())
+                .param("page", "0")
+                .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.content.length()").value(2))
+                .andExpect(jsonPath("$.data.content[0].totalQuantity").exists())
+                .andExpect(jsonPath("$.data.totalElements").value(2));
     }
 }
