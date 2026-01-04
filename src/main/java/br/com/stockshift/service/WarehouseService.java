@@ -138,8 +138,8 @@ public class WarehouseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", warehouseId));
 
         // Fetch products with aggregated stock
-        Page<ProductWithStockProjection> projections =
-                batchRepository.findProductsWithStockByWarehouse(warehouseId, tenantId, pageable);
+        Page<ProductWithStockProjection> projections = batchRepository.findProductsWithStockByWarehouse(warehouseId,
+                tenantId, pageable);
 
         // Map to response DTO
         return projections.map(this::mapToProductWithStockResponse);

@@ -59,6 +59,8 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
                p.updatedAt as updatedAt
         FROM Batch b
         JOIN b.product p
+        LEFT JOIN p.category
+        LEFT JOIN p.brand
         WHERE b.warehouse.id = :warehouseId
           AND b.tenantId = :tenantId
           AND p.tenantId = :tenantId
