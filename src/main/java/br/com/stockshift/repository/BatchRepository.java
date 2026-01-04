@@ -41,7 +41,7 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
     @Query("SELECT b FROM Batch b WHERE b.quantity <= :threshold AND b.tenantId = :tenantId")
     List<Batch> findLowStock(Integer threshold, UUID tenantId);
 
-    @Query("""
+    @Query(value = """
         SELECT p.id as id,
                p.name as name,
                p.sku as sku,
@@ -66,6 +66,14 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
                  p.description, p.category, p.brand, p.isKit,
                  p.attributes, p.hasExpiration, p.active,
                  p.createdAt, p.updatedAt
+        """,
+        countQuery = """
+        SELECT COUNT(DISTINCT p.id)
+        FROM Batch b
+        JOIN b.product p
+        WHERE b.warehouse.id = :warehouseId
+          AND b.tenantId = :tenantId
+          AND p.deletedAt IS NULL
         """)
     Page<ProductWithStockProjection> findProductsWithStockByWarehouse(
         @Param("warehouseId") UUID warehouseId,

@@ -18,7 +18,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/warehouses")
@@ -86,7 +88,36 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<Page<ProductWithStockResponse>>> getProductsWithStock(
             @PathVariable UUID id,
             Pageable pageable) {
-        Page<ProductWithStockResponse> products = warehouseService.getProductsWithStock(id, pageable);
+        // Filter out invalid sorts - only allow sorting by entity fields
+        Pageable sanitizedPageable = sanitizePageable(pageable);
+        Page<ProductWithStockResponse> products = warehouseService.getProductsWithStock(id, sanitizedPageable);
         return ResponseEntity.ok(ApiResponse.success(products));
+    }
+
+    private Pageable sanitizePageable(Pageable pageable) {
+        if (pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+        
+        // List of valid sortable fields (Product entity fields only)
+        Set<String> validSortFields = Set.of("name", "sku", "barcode", "active", "createdAt", "updatedAt");
+        
+        List<org.springframework.data.domain.Sort.Order> validOrders = pageable.getSort().stream()
+                .filter(order -> validSortFields.contains(order.getProperty()))
+                .collect(Collectors.toList());
+        
+        if (validOrders.isEmpty()) {
+            // No valid sort fields, return unsorted
+            return org.springframework.data.domain.PageRequest.of(
+                    pageable.getPageNumber(), 
+                    pageable.getPageSize()
+            );
+        }
+        
+        return org.springframework.data.domain.PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                org.springframework.data.domain.Sort.by(validOrders)
+        );
     }
 }
