@@ -11,6 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
+import br.com.stockshift.dto.warehouse.ProductBatchRequest;
+import br.com.stockshift.dto.warehouse.ProductBatchResponse;
+import br.com.stockshift.dto.product.ProductRequest;
+import br.com.stockshift.dto.product.ProductResponse;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Batch;
@@ -31,6 +35,7 @@ public class BatchService {
     private final BatchRepository batchRepository;
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
+    private final ProductService productService;
 
     @Transactional
     public BatchResponse create(BatchRequest request) {
@@ -177,6 +182,95 @@ public class BatchService {
 
         batchRepository.delete(batch);
         log.info("Deleted batch {} for tenant {}", id, tenantId);
+    }
+
+    @Transactional
+    public ProductBatchResponse createWithProduct(ProductBatchRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate product duplicity - SKU
+        if (request.getSku() != null) {
+            productRepository.findBySkuAndTenantId(request.getSku(), tenantId)
+                    .ifPresent(p -> {
+                        throw new BusinessException("Product with SKU '" + request.getSku() +
+                                "' already exists. Use POST /api/batches instead");
+                    });
+        }
+
+        // Validate product duplicity - Barcode
+        if (request.getBarcode() != null) {
+            productRepository.findByBarcodeAndTenantId(request.getBarcode(), tenantId)
+                    .ifPresent(p -> {
+                        throw new BusinessException("Product with barcode '" + request.getBarcode() +
+                                "' already exists. Use POST /api/batches instead");
+                    });
+        }
+
+        // Validate warehouse exists and is active
+        Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getWarehouseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
+
+        if (!warehouse.getIsActive()) {
+            throw new BusinessException("Warehouse is not active");
+        }
+
+        // Validate batch code uniqueness
+        batchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode())
+                .ifPresent(b -> {
+                    throw new BusinessException("Batch with code '" + request.getBatchCode() + "' already exists");
+                });
+
+        // Validate date logic
+        if (request.getHasExpiration() && request.getExpirationDate() == null) {
+            throw new BusinessException("Expiration date is required for products with expiration");
+        }
+
+        if (request.getManufacturedDate() != null && request.getExpirationDate() != null) {
+            if (request.getExpirationDate().isBefore(request.getManufacturedDate())) {
+                throw new BusinessException("Expiration date must be after manufactured date");
+            }
+        }
+
+        // Create product
+        ProductRequest productRequest = ProductRequest.builder()
+                .name(request.getName())
+                .description(request.getDescription())
+                .categoryId(request.getCategoryId())
+                .brandId(request.getBrandId())
+                .barcode(request.getBarcode())
+                .barcodeType(request.getBarcodeType())
+                .sku(request.getSku())
+                .isKit(request.getIsKit())
+                .attributes(request.getAttributes())
+                .hasExpiration(request.getHasExpiration())
+                .active(true)
+                .build();
+
+        ProductResponse productResponse = productService.create(productRequest);
+
+        // Create batch
+        Product product = productRepository.findByTenantIdAndId(tenantId, productResponse.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product", "id", productResponse.getId()));
+
+        Batch batch = new Batch();
+        batch.setTenantId(tenantId);
+        batch.setProduct(product);
+        batch.setWarehouse(warehouse);
+        batch.setBatchCode(request.getBatchCode());
+        batch.setQuantity(request.getQuantity());
+        batch.setManufacturedDate(request.getManufacturedDate());
+        batch.setExpirationDate(request.getExpirationDate());
+        batch.setCostPrice(request.getCostPrice());
+        batch.setSellingPrice(request.getSellingPrice());
+
+        Batch savedBatch = batchRepository.save(batch);
+        log.info("Created product {} with batch {} for tenant {}",
+                productResponse.getId(), savedBatch.getId(), tenantId);
+
+        return ProductBatchResponse.builder()
+                .product(productResponse)
+                .batch(mapToResponse(savedBatch))
+                .build();
     }
 
     private BatchResponse mapToResponse(Batch batch) {
