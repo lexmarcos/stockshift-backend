@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -210,5 +212,16 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.content").isArray())
                 .andExpect(jsonPath("$.data.content.length()").value(0))
                 .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    @Test
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturn404WhenWarehouseNotFound() throws Exception {
+        // Given: non-existent warehouse ID
+        UUID nonExistentId = UUID.randomUUID();
+
+        // When & Then
+        mockMvc.perform(get("/api/warehouses/{id}/products", nonExistentId))
+                .andExpect(status().isNotFound());
     }
 }
