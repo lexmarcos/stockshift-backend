@@ -61,6 +61,7 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
         JOIN b.product p
         WHERE b.warehouse.id = :warehouseId
           AND b.tenantId = :tenantId
+          AND p.tenantId = :tenantId
           AND p.deletedAt IS NULL
         GROUP BY p.id, p.name, p.sku, p.barcode, p.barcodeType,
                  p.description, p.category, p.brand, p.isKit,
@@ -73,6 +74,7 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
         JOIN b.product p
         WHERE b.warehouse.id = :warehouseId
           AND b.tenantId = :tenantId
+          AND p.tenantId = :tenantId
           AND p.deletedAt IS NULL
         """)
     Page<ProductWithStockProjection> findProductsWithStockByWarehouse(
