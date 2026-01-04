@@ -152,4 +152,25 @@ class BatchServiceTest {
         verify(productService, never()).create(any());
         verify(batchRepository, never()).save(any());
     }
+
+    @Test
+    void shouldThrowExceptionWhenBarcodeAlreadyExists() {
+        // Arrange
+        Product existingProduct = new Product();
+        existingProduct.setId(UUID.randomUUID());
+        existingProduct.setBarcode("1234567890");
+
+        when(productRepository.findBySkuAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndTenantId("1234567890", tenantId))
+                .thenReturn(Optional.of(existingProduct));
+
+        // Act & Assert
+        assertThatThrownBy(() -> batchService.createWithProduct(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Product with barcode '1234567890' already exists");
+
+        verify(productService, never()).create(any());
+        verify(batchRepository, never()).save(any());
+    }
 }
