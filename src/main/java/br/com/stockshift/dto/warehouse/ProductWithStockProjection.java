@@ -4,7 +4,7 @@ import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.enums.BarcodeType;
 
-import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -21,5 +21,7 @@ public interface ProductWithStockProjection {
     Map<String, Object> getAttributes();
     Boolean getHasExpiration();
     Boolean getActive();
-    BigDecimal getTotalQuantity();
+    Long getTotalQuantity();
+    LocalDateTime getCreatedAt();
+    LocalDateTime getUpdatedAt();
 }

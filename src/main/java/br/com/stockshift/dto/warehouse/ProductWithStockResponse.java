@@ -30,7 +30,7 @@ public class ProductWithStockResponse {
     private Map<String, Object> attributes;
     private Boolean hasExpiration;
     private Boolean active;
-    private BigDecimal totalQuantity;
+    private Long totalQuantity;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

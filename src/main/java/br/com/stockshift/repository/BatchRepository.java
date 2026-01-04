@@ -54,7 +54,9 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
                p.attributes as attributes,
                p.hasExpiration as hasExpiration,
                p.active as active,
-               COALESCE(SUM(b.quantity), 0) as totalQuantity
+               COALESCE(SUM(b.quantity), 0) as totalQuantity,
+               p.createdAt as createdAt,
+               p.updatedAt as updatedAt
         FROM Batch b
         JOIN b.product p
         WHERE b.warehouse.id = :warehouseId
@@ -62,7 +64,8 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
           AND p.deletedAt IS NULL
         GROUP BY p.id, p.name, p.sku, p.barcode, p.barcodeType,
                  p.description, p.category, p.brand, p.isKit,
-                 p.attributes, p.hasExpiration, p.active
+                 p.attributes, p.hasExpiration, p.active,
+                 p.createdAt, p.updatedAt
         """)
     Page<ProductWithStockProjection> findProductsWithStockByWarehouse(
         @Param("warehouseId") UUID warehouseId,
