@@ -173,4 +173,25 @@ class BatchServiceTest {
         verify(productService, never()).create(any());
         verify(batchRepository, never()).save(any());
     }
+
+    @Test
+    void shouldThrowExceptionWhenWarehouseIsInactive() {
+        // Arrange
+        warehouse.setIsActive(false);
+
+        when(productRepository.findBySkuAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId))
+                .thenReturn(Optional.of(warehouse));
+
+        // Act & Assert
+        assertThatThrownBy(() -> batchService.createWithProduct(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Warehouse is not active");
+
+        verify(productService, never()).create(any());
+        verify(batchRepository, never()).save(any());
+    }
 }
