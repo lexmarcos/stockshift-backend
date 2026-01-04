@@ -133,4 +133,23 @@ class BatchServiceTest {
         verify(productService).create(any(ProductRequest.class));
         verify(batchRepository).save(any(Batch.class));
     }
+
+    @Test
+    void shouldThrowExceptionWhenSkuAlreadyExists() {
+        // Arrange
+        Product existingProduct = new Product();
+        existingProduct.setId(UUID.randomUUID());
+        existingProduct.setSku("SKU-001");
+
+        when(productRepository.findBySkuAndTenantId("SKU-001", tenantId))
+                .thenReturn(Optional.of(existingProduct));
+
+        // Act & Assert
+        assertThatThrownBy(() -> batchService.createWithProduct(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Product with SKU 'SKU-001' already exists");
+
+        verify(productService, never()).create(any());
+        verify(batchRepository, never()).save(any());
+    }
 }
