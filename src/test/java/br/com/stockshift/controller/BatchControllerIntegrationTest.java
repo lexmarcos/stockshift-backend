@@ -174,4 +174,22 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.product.name").value("New Product"))
                 .andExpect(jsonPath("$.data.batch.quantity").value(50));
     }
+
+    @Test
+    @WithMockUser(username = "batch@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldReturn409WhenSkuAlreadyExists() throws Exception {
+        ProductBatchRequest request = ProductBatchRequest.builder()
+                .name("Duplicate Product")
+                .sku(testProduct.getSku()) // Use existing SKU
+                .warehouseId(testWarehouse.getId())
+                .batchCode("BATCH-DUP-001")
+                .quantity(50)
+                .build();
+
+        mockMvc.perform(post("/api/batches/with-product")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("already exists")));
+    }
 }
