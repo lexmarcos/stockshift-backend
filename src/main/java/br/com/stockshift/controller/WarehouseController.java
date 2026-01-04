@@ -1,6 +1,7 @@
 package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.warehouse.ProductWithStockResponse;
 import br.com.stockshift.dto.warehouse.WarehouseRequest;
 import br.com.stockshift.dto.warehouse.WarehouseResponse;
 import br.com.stockshift.service.WarehouseService;
@@ -9,6 +10,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -75,5 +78,15 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         warehouseService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Warehouse deleted successfully", null));
+    }
+
+    @GetMapping("/{id}/products")
+    @PreAuthorize("hasAnyAuthority('WAREHOUSE_READ', 'ROLE_ADMIN')")
+    @Operation(summary = "Get products with stock for warehouse")
+    public ResponseEntity<ApiResponse<Page<ProductWithStockResponse>>> getProductsWithStock(
+            @PathVariable UUID id,
+            Pageable pageable) {
+        Page<ProductWithStockResponse> products = warehouseService.getProductsWithStock(id, pageable);
+        return ResponseEntity.ok(ApiResponse.success(products));
     }
 }
