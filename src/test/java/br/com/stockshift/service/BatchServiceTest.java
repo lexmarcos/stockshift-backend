@@ -194,4 +194,46 @@ class BatchServiceTest {
         verify(productService, never()).create(any());
         verify(batchRepository, never()).save(any());
     }
+
+    @Test
+    void shouldThrowExceptionWhenExpirationDateMissingForProductWithExpiration() {
+        // Arrange
+        request.setHasExpiration(true);
+        request.setExpirationDate(null);
+
+        when(productRepository.findBySkuAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId))
+                .thenReturn(Optional.of(warehouse));
+        when(batchRepository.findByTenantIdAndBatchCode(any(), any()))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> batchService.createWithProduct(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Expiration date is required for products with expiration");
+    }
+
+    @Test
+    void shouldThrowExceptionWhenExpirationDateBeforeManufacturedDate() {
+        // Arrange
+        request.setManufacturedDate(LocalDate.now());
+        request.setExpirationDate(LocalDate.now().minusDays(1));
+
+        when(productRepository.findBySkuAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(productRepository.findByBarcodeAndTenantId(any(), any()))
+                .thenReturn(Optional.empty());
+        when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId))
+                .thenReturn(Optional.of(warehouse));
+        when(batchRepository.findByTenantIdAndBatchCode(any(), any()))
+                .thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> batchService.createWithProduct(request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Expiration date must be after manufactured date");
+    }
 }
