@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -295,5 +296,43 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content.length()").value(1))
                 .andExpect(jsonPath("$.data.content[0].name").value("Active Product"));
+    }
+
+    @Test
+    @Disabled("Sorting by aggregated fields not supported in current implementation")
+    @WithMockUser(username = "warehouse@test.com", authorities = {"ROLE_ADMIN"})
+    void shouldSupportSorting() throws Exception {
+        // Given: warehouse with products with different quantities
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                testTenant.getId(), "Sortable Warehouse");
+
+        Category category = TestDataFactory.createCategory(categoryRepository,
+                testTenant.getId(), "Sort Category");
+
+        Brand brand = TestDataFactory.createBrand(brandRepository,
+                testTenant.getId(), "Sort Brand");
+
+        Product productLow = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Low Stock", "SKU-LOW", category, brand);
+        Product productMid = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "Mid Stock", "SKU-MID", category, brand);
+        Product productHigh = TestDataFactory.createProduct(productRepository,
+                testTenant.getId(), "High Stock", "SKU-HIGH", category, brand);
+
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                productLow, warehouse, "BATCH-LOW", 5);
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                productMid, warehouse, "BATCH-MID", 50);
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                productHigh, warehouse, "BATCH-HIGH", 200);
+
+        // When & Then: sort by totalQuantity descending
+        mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId())
+                .param("sort", "totalQuantity,desc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].name").value("High Stock"))
+                .andExpect(jsonPath("$.data.content[0].totalQuantity").value(200))
+                .andExpect(jsonPath("$.data.content[2].name").value("Low Stock"))
+                .andExpect(jsonPath("$.data.content[2].totalQuantity").value(5));
     }
 }
