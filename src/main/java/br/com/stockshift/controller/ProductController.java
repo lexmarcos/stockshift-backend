@@ -10,9 +10,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -26,11 +28,13 @@ public class ProductController {
 
     private final ProductService productService;
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
     @Operation(summary = "Create a new product")
-    public ResponseEntity<ApiResponse<ProductResponse>> create(@Valid @RequestBody ProductRequest request) {
-        ProductResponse response = productService.create(request);
+    public ResponseEntity<ApiResponse<ProductResponse>> create(
+            @RequestPart("product") @Valid ProductRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        ProductResponse response = productService.create(request, image);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Product created successfully", response));
     }
@@ -91,13 +95,14 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('PRODUCT_UPDATE', 'ROLE_ADMIN')")
     @Operation(summary = "Update product")
     public ResponseEntity<ApiResponse<ProductResponse>> update(
             @PathVariable UUID id,
-            @Valid @RequestBody ProductRequest request) {
-        ProductResponse response = productService.update(id, request);
+            @RequestPart("product") @Valid ProductRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        ProductResponse response = productService.update(id, request, image);
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", response));
     }
 
