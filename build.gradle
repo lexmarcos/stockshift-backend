@@ -43,6 +43,9 @@ dependencies {
 	// Hibernate JSONB support - Hibernate 7.x compatibility
 	implementation 'io.hypersistence:hypersistence-utils-hibernate-70:3.14.1'
 
+	// AWS SDK S3 for Supabase Storage (S3-compatible)
+	implementation 'software.amazon.awssdk:s3:2.20.26'
+
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	runtimeOnly 'org.postgresql:postgresql'
