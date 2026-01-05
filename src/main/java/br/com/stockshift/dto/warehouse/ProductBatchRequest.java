@@ -33,6 +33,7 @@ public class ProductBatchRequest {
     private Map<String, Object> attributes;
     @Builder.Default
     private Boolean hasExpiration = false;
+    private String imageUrl;
 
     // Batch fields
     @NotNull(message = "Warehouse ID is required")

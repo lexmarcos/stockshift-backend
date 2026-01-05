@@ -31,4 +31,5 @@ public class ProductRequest {
     private Boolean hasExpiration = false;
     @Builder.Default
     private Boolean active = true;
+    private String imageUrl;
 }

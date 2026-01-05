@@ -57,6 +57,9 @@ public class Product extends TenantAwareEntity {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
     @Column(name = "deleted_at")
     private java.time.LocalDateTime deletedAt;
 }

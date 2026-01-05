@@ -29,6 +29,7 @@ public class ProductResponse {
     private Map<String, Object> attributes;
     private Boolean hasExpiration;
     private Boolean active;
+    private String imageUrl;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
