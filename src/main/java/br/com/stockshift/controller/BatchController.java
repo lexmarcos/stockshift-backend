@@ -12,9 +12,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -37,12 +39,13 @@ public class BatchController {
                 .body(ApiResponse.success("Batch created successfully", response));
     }
 
-    @PostMapping("/with-product")
+    @PostMapping(value = "/with-product", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('BATCH_CREATE', 'PRODUCT_CREATE', 'ROLE_ADMIN')")
     @Operation(summary = "Create a new product with initial stock in warehouse")
     public ResponseEntity<ApiResponse<ProductBatchResponse>> createWithProduct(
-            @Valid @RequestBody ProductBatchRequest request) {
-        ProductBatchResponse response = batchService.createWithProduct(request);
+            @RequestPart("product") @Valid ProductBatchRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        ProductBatchResponse response = batchService.createWithProduct(request, image);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Product and batch created successfully", response));
     }
