@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
@@ -36,6 +37,7 @@ public class BatchService {
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
+    private final StorageService storageService;
 
     @Transactional
     public BatchResponse create(BatchRequest request) {
@@ -185,7 +187,13 @@ public class BatchService {
     }
 
     @Transactional
-    public ProductBatchResponse createWithProduct(ProductBatchRequest request) {
+    public ProductBatchResponse createWithProduct(ProductBatchRequest request, MultipartFile image) {
+        // Upload image if provided
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = storageService.uploadImage(image);
+            request.setImageUrl(imageUrl);
+        }
+
         UUID tenantId = TenantContext.getTenantId();
 
         // Validate product duplicity - SKU
@@ -243,6 +251,7 @@ public class BatchService {
                 .isKit(request.getIsKit())
                 .attributes(request.getAttributes())
                 .hasExpiration(request.getHasExpiration())
+                .imageUrl(request.getImageUrl())
                 .active(true)
                 .build();
 
@@ -271,6 +280,11 @@ public class BatchService {
                 .product(productResponse)
                 .batch(mapToResponse(savedBatch))
                 .build();
+    }
+
+    @Transactional
+    public ProductBatchResponse createWithProduct(ProductBatchRequest request) {
+        return createWithProduct(request, null);
     }
 
     private BatchResponse mapToResponse(Batch batch) {
