@@ -41,3 +41,6 @@ out/
 .github
 AGENTS.md
 .worktrees/
+
+### Local Configuration ###
+src/main/resources/application-dev.yml
