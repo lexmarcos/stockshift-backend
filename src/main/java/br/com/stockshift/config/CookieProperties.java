@@ -11,6 +11,6 @@ public class CookieProperties {
   private boolean secure = false;
   private String sameSite = "Lax";
   private String domain;
-  private String path = "/api";
+  private String path = "/";
   private boolean httpOnly = true;
 }

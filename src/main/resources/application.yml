@@ -1,3 +1,7 @@
+server:
+  servlet:
+    context-path: /stockshift
+
 spring:
   application:
     name: stockshift
@@ -24,19 +28,11 @@ jwt:
     secure: ${JWT_COOKIE_SECURE:false}
     same-site: ${JWT_COOKIE_SAME_SITE:Lax}
     domain: ${JWT_COOKIE_DOMAIN:}
-    path: /api
+    path: /
     http-only: true
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000}
-
-storage:
-  endpoint: ${STORAGE_ENDPOINT:}
-  access-key: ${STORAGE_ACCESS_KEY:}
-  secret-key: ${STORAGE_SECRET_KEY:}
-  bucket-name: ${STORAGE_BUCKET_NAME:product-images}
-  region: ${STORAGE_REGION:us-east-1}
-  public-url: ${STORAGE_PUBLIC_URL:}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://stag-above-hog.ngrok-free.app}
 
 management:
   endpoints:

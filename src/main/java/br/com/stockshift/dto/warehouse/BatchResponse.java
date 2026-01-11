@@ -1,11 +1,11 @@
 package br.com.stockshift.dto.warehouse;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -24,8 +24,10 @@ public class BatchResponse {
     private Integer quantity;
     private LocalDate manufacturedDate;
     private LocalDate expirationDate;
-    private BigDecimal costPrice;
-    private BigDecimal sellingPrice;
+    @Schema(description = "Cost price in cents", example = "1050")
+    private Long costPrice;
+    @Schema(description = "Selling price in cents", example = "1575")
+    private Long sellingPrice;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

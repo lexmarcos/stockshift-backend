@@ -13,6 +13,20 @@ jwt:
   secret: test-secret-key-for-integration-tests-minimum-256-bits
   access-expiration: 900000
   refresh-expiration: 604800000
+  cookie:
+    secure: false
+    same-site: Lax
+    domain:
+    path: /
+    http-only: true
+
+storage:
+  endpoint: http://localhost:54321
+  access-key: test-access-key
+  secret-key: test-secret-key
+  bucket-name: test-bucket
+  region: us-east-1
+  public-url: http://localhost:54321/test-bucket
 
 logging:
   level:

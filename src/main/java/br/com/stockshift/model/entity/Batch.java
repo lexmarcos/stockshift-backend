@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -43,9 +42,9 @@ public class Batch extends TenantAwareEntity {
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
-    @Column(name = "cost_price", precision = 15, scale = 2)
-    private BigDecimal costPrice;
+    @Column(name = "cost_price")
+    private Long costPrice;
 
-    @Column(name = "selling_price", precision = 15, scale = 2)
-    private BigDecimal sellingPrice;
+    @Column(name = "selling_price")
+    private Long sellingPrice;
 }

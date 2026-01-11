@@ -1,6 +1,7 @@
 package br.com.stockshift.service;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -37,17 +38,44 @@ public class BatchService {
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
-    private final StorageService storageService;
+
+    /**
+     * Generates a unique batch code in the format: BATCH-YYYYMMDD-XXX
+     * where XXX is a sequential number for the day
+     */
+    private String generateBatchCode(UUID tenantId) {
+        String datePrefix = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String baseCode = "BATCH-" + datePrefix;
+
+        int sequence = 1;
+        String batchCode;
+
+        // Find next available sequence number
+        do {
+            batchCode = String.format("%s-%03d", baseCode, sequence);
+            sequence++;
+        } while (batchRepository.findByTenantIdAndBatchCode(tenantId, batchCode).isPresent());
+
+        return batchCode;
+    }
 
     @Transactional
     public BatchResponse create(BatchRequest request) {
         UUID tenantId = TenantContext.getTenantId();
 
-        // Validate unique batch code
-        batchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode())
-                .ifPresent(b -> {
-                    throw new BusinessException("Batch with code " + request.getBatchCode() + " already exists");
-                });
+        // Generate batch code if not provided
+        String batchCode = request.getBatchCode();
+        if (batchCode == null || batchCode.trim().isEmpty()) {
+            batchCode = generateBatchCode(tenantId);
+            log.info("Generated batch code: {}", batchCode);
+        } else {
+            // Validate unique batch code when provided
+            final String providedCode = batchCode;
+            batchRepository.findByTenantIdAndBatchCode(tenantId, providedCode)
+                    .ifPresent(b -> {
+                        throw new BusinessException("Batch with code " + providedCode + " already exists");
+                    });
+        }
 
         // Validate product
         Product product = productRepository.findByTenantIdAndId(tenantId, request.getProductId())
@@ -66,7 +94,7 @@ public class BatchService {
         batch.setTenantId(tenantId);
         batch.setProduct(product);
         batch.setWarehouse(warehouse);
-        batch.setBatchCode(request.getBatchCode());
+        batch.setBatchCode(batchCode);
         batch.setQuantity(request.getQuantity());
         batch.setManufacturedDate(request.getManufacturedDate());
         batch.setExpirationDate(request.getExpirationDate());
@@ -188,12 +216,6 @@ public class BatchService {
 
     @Transactional
     public ProductBatchResponse createWithProduct(ProductBatchRequest request, MultipartFile image) {
-        // Upload image if provided
-        if (image != null && !image.isEmpty()) {
-            String imageUrl = storageService.uploadImage(image);
-            request.setImageUrl(imageUrl);
-        }
-
         UUID tenantId = TenantContext.getTenantId();
 
         // Validate product duplicity - SKU
@@ -222,11 +244,19 @@ public class BatchService {
             throw new BusinessException("Warehouse is not active");
         }
 
-        // Validate batch code uniqueness
-        batchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode())
-                .ifPresent(b -> {
-                    throw new BusinessException("Batch with code '" + request.getBatchCode() + "' already exists");
-                });
+        // Generate batch code if not provided
+        String batchCode = request.getBatchCode();
+        if (batchCode == null || batchCode.trim().isEmpty()) {
+            batchCode = generateBatchCode(tenantId);
+            log.info("Generated batch code: {}", batchCode);
+        } else {
+            // Validate batch code uniqueness when provided
+            final String providedCode = batchCode;
+            batchRepository.findByTenantIdAndBatchCode(tenantId, providedCode)
+                    .ifPresent(b -> {
+                        throw new BusinessException("Batch with code '" + providedCode + "' already exists");
+                    });
+        }
 
         // Validate date logic
         if (request.getHasExpiration() && request.getExpirationDate() == null) {
@@ -251,11 +281,10 @@ public class BatchService {
                 .isKit(request.getIsKit())
                 .attributes(request.getAttributes())
                 .hasExpiration(request.getHasExpiration())
-                .imageUrl(request.getImageUrl())
                 .active(true)
                 .build();
 
-        ProductResponse productResponse = productService.create(productRequest);
+        ProductResponse productResponse = productService.create(productRequest, image);
 
         // Create batch
         Product product = productRepository.findByTenantIdAndId(tenantId, productResponse.getId())
@@ -265,7 +294,7 @@ public class BatchService {
         batch.setTenantId(tenantId);
         batch.setProduct(product);
         batch.setWarehouse(warehouse);
-        batch.setBatchCode(request.getBatchCode());
+        batch.setBatchCode(batchCode);
         batch.setQuantity(request.getQuantity());
         batch.setManufacturedDate(request.getManufacturedDate());
         batch.setExpirationDate(request.getExpirationDate());
@@ -280,11 +309,6 @@ public class BatchService {
                 .product(productResponse)
                 .batch(mapToResponse(savedBatch))
                 .build();
-    }
-
-    @Transactional
-    public ProductBatchResponse createWithProduct(ProductBatchRequest request) {
-        return createWithProduct(request, null);
     }
 
     private BatchResponse mapToResponse(Batch batch) {

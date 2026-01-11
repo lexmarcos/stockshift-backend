@@ -5,3 +5,10 @@ spring:
     password: ${DB_PASSWORD:postgres}
   jpa:
     show-sql: true
+storage:
+    endpoint: https://example-project-id.storage.supabase.co/storage/v1/s3
+    access-key: your_access_key_here
+    secret-key: your_secret_key_here
+    bucket-name: your-bucket-name
+    region: us-east-1
+    public-url: https://example-project-id.supabase.co/storage/v1/object/public/your-bucket-name

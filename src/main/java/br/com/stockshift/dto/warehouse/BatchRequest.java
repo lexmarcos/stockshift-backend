@@ -1,9 +1,9 @@
 package br.com.stockshift.dto.warehouse;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -23,7 +23,6 @@ public class BatchRequest {
     @NotNull(message = "Warehouse ID is required")
     private UUID warehouseId;
 
-    @NotBlank(message = "Batch code is required")
     private String batchCode;
 
     @NotNull(message = "Quantity is required")
@@ -33,9 +32,11 @@ public class BatchRequest {
     private LocalDate manufacturedDate;
     private LocalDate expirationDate;
 
+    @Schema(description = "Cost price in cents", example = "1050")
     @PositiveOrZero(message = "Cost price must be zero or positive")
-    private BigDecimal costPrice;
+    private Long costPrice;
 
+    @Schema(description = "Selling price in cents", example = "1575")
     @PositiveOrZero(message = "Selling price must be zero or positive")
-    private BigDecimal sellingPrice;
+    private Long sellingPrice;
 }

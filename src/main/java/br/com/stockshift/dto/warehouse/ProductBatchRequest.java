@@ -1,6 +1,7 @@
 package br.com.stockshift.dto.warehouse;
 
 import br.com.stockshift.model.enums.BarcodeType;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -9,7 +10,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
@@ -33,20 +33,20 @@ public class ProductBatchRequest {
     private Map<String, Object> attributes;
     @Builder.Default
     private Boolean hasExpiration = false;
-    private String imageUrl;
 
     // Batch fields
     @NotNull(message = "Warehouse ID is required")
     private UUID warehouseId;
-    @NotBlank(message = "Batch code is required")
     private String batchCode;
     @NotNull(message = "Quantity is required")
     @PositiveOrZero(message = "Quantity must be zero or positive")
     private Integer quantity;
     private LocalDate manufacturedDate;
     private LocalDate expirationDate;
+    @Schema(description = "Cost price in cents", example = "1050")
     @PositiveOrZero(message = "Cost price must be zero or positive")
-    private BigDecimal costPrice;
+    private Long costPrice;
+    @Schema(description = "Selling price in cents", example = "1575")
     @PositiveOrZero(message = "Selling price must be zero or positive")
-    private BigDecimal sellingPrice;
+    private Long sellingPrice;
 }

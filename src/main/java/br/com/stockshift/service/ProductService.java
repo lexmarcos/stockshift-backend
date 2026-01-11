@@ -33,6 +33,31 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final StorageService storageService;
 
+    /**
+     * Generates a unique SKU for a product
+     * Format: PRD-{timestamp}-{random}
+     */
+    private String generateUniqueSku() {
+        UUID tenantId = TenantContext.getTenantId();
+        String sku;
+        int attempts = 0;
+        final int maxAttempts = 10;
+
+        do {
+            // Generate SKU with format: PRD-{timestamp}-{random}
+            long timestamp = System.currentTimeMillis();
+            int random = (int) (Math.random() * 1000);
+            sku = String.format("PRD-%d-%03d", timestamp, random);
+
+            attempts++;
+            if (attempts >= maxAttempts) {
+                throw new BusinessException("Failed to generate unique SKU after " + maxAttempts + " attempts");
+            }
+        } while (productRepository.findBySkuAndTenantId(sku, tenantId).isPresent());
+
+        return sku;
+    }
+
     @Transactional
     public ProductResponse create(ProductRequest request, MultipartFile image) {
         // Upload image if provided
@@ -51,11 +76,17 @@ public class ProductService {
                     });
         }
 
-        // Validate unique SKU if provided
-        if (request.getSku() != null) {
-            productRepository.findBySkuAndTenantId(request.getSku(), tenantId)
+        // Generate SKU automatically if not provided
+        final String sku;
+        if (request.getSku() == null || request.getSku().trim().isEmpty()) {
+            sku = generateUniqueSku();
+            log.info("Generated automatic SKU: {} for product: {}", sku, request.getName());
+        } else {
+            sku = request.getSku();
+            // Validate unique SKU if provided
+            productRepository.findBySkuAndTenantId(sku, tenantId)
                     .ifPresent(p -> {
-                        throw new BusinessException("Product with SKU " + request.getSku() + " already exists");
+                        throw new BusinessException("Product with SKU " + sku + " already exists");
                     });
         }
 
@@ -82,7 +113,7 @@ public class ProductService {
         product.setBrand(brand);
         product.setBarcode(request.getBarcode());
         product.setBarcodeType(request.getBarcodeType());
-        product.setSku(request.getSku());
+        product.setSku(sku);
         product.setIsKit(request.getIsKit() != null ? request.getIsKit() : false);
         product.setAttributes(request.getAttributes());
         product.setHasExpiration(request.getHasExpiration() != null ? request.getHasExpiration() : false);

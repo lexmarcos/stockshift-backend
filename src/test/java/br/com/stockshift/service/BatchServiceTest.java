@@ -71,8 +71,8 @@ class BatchServiceTest {
                 .warehouseId(warehouseId)
                 .batchCode("BATCH-001")
                 .quantity(100)
-                .costPrice(BigDecimal.valueOf(10.00))
-                .sellingPrice(BigDecimal.valueOf(20.00))
+                .costPrice(1000L)  // R$10.00 in cents
+                .sellingPrice(2000L)  // R$20.00 in cents
                 .build();
 
         warehouse = new Warehouse();
@@ -105,7 +105,7 @@ class BatchServiceTest {
                 .sku("SKU-001")
                 .build();
 
-        when(productService.create(any(ProductRequest.class)))
+        when(productService.create(any(ProductRequest.class), any()))
                 .thenReturn(productResponse);
 
         Batch savedBatch = new Batch();
@@ -122,7 +122,7 @@ class BatchServiceTest {
                 .thenReturn(savedBatch);
 
         // Act
-        ProductBatchResponse response = batchService.createWithProduct(request);
+        ProductBatchResponse response = batchService.createWithProduct(request, null);
 
         // Assert
         assertThat(response).isNotNull();
@@ -130,7 +130,7 @@ class BatchServiceTest {
         assertThat(response.getBatch()).isNotNull();
         assertThat(response.getProduct().getId()).isEqualTo(productId);
 
-        verify(productService).create(any(ProductRequest.class));
+        verify(productService).create(any(ProductRequest.class), any());
         verify(batchRepository).save(any(Batch.class));
     }
 
@@ -145,11 +145,11 @@ class BatchServiceTest {
                 .thenReturn(Optional.of(existingProduct));
 
         // Act & Assert
-        assertThatThrownBy(() -> batchService.createWithProduct(request))
+        assertThatThrownBy(() -> batchService.createWithProduct(request, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Product with SKU 'SKU-001' already exists");
 
-        verify(productService, never()).create(any());
+        verify(productService, never()).create(any(), any());
         verify(batchRepository, never()).save(any());
     }
 
@@ -166,11 +166,11 @@ class BatchServiceTest {
                 .thenReturn(Optional.of(existingProduct));
 
         // Act & Assert
-        assertThatThrownBy(() -> batchService.createWithProduct(request))
+        assertThatThrownBy(() -> batchService.createWithProduct(request, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Product with barcode '1234567890' already exists");
 
-        verify(productService, never()).create(any());
+        verify(productService, never()).create(any(), any());
         verify(batchRepository, never()).save(any());
     }
 
@@ -187,11 +187,11 @@ class BatchServiceTest {
                 .thenReturn(Optional.of(warehouse));
 
         // Act & Assert
-        assertThatThrownBy(() -> batchService.createWithProduct(request))
+        assertThatThrownBy(() -> batchService.createWithProduct(request, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Warehouse is not active");
 
-        verify(productService, never()).create(any());
+        verify(productService, never()).create(any(), any());
         verify(batchRepository, never()).save(any());
     }
 
@@ -211,7 +211,7 @@ class BatchServiceTest {
                 .thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> batchService.createWithProduct(request))
+        assertThatThrownBy(() -> batchService.createWithProduct(request, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Expiration date is required for products with expiration");
     }
@@ -232,7 +232,7 @@ class BatchServiceTest {
                 .thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> batchService.createWithProduct(request))
+        assertThatThrownBy(() -> batchService.createWithProduct(request, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Expiration date must be after manufactured date");
     }

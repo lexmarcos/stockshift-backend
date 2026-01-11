@@ -44,7 +44,7 @@ public class ReportService {
 
         BigDecimal totalStockValue = allBatches.stream()
                 .filter(b -> b.getCostPrice() != null)
-                .map(b -> b.getCostPrice().multiply(BigDecimal.valueOf(b.getQuantity())))
+                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(BigDecimal.valueOf(b.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         long pendingMovements = stockMovementRepository.findByTenantIdAndStatus(tenantId, MovementStatus.PENDING).size();
@@ -120,7 +120,7 @@ public class ReportService {
 
         BigDecimal totalValue = batches.stream()
                 .filter(b -> b.getCostPrice() != null)
-                .map(b -> b.getCostPrice().multiply(BigDecimal.valueOf(b.getQuantity())))
+                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(BigDecimal.valueOf(b.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         LocalDate nearestExpiration = batches.stream()
@@ -143,7 +143,7 @@ public class ReportService {
 
     private StockReportResponse batchToReport(Batch batch) {
         BigDecimal totalValue = batch.getCostPrice() != null ?
-                batch.getCostPrice().multiply(BigDecimal.valueOf(batch.getQuantity())) :
+                BigDecimal.valueOf(batch.getCostPrice()).multiply(BigDecimal.valueOf(batch.getQuantity())) :
                 BigDecimal.ZERO;
 
         return StockReportResponse.builder()
