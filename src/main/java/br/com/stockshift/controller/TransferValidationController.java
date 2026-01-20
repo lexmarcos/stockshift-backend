@@ -2,7 +2,10 @@ package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.validation.*;
+import br.com.stockshift.service.DiscrepancyReportService;
 import br.com.stockshift.service.TransferValidationService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +26,7 @@ import java.util.UUID;
 public class TransferValidationController {
 
     private final TransferValidationService validationService;
+    private final DiscrepancyReportService reportService;
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_EXECUTE', 'ROLE_ADMIN')")
@@ -63,5 +67,33 @@ public class TransferValidationController {
             @PathVariable UUID validationId) {
         CompleteValidationResponse response = validationService.completeValidation(movementId, validationId);
         return ResponseEntity.ok(ApiResponse.success("Validation completed successfully", response));
+    }
+
+    @GetMapping("/{validationId}/discrepancy-report")
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ROLE_ADMIN')")
+    @Operation(summary = "Download discrepancy report")
+    public ResponseEntity<byte[]> getDiscrepancyReport(
+            @PathVariable UUID movementId,
+            @PathVariable UUID validationId,
+            @RequestHeader(value = "Accept", defaultValue = "application/pdf") String acceptHeader) {
+
+        byte[] report;
+        String contentType;
+        String filename;
+
+        if (acceptHeader.contains("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {
+            report = reportService.generateExcelReport(movementId, validationId);
+            contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            filename = "discrepancy-report-" + validationId + ".xlsx";
+        } else {
+            report = reportService.generatePdfReport(movementId, validationId);
+            contentType = "application/pdf";
+            filename = "discrepancy-report-" + validationId + ".pdf";
+        }
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(report);
     }
 }
