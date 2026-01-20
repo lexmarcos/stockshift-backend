@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -75,6 +76,8 @@ public class StorageService {
             s3Client.deleteObject(request);
             log.info("Image deleted successfully: {}", imageUrl);
 
+        } catch (NoSuchKeyException e) {
+            log.warn("Image not found in storage (already deleted?): {}", imageUrl);
         } catch (S3Exception e) {
             log.error("Failed to delete image from storage: {}", imageUrl, e);
             throw new StorageException("Failed to delete image from storage", e);

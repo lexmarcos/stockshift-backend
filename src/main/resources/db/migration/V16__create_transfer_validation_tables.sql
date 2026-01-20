@@ -31,7 +31,8 @@ CREATE TABLE transfer_discrepancies (
     expected_quantity INTEGER NOT NULL,
     received_quantity INTEGER NOT NULL,
     missing_quantity INTEGER NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes
@@ -49,4 +50,7 @@ CREATE TRIGGER update_transfer_validations_updated_at BEFORE UPDATE ON transfer_
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_transfer_validation_items_updated_at BEFORE UPDATE ON transfer_validation_items
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_transfer_discrepancies_updated_at BEFORE UPDATE ON transfer_discrepancies
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

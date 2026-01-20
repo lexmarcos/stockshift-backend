@@ -7,6 +7,10 @@ spring:
     name: stockshift
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+  servlet:
+    multipart:
+      max-file-size: 6MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: validate
