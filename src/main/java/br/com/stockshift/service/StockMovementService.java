@@ -135,8 +135,13 @@ public class StockMovementService {
                 applyStockChanges(movement, item);
             }
 
-            movement.setStatus(MovementStatus.COMPLETED);
-            movement.setCompletedAt(LocalDateTime.now());
+            if (movement.getMovementType() == MovementType.TRANSFER) {
+                movement.setStatus(MovementStatus.IN_TRANSIT);
+                // completedAt will be set when validation is completed
+            } else {
+                movement.setStatus(MovementStatus.COMPLETED);
+                movement.setCompletedAt(LocalDateTime.now());
+            }
 
             StockMovement updated = stockMovementRepository.save(movement);
             log.info("Executed stock movement {} for tenant {}", id, tenantId);
@@ -245,36 +250,13 @@ public class StockMovementService {
                 break;
 
             case TRANSFER:
-                // Decrease from source, create/increase in destination
+                // Only decrease from source - destination will be handled by validation
                 if (batch.getQuantity() < item.getQuantity()) {
                     throw new BusinessException("Insufficient stock for product " + item.getProduct().getName());
                 }
                 batch.setQuantity(batch.getQuantity() - item.getQuantity());
                 batchRepository.save(batch);
-
-                // Find or create batch in destination warehouse
-                List<Batch> destBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
-                        item.getProduct().getId(),
-                        movement.getDestinationWarehouse().getId(),
-                        movement.getTenantId());
-
-                Batch destBatch;
-                if (!destBatches.isEmpty()) {
-                    destBatch = destBatches.get(0);
-                    destBatch.setQuantity(destBatch.getQuantity() + item.getQuantity());
-                } else {
-                    destBatch = new Batch();
-                    destBatch.setTenantId(movement.getTenantId());
-                    destBatch.setProduct(item.getProduct());
-                    destBatch.setWarehouse(movement.getDestinationWarehouse());
-                    destBatch.setBatchCode(batch.getBatchCode() + "-TRANSFER");
-                    destBatch.setQuantity(item.getQuantity());
-                    destBatch.setManufacturedDate(batch.getManufacturedDate());
-                    destBatch.setExpirationDate(batch.getExpirationDate());
-                    destBatch.setCostPrice(batch.getCostPrice());
-                    destBatch.setSellingPrice(batch.getSellingPrice());
-                }
-                batchRepository.save(destBatch);
+                // Note: Stock will be added to destination warehouse during validation
                 break;
 
             case RETURN:
