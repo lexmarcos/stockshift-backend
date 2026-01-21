@@ -12,6 +12,7 @@ import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -107,8 +108,8 @@ public class ProductService {
 
         Product product = new Product();
         product.setTenantId(tenantId);
-        product.setName(request.getName());
-        product.setDescription(request.getDescription());
+        product.setName(SanitizationUtil.sanitizeForHtml(request.getName()));
+        product.setDescription(SanitizationUtil.sanitizeForHtml(request.getDescription()));
         product.setCategory(category);
         product.setBrand(brand);
         product.setBarcode(request.getBarcode());
@@ -118,7 +119,7 @@ public class ProductService {
         product.setAttributes(request.getAttributes());
         product.setHasExpiration(request.getHasExpiration() != null ? request.getHasExpiration() : false);
         product.setActive(request.getActive() != null ? request.getActive() : true);
-        product.setImageUrl(request.getImageUrl());
+        product.setImageUrl(SanitizationUtil.sanitizeUrl(request.getImageUrl()));
 
         Product saved = productRepository.save(product);
         log.info("Created product {} for tenant {}", saved.getId(), tenantId);
@@ -239,8 +240,8 @@ public class ProductService {
             product.setBrand(null);
         }
 
-        product.setName(request.getName());
-        product.setDescription(request.getDescription());
+        product.setName(SanitizationUtil.sanitizeForHtml(request.getName()));
+        product.setDescription(SanitizationUtil.sanitizeForHtml(request.getDescription()));
         product.setBarcode(request.getBarcode());
         product.setBarcodeType(request.getBarcodeType());
         product.setSku(request.getSku());

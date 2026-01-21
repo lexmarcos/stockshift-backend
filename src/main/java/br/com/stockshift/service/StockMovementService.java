@@ -93,6 +93,9 @@ public class StockMovementService {
             if (itemRequest.getBatchId() != null) {
                 batch = batchRepository.findByTenantIdAndId(tenantId, itemRequest.getBatchId())
                         .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", itemRequest.getBatchId()));
+
+                // Validate stock availability for movements that reduce inventory
+                validateStockAvailability(request.getMovementType(), batch, itemRequest.getQuantity(), product.getName());
             }
 
             StockMovementItem item = new StockMovementItem();
@@ -219,6 +222,32 @@ public class StockMovementService {
         } else if (type == MovementType.SALE) {
             if (request.getSourceWarehouseId() == null) {
                 throw new BusinessException("SALE movements require a source warehouse");
+            }
+        }
+    }
+
+    /**
+     * Validates that sufficient stock is available for movements that reduce inventory.
+     * This proactive validation prevents the creation of movements with quantities
+     * exceeding available stock, avoiding downstream errors during execution.
+     *
+     * @param movementType The type of movement being created
+     * @param batch The batch from which stock will be taken
+     * @param requestedQuantity The quantity requested for the movement
+     * @param productName The product name for error messaging
+     * @throws BusinessException if requested quantity exceeds available stock
+     */
+    private void validateStockAvailability(MovementType movementType, Batch batch, Integer requestedQuantity, String productName) {
+        // Only validate for movement types that reduce inventory
+        if (movementType == MovementType.SALE ||
+            movementType == MovementType.TRANSFER ||
+            movementType == MovementType.ADJUSTMENT) {
+
+            if (batch.getQuantity() < requestedQuantity) {
+                throw new BusinessException(
+                    String.format("Insufficient stock for product '%s'. Requested: %d, Available: %d",
+                        productName, requestedQuantity, batch.getQuantity())
+                );
             }
         }
     }

@@ -8,6 +8,7 @@ import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,15 +31,19 @@ public class BrandService {
     public BrandResponse create(BrandRequest request) {
         UUID tenantId = TenantContext.getTenantId();
 
+        // Sanitize input to prevent XSS
+        String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
+        String sanitizedLogoUrl = SanitizationUtil.sanitizeUrl(request.getLogoUrl());
+
         // Validate unique name within tenant
-        if (brandRepository.existsByNameAndTenantIdAndDeletedAtIsNull(request.getName(), tenantId)) {
-            throw new BusinessException("Brand with name '" + request.getName() + "' already exists");
+        if (brandRepository.existsByNameAndTenantIdAndDeletedAtIsNull(sanitizedName, tenantId)) {
+            throw new BusinessException("Brand with name '" + sanitizedName + "' already exists");
         }
 
         Brand brand = new Brand();
         brand.setTenantId(tenantId);
-        brand.setName(request.getName());
-        brand.setLogoUrl(request.getLogoUrl());
+        brand.setName(sanitizedName);
+        brand.setLogoUrl(sanitizedLogoUrl);
 
         Brand saved = brandRepository.save(brand);
         log.info("Created brand {} for tenant {}", saved.getId(), tenantId);
@@ -67,13 +72,17 @@ public class BrandService {
 
         Brand brand = findBrandByIdAndTenant(id, tenantId);
 
+        // Sanitize input to prevent XSS
+        String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
+        String sanitizedLogoUrl = SanitizationUtil.sanitizeUrl(request.getLogoUrl());
+
         // Validate unique name within tenant (exclude current brand)
-        if (brandRepository.existsByNameAndTenantIdAndDeletedAtIsNullAndIdNot(request.getName(), tenantId, id)) {
-            throw new BusinessException("Brand with name '" + request.getName() + "' already exists");
+        if (brandRepository.existsByNameAndTenantIdAndDeletedAtIsNullAndIdNot(sanitizedName, tenantId, id)) {
+            throw new BusinessException("Brand with name '" + sanitizedName + "' already exists");
         }
 
-        brand.setName(request.getName());
-        brand.setLogoUrl(request.getLogoUrl());
+        brand.setName(sanitizedName);
+        brand.setLogoUrl(sanitizedLogoUrl);
 
         Brand updated = brandRepository.save(brand);
         log.info("Updated brand {} for tenant {}", id, tenantId);

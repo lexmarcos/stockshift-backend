@@ -7,6 +7,7 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,18 +35,23 @@ public class WarehouseService {
     public WarehouseResponse create(WarehouseRequest request) {
         UUID tenantId = TenantContext.getTenantId();
 
+        // Sanitize input to prevent XSS
+        String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
+        String sanitizedCity = SanitizationUtil.sanitizeForHtml(request.getCity());
+        String sanitizedAddress = SanitizationUtil.sanitizeForHtml(request.getAddress());
+
         // Validate unique name
-        warehouseRepository.findByTenantIdAndName(tenantId, request.getName())
+        warehouseRepository.findByTenantIdAndName(tenantId, sanitizedName)
                 .ifPresent(w -> {
-                    throw new BusinessException("Warehouse with name " + request.getName() + " already exists");
+                    throw new BusinessException("Warehouse with name " + sanitizedName + " already exists");
                 });
 
         Warehouse warehouse = new Warehouse();
         warehouse.setTenantId(tenantId);
-        warehouse.setName(request.getName());
-        warehouse.setCity(request.getCity());
+        warehouse.setName(sanitizedName);
+        warehouse.setCity(sanitizedCity);
         warehouse.setState(request.getState());
-        warehouse.setAddress(request.getAddress());
+        warehouse.setAddress(sanitizedAddress);
         warehouse.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
 
         Warehouse saved = warehouseRepository.save(warehouse);
@@ -85,18 +91,23 @@ public class WarehouseService {
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
 
+        // Sanitize input to prevent XSS
+        String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
+        String sanitizedCity = SanitizationUtil.sanitizeForHtml(request.getCity());
+        String sanitizedAddress = SanitizationUtil.sanitizeForHtml(request.getAddress());
+
         // Validate unique name if changed
-        if (!warehouse.getName().equals(request.getName())) {
-            warehouseRepository.findByTenantIdAndName(tenantId, request.getName())
+        if (!warehouse.getName().equals(sanitizedName)) {
+            warehouseRepository.findByTenantIdAndName(tenantId, sanitizedName)
                     .ifPresent(w -> {
-                        throw new BusinessException("Warehouse with name " + request.getName() + " already exists");
+                        throw new BusinessException("Warehouse with name " + sanitizedName + " already exists");
                     });
         }
 
-        warehouse.setName(request.getName());
-        warehouse.setCity(request.getCity());
+        warehouse.setName(sanitizedName);
+        warehouse.setCity(sanitizedCity);
         warehouse.setState(request.getState());
-        warehouse.setAddress(request.getAddress());
+        warehouse.setAddress(sanitizedAddress);
         warehouse.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
 
         Warehouse updated = warehouseRepository.save(warehouse);

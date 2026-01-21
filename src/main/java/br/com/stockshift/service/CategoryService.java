@@ -7,6 +7,7 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,10 @@ public class CategoryService {
     public CategoryResponse create(CategoryRequest request) {
         UUID tenantId = TenantContext.getTenantId();
 
+        // Sanitize input to prevent XSS
+        String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
+        String sanitizedDescription = SanitizationUtil.sanitizeForHtml(request.getDescription());
+
         // Validate parent category if provided
         Category parentCategory = null;
         if (request.getParentCategoryId() != null) {
@@ -37,8 +42,8 @@ public class CategoryService {
 
         Category category = new Category();
         category.setTenantId(tenantId);
-        category.setName(request.getName());
-        category.setDescription(request.getDescription());
+        category.setName(sanitizedName);
+        category.setDescription(sanitizedDescription);
         category.setParentCategory(parentCategory);
         category.setAttributesSchema(request.getAttributesSchema());
 
@@ -90,8 +95,12 @@ public class CategoryService {
             category.setParentCategory(null);
         }
 
-        category.setName(request.getName());
-        category.setDescription(request.getDescription());
+        // Sanitize input to prevent XSS
+        String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
+        String sanitizedDescription = SanitizationUtil.sanitizeForHtml(request.getDescription());
+
+        category.setName(sanitizedName);
+        category.setDescription(sanitizedDescription);
         category.setAttributesSchema(request.getAttributesSchema());
 
         Category updated = categoryRepository.save(category);

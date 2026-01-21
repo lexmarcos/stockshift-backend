@@ -1,19 +1,24 @@
 package br.com.stockshift.exception;
 
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 @Slf4j
@@ -121,6 +126,100 @@ public class GlobalExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+    }
+
+    /**
+     * Handles invalid path parameter types (e.g., passing "123'" instead of a valid UUID).
+     * This prevents SQL injection attempts from causing 500 errors and exposing internal state.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException ex,
+            WebRequest request
+    ) {
+        String parameterName = ex.getName();
+        String requiredType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+
+        log.warn("Invalid parameter type for '{}': expected {}, received '{}'",
+                parameterName, requiredType, ex.getValue());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Invalid Parameter")
+                .message(String.format("Invalid value for parameter '%s': expected a valid %s",
+                        parameterName, requiredType))
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handles constraint violations from @Valid annotations on path/query parameters.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolationException(
+            ConstraintViolationException ex,
+            WebRequest request
+    ) {
+        Map<String, String> validationErrors = ex.getConstraintViolations().stream()
+                .collect(Collectors.toMap(
+                        violation -> violation.getPropertyPath().toString(),
+                        violation -> violation.getMessage(),
+                        (existing, replacement) -> existing
+                ));
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Validation Failed")
+                .message("Invalid input parameters")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .validationErrors(validationErrors)
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handles malformed JSON in request body.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException ex,
+            WebRequest request
+    ) {
+        log.warn("Malformed request body: {}", ex.getMessage());
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Malformed Request")
+                .message("Invalid request body format")
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handles missing required request parameters.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException ex,
+            WebRequest request
+    ) {
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error("Missing Parameter")
+                .message(String.format("Required parameter '%s' is missing", ex.getParameterName()))
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Exception.class)
