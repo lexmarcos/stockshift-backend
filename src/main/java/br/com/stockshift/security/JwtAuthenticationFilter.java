@@ -1,5 +1,6 @@
 package br.com.stockshift.security;
 
+import br.com.stockshift.service.TokenDenylistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -25,6 +26,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final CustomUserDetailsService userDetailsService;
+    private final TokenDenylistService tokenDenylistService;
 
     @Override
     protected void doFilterInternal(
@@ -35,6 +37,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String jwt = getJwtFromRequest(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                // Check if token is revoked
+                String jti = tokenProvider.getJtiFromToken(jwt);
+                if (tokenDenylistService.isDenylisted(jti)) {
+                    log.warn("Attempted use of revoked token: {}", jti);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
+
                 UUID userId = tokenProvider.getUserIdFromToken(jwt);
                 UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
 
