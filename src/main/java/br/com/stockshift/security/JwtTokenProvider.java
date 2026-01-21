@@ -27,8 +27,10 @@ public class JwtTokenProvider {
     public String generateAccessToken(UUID userId, UUID tenantId, String email) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessExpiration());
+        String jti = UUID.randomUUID().toString();
 
         return Jwts.builder()
+                .id(jti)
                 .subject(userId.toString())
                 .claim("tenantId", tenantId.toString())
                 .claim("email", email)
@@ -75,5 +77,27 @@ public class JwtTokenProvider {
             log.error("JWT claims string is empty");
         }
         return false;
+    }
+
+    public String getJtiFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        return claims.getId();
+    }
+
+    public long getRemainingTtl(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        Date expiration = claims.getExpiration();
+        long remaining = expiration.getTime() - System.currentTimeMillis();
+        return Math.max(remaining, 0);
     }
 }
