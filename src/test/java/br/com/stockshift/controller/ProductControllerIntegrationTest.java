@@ -2,15 +2,16 @@ package br.com.stockshift.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 
@@ -109,9 +110,14 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .active(true)
                 .build();
 
-        mockMvc.perform(post("/api/products")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(productPart))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Test Product"))
@@ -159,9 +165,14 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .active(false)
                 .build();
 
-        mockMvc.perform(put("/api/products/{id}", product.getId())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(updateRequest)))
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(updateRequest));
+
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/{id}", product.getId())
+                .file(productPart))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Updated Product Name"))
@@ -214,9 +225,14 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .active(true)
                 .build();
 
-        mockMvc.perform(post("/api/products")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(productPart))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Branded Product"))
@@ -238,9 +254,14 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .active(true)
                 .build();
 
-        mockMvc.perform(post("/api/products")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(productPart))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Product Without Brand"))
@@ -262,9 +283,14 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .active(true)
                 .build();
 
-        mockMvc.perform(post("/api/products")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(productPart))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Not Found"));
     }
@@ -283,9 +309,14 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .active(true)
                 .build();
 
-        mockMvc.perform(post("/api/products")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(productPart))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.name").value("Product With Auto SKU"))

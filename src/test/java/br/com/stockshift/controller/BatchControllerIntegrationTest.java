@@ -1,6 +1,7 @@
 package br.com.stockshift.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 
@@ -188,9 +190,14 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .sellingPrice(2200L)  // R$22.00 in cents
                                 .build();
 
-                mockMvc.perform(post("/api/batches/with-product")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
+                MockMultipartFile productPart = new MockMultipartFile(
+                                "product",
+                                "",
+                                MediaType.APPLICATION_JSON_VALUE,
+                                objectMapper.writeValueAsBytes(request));
+
+                mockMvc.perform(multipart("/api/batches/with-product")
+                                .file(productPart))
                                 .andExpect(status().isCreated())
                                 .andExpect(jsonPath("$.success").value(true))
                                 .andExpect(jsonPath("$.data.product").isNotEmpty())
@@ -210,9 +217,14 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .quantity(50)
                                 .build();
 
-                mockMvc.perform(post("/api/batches/with-product")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
+                MockMultipartFile productPart = new MockMultipartFile(
+                                "product",
+                                "",
+                                MediaType.APPLICATION_JSON_VALUE,
+                                objectMapper.writeValueAsBytes(request));
+
+                mockMvc.perform(multipart("/api/batches/with-product")
+                                .file(productPart))
                                 .andExpect(status().isBadRequest())
                                 .andExpect(jsonPath("$.message")
                                                 .value(org.hamcrest.Matchers.containsString("already exists")));
@@ -229,9 +241,14 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .quantity(50)
                                 .build();
 
-                mockMvc.perform(post("/api/batches/with-product")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
+                MockMultipartFile productPart = new MockMultipartFile(
+                                "product",
+                                "",
+                                MediaType.APPLICATION_JSON_VALUE,
+                                objectMapper.writeValueAsBytes(request));
+
+                mockMvc.perform(multipart("/api/batches/with-product")
+                                .file(productPart))
                                 .andExpect(status().isNotFound());
         }
 
@@ -242,9 +259,14 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 // Missing name, warehouseId, batchCode, quantity
                                 .build();
 
-                mockMvc.perform(post("/api/batches/with-product")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(objectMapper.writeValueAsString(request)))
+                MockMultipartFile productPart = new MockMultipartFile(
+                                "product",
+                                "",
+                                MediaType.APPLICATION_JSON_VALUE,
+                                objectMapper.writeValueAsBytes(request));
+
+                mockMvc.perform(multipart("/api/batches/with-product")
+                                .file(productPart))
                                 .andExpect(status().isBadRequest());
         }
 }

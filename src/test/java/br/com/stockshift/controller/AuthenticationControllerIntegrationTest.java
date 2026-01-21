@@ -73,8 +73,8 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(cookie().exists("refreshToken"))
                                 .andExpect(cookie().httpOnly("accessToken", true))
                                 .andExpect(cookie().httpOnly("refreshToken", true))
-                                .andExpect(cookie().path("accessToken", "/api"))
-                                .andExpect(cookie().path("refreshToken", "/api"));
+                                .andExpect(cookie().path("accessToken", "/"))
+                                .andExpect(cookie().path("refreshToken", "/"));
         }
 
         @Test
