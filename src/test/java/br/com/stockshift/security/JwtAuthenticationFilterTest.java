@@ -1,5 +1,6 @@
 package br.com.stockshift.security;
 
+import br.com.stockshift.service.TokenDenylistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -32,6 +33,9 @@ class JwtAuthenticationFilterTest {
   private CustomUserDetailsService userDetailsService;
 
   @Mock
+  private TokenDenylistService tokenDenylistService;
+
+  @Mock
   private FilterChain filterChain;
 
   @InjectMocks
@@ -60,10 +64,13 @@ class JwtAuthenticationFilterTest {
   void shouldAuthenticateWithCookie() throws ServletException, IOException {
     // Given
     String token = "valid-jwt-token";
+    String jti = "test-jti";
     Cookie accessTokenCookie = new Cookie("accessToken", token);
     request.setCookies(accessTokenCookie);
 
     when(tokenProvider.validateToken(token)).thenReturn(true);
+    when(tokenProvider.getJtiFromToken(token)).thenReturn(jti);
+    when(tokenDenylistService.isDenylisted(jti)).thenReturn(false);
     when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
     when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
@@ -73,6 +80,7 @@ class JwtAuthenticationFilterTest {
 
     // Then
     verify(tokenProvider).validateToken(token);
+    verify(tokenDenylistService).isDenylisted(jti);
     verify(userDetailsService).loadUserById(userId.toString());
     verify(filterChain).doFilter(request, response);
   }
@@ -81,9 +89,12 @@ class JwtAuthenticationFilterTest {
   void shouldAuthenticateWithAuthorizationHeader() throws ServletException, IOException {
     // Given
     String token = "valid-jwt-token";
+    String jti = "test-jti";
     request.addHeader("Authorization", "Bearer " + token);
 
     when(tokenProvider.validateToken(token)).thenReturn(true);
+    when(tokenProvider.getJtiFromToken(token)).thenReturn(jti);
+    when(tokenDenylistService.isDenylisted(jti)).thenReturn(false);
     when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
     when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
@@ -93,6 +104,7 @@ class JwtAuthenticationFilterTest {
 
     // Then
     verify(tokenProvider).validateToken(token);
+    verify(tokenDenylistService).isDenylisted(jti);
     verify(userDetailsService).loadUserById(userId.toString());
     verify(filterChain).doFilter(request, response);
   }
@@ -102,12 +114,15 @@ class JwtAuthenticationFilterTest {
     // Given
     String cookieToken = "cookie-token";
     String headerToken = "header-token";
+    String jti = "test-jti";
 
     Cookie accessTokenCookie = new Cookie("accessToken", cookieToken);
     request.setCookies(accessTokenCookie);
     request.addHeader("Authorization", "Bearer " + headerToken);
 
     when(tokenProvider.validateToken(cookieToken)).thenReturn(true);
+    when(tokenProvider.getJtiFromToken(cookieToken)).thenReturn(jti);
+    when(tokenDenylistService.isDenylisted(jti)).thenReturn(false);
     when(tokenProvider.getUserIdFromToken(cookieToken)).thenReturn(userId);
     when(tokenProvider.getTenantIdFromToken(cookieToken)).thenReturn(tenantId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
