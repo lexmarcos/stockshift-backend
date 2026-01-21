@@ -31,6 +31,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenService refreshTokenService;
     private final JwtProperties jwtProperties;
+    private final TokenDenylistService tokenDenylistService;
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -110,7 +111,24 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String refreshTokenValue) {
-        refreshTokenService.revokeRefreshToken(refreshTokenValue);
+    public void logout(String accessToken, String refreshTokenValue) {
+        // Revoke refresh token in database
+        if (refreshTokenValue != null) {
+            refreshTokenService.revokeRefreshToken(refreshTokenValue);
+        }
+
+        // Add access token to denylist
+        if (accessToken != null) {
+            try {
+                String jti = jwtTokenProvider.getJtiFromToken(accessToken);
+                long ttl = jwtTokenProvider.getRemainingTtl(accessToken);
+                if (ttl > 0) {
+                    tokenDenylistService.addToDenylist(jti, ttl);
+                    log.debug("Access token added to denylist: {}", jti);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to add access token to denylist: {}", e.getMessage());
+            }
+        }
     }
 }

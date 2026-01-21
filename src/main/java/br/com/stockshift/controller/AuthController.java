@@ -73,17 +73,17 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout", description = "Revoke refresh token and clear cookies")
+    @Operation(summary = "Logout", description = "Revoke tokens and clear cookies")
     public ResponseEntity<ApiResponse<Void>> logout(
             HttpServletRequest request,
             HttpServletResponse response) {
 
-        // Read refresh token from cookie
+        // Read tokens from cookies
+        String accessToken = cookieUtil.getAccessTokenFromCookie(request.getCookies());
         String refreshTokenValue = cookieUtil.getRefreshTokenFromCookie(request.getCookies());
 
-        if (refreshTokenValue != null) {
-            authService.logout(refreshTokenValue);
-        }
+        // Revoke tokens
+        authService.logout(accessToken, refreshTokenValue);
 
         // Remove cookies
         cookieUtil.removeAccessTokenCookie(response);

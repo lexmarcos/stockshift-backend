@@ -100,4 +100,16 @@ public class CookieUtil {
     }
     return null;
   }
+
+  public String getAccessTokenFromCookie(Cookie[] cookies) {
+    if (cookies == null) {
+      return null;
+    }
+    for (Cookie cookie : cookies) {
+      if (ACCESS_TOKEN_COOKIE.equals(cookie.getName())) {
+        return cookie.getValue();
+      }
+    }
+    return null;
+  }
 }
