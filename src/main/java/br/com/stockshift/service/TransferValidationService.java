@@ -123,6 +123,19 @@ public class TransferValidationService {
     }
 
     @Transactional(readOnly = true)
+    public List<ValidationSummaryResponse> listValidations(UUID movementId) {
+        if (!movementRepository.existsById(movementId)) {
+            throw new ResourceNotFoundException("StockMovement", "id", movementId);
+        }
+
+        List<TransferValidation> validations = validationRepository.findByStockMovementId(movementId);
+
+        return validations.stream()
+                .map(this::mapToSummaryResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public ValidationProgressResponse getProgress(UUID movementId, UUID validationId) {
         TransferValidation validation = validationRepository.findById(validationId)
                 .orElseThrow(() -> new ResourceNotFoundException("TransferValidation", "id", validationId));
@@ -182,13 +195,20 @@ public class TransferValidationService {
                 addStockToDestination(movement, item.getStockMovementItem(), item.getReceivedQuantity());
             }
 
-            if (item.getReceivedQuantity() < item.getExpectedQuantity()) {
+            if (item.getReceivedQuantity() != item.getExpectedQuantity()) {
                 TransferDiscrepancy discrepancy = new TransferDiscrepancy();
                 discrepancy.setTransferValidation(validation);
                 discrepancy.setStockMovementItem(item.getStockMovementItem());
                 discrepancy.setExpectedQuantity(item.getExpectedQuantity());
                 discrepancy.setReceivedQuantity(item.getReceivedQuantity());
-                discrepancy.setMissingQuantity(item.getExpectedQuantity() - item.getReceivedQuantity());
+
+                if (item.getReceivedQuantity() < item.getExpectedQuantity()) {
+                    discrepancy.setMissingQuantity(item.getExpectedQuantity() - item.getReceivedQuantity());
+                    discrepancy.setExcessQuantity(0);
+                } else {
+                    discrepancy.setMissingQuantity(0);
+                    discrepancy.setExcessQuantity(item.getReceivedQuantity() - item.getExpectedQuantity());
+                }
                 discrepancies.add(discrepancy);
             }
         }
@@ -218,6 +238,7 @@ public class TransferValidationService {
                         .expected(d.getExpectedQuantity())
                         .received(d.getReceivedQuantity())
                         .missing(d.getMissingQuantity())
+                        .excess(d.getExcessQuantity())
                         .build())
                 .collect(Collectors.toList());
 
@@ -264,6 +285,27 @@ public class TransferValidationService {
             destBatch.setSellingPrice(sourceBatch.getSellingPrice());
         }
         batchRepository.save(destBatch);
+    }
+
+    private ValidationSummaryResponse mapToSummaryResponse(TransferValidation validation) {
+        int totalExpected = validation.getItems().stream()
+                .mapToInt(TransferValidationItem::getExpectedQuantity)
+                .sum();
+        int totalReceived = validation.getItems().stream()
+                .mapToInt(TransferValidationItem::getReceivedQuantity)
+                .sum();
+
+        return ValidationSummaryResponse.builder()
+                .validationId(validation.getId())
+                .status(validation.getStatus().name())
+                .startedAt(validation.getStartedAt())
+                .completedAt(validation.getCompletedAt())
+                .validatedByName(validation.getValidatedBy().getFullName())
+                .progress(ValidationSummaryResponse.ProgressSummary.builder()
+                        .totalExpected(totalExpected)
+                        .totalReceived(totalReceived)
+                        .build())
+                .build();
     }
 
     private List<ValidationItemResponse> mapItemsToResponse(List<TransferValidationItem> items) {

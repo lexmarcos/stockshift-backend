@@ -17,4 +17,5 @@ public class DiscrepancyResponse {
     private Integer expected;
     private Integer received;
     private Integer missing;
+    private Integer excess;
 }

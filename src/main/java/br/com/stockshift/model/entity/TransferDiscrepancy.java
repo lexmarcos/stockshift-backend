@@ -30,4 +30,7 @@ public class TransferDiscrepancy extends BaseEntity {
 
     @Column(name = "missing_quantity", nullable = false)
     private Integer missingQuantity;
+
+    @Column(name = "excess_quantity", nullable = false)
+    private Integer excessQuantity;
 }

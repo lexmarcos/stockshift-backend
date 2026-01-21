@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -27,6 +28,15 @@ public class TransferValidationController {
 
     private final TransferValidationService validationService;
     private final DiscrepancyReportService reportService;
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_READ', 'ROLE_ADMIN')")
+    @Operation(summary = "List all validations for a transfer")
+    public ResponseEntity<ApiResponse<List<ValidationSummaryResponse>>> listValidations(
+            @PathVariable UUID movementId) {
+        List<ValidationSummaryResponse> validations = validationService.listValidations(movementId);
+        return ResponseEntity.ok(ApiResponse.success(validations));
+    }
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('STOCK_MOVEMENT_EXECUTE', 'ROLE_ADMIN')")
