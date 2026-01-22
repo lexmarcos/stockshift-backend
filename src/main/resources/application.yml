@@ -57,3 +57,10 @@ logging:
   level:
     root: INFO
     br.com.stockshift: DEBUG
+
+# Rate Limiting
+rate-limit:
+  login:
+    capacity: 5
+    refill-tokens: 5
+    refill-duration-minutes: 15
