@@ -47,6 +47,22 @@ services:
   #   environment:
   #     - NODE_ENV=development
 
+  redis:
+    image: redis:7-alpine
+    container_name: stockshift-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stockshift-network
+
   postgres:
     image: postgres:16-alpine
     container_name: stockshift-postgres
@@ -84,6 +100,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:
