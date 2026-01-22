@@ -128,6 +128,28 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceededException(
+            RateLimitExceededException ex,
+            WebRequest request
+    ) {
+        log.warn("Rate limit exceeded for request: {}",
+                request.getDescription(false).replace("uri=", ""));
+
+        ErrorResponse error = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .error("Too Many Requests")
+                .message(ex.getMessage())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(error);
+    }
+
     /**
      * Handles invalid path parameter types (e.g., passing "123'" instead of a valid UUID).
      * This prevents SQL injection attempts from causing 500 errors and exposing internal state.
