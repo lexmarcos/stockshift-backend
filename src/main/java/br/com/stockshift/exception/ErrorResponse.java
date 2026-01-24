@@ -21,4 +21,10 @@ public class ErrorResponse {
     private String message;
     private String path;
     private Map<String, String> validationErrors;
+
+    /**
+     * Indicates if captcha is required for the next login attempt.
+     * Only present in authentication-related error responses.
+     */
+    private Boolean requiresCaptcha;
 }

@@ -61,6 +61,6 @@ logging:
 # Rate Limiting
 rate-limit:
   login:
-    capacity: 5
-    refill-tokens: 5
+    capacity: 10
+    refill-tokens: 10
     refill-duration-minutes: 15

@@ -106,4 +106,39 @@ public class RateLimitService {
     public long getRetryAfterSeconds() {
         return properties.getRefillDurationMinutes() * 60L;
     }
+
+    /**
+     * Gets the number of remaining tokens for the given client IP.
+     *
+     * @param clientIp the client's IP address
+     * @return number of remaining tokens
+     */
+    public long getRemainingTokens(String clientIp) {
+        String key = KEY_PREFIX + clientIp;
+
+        BucketConfiguration configuration = BucketConfiguration.builder()
+                .addLimit(Bandwidth.builder()
+                        .capacity(properties.getCapacity())
+                        .refillGreedy(properties.getRefillTokens(),
+                                Duration.ofMinutes(properties.getRefillDurationMinutes()))
+                        .build())
+                .build();
+
+        return proxyManager.builder()
+                .build(key, () -> configuration)
+                .getAvailableTokens();
+    }
+
+    /**
+     * Determines if captcha should be required based on remaining login attempts.
+     * Captcha is required when less than half of the capacity remains.
+     *
+     * @param clientIp the client's IP address
+     * @return true if captcha should be required
+     */
+    public boolean shouldRequireCaptcha(String clientIp) {
+        long remaining = getRemainingTokens(clientIp);
+        int threshold = properties.getCapacity() / 2;
+        return remaining <= threshold;
+    }
 }

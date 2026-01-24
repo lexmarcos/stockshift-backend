@@ -7,9 +7,12 @@ import br.com.stockshift.dto.auth.RefreshTokenRequest;
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
 import br.com.stockshift.dto.auth.RegisterRequest;
 import br.com.stockshift.dto.auth.RegisterResponse;
+import br.com.stockshift.security.ratelimit.RateLimitService;
 import br.com.stockshift.service.AuthService;
+import br.com.stockshift.service.HCaptchaService;
 import br.com.stockshift.service.TenantService;
 import br.com.stockshift.util.CookieUtil;
+import br.com.stockshift.util.IpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
@@ -30,13 +33,29 @@ public class AuthController {
     private final AuthService authService;
     private final TenantService tenantService;
     private final CookieUtil cookieUtil;
+    private final RateLimitService rateLimitService;
+    private final HCaptchaService hCaptchaService;
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate user and set HTTP-only cookies")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest,
             HttpServletResponse response) {
+
+        // Check if captcha is required for this IP and validate it
+        String clientIp = IpUtil.getClientIp(httpRequest);
+        boolean captchaRequired = rateLimitService.shouldRequireCaptcha(clientIp);
+
+        if (captchaRequired) {
+            hCaptchaService.validateCaptcha(request.getCaptchaToken());
+        }
+
         LoginResponse loginResponse = authService.login(request);
+
+        // Check if captcha should be required for next attempt
+        boolean requiresCaptcha = rateLimitService.shouldRequireCaptcha(clientIp);
+        loginResponse.setRequiresCaptcha(requiresCaptcha);
 
         // Add tokens to HTTP-only cookies
         cookieUtil.addAccessTokenCookie(response, loginResponse.getAccessToken());

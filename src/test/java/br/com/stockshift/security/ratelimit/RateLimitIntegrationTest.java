@@ -51,6 +51,9 @@ class RateLimitIntegrationTest {
         registry.add("rate-limit.login.capacity", () -> 3);
         registry.add("rate-limit.login.refill-tokens", () -> 3);
         registry.add("rate-limit.login.refill-duration-minutes", () -> 15);
+
+        // Disable captcha for rate limit tests
+        registry.add("hcaptcha.enabled", () -> false);
     }
 
     @Value("${local.server.port}")
@@ -68,7 +71,7 @@ class RateLimitIntegrationTest {
     @DisplayName("Should return 429 when rate limit exceeded")
     void shouldReturn429WhenRateLimitExceeded() throws Exception {
         RestClient restClient = createRestClient();
-        LoginRequest request = new LoginRequest("ratelimit-test@test.com", "wrongpassword");
+        LoginRequest request = new LoginRequest("ratelimit-test@test.com", "wrongpassword", null);
         String jsonRequest = objectMapper.writeValueAsString(request);
 
         // Make requests up to the limit (3 attempts) - expect 401 Unauthorized
@@ -108,7 +111,7 @@ class RateLimitIntegrationTest {
     @DisplayName("Should allow requests from different IPs")
     void shouldAllowRequestsFromDifferentIps() throws Exception {
         RestClient restClient = createRestClient();
-        LoginRequest request = new LoginRequest("ratelimit-test2@test.com", "wrongpassword");
+        LoginRequest request = new LoginRequest("ratelimit-test2@test.com", "wrongpassword", null);
         String jsonRequest = objectMapper.writeValueAsString(request);
 
         // Exhaust limit for IP1

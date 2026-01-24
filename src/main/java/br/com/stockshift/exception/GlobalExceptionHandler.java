@@ -1,6 +1,10 @@
 package br.com.stockshift.exception;
 
+import br.com.stockshift.security.ratelimit.RateLimitService;
+import br.com.stockshift.util.IpUtil;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -21,8 +26,20 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
+@RequiredArgsConstructor
 @Slf4j
 public class GlobalExceptionHandler {
+
+    private final RateLimitService rateLimitService;
+
+    private boolean shouldRequireCaptcha(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            HttpServletRequest httpRequest = servletWebRequest.getRequest();
+            String clientIp = IpUtil.getClientIp(httpRequest);
+            return rateLimitService.shouldRequireCaptcha(clientIp);
+        }
+        return false;
+    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFoundException(
@@ -51,6 +68,7 @@ public class GlobalExceptionHandler {
                 .error("Unauthorized")
                 .message(ex.getMessage())
                 .path(request.getDescription(false).replace("uri=", ""))
+                .requiresCaptcha(shouldRequireCaptcha(request))
                 .build();
 
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
@@ -123,6 +141,7 @@ public class GlobalExceptionHandler {
                 .error("Unauthorized")
                 .message("Invalid email or password")
                 .path(request.getDescription(false).replace("uri=", ""))
+                .requiresCaptcha(shouldRequireCaptcha(request))
                 .build();
 
         return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
