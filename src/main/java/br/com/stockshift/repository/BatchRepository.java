@@ -88,8 +88,8 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
     @Modifying
     @Query("UPDATE Batch b SET b.deletedAt = CURRENT_TIMESTAMP " +
-           "WHERE b.productId = :productId " +
-           "AND b.warehouseId = :warehouseId " +
+           "WHERE b.product.id = :productId " +
+           "AND b.warehouse.id = :warehouseId " +
            "AND b.tenantId = :tenantId " +
            "AND b.deletedAt IS NULL")
     int softDeleteByProductAndWarehouse(
