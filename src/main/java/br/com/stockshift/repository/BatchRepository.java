@@ -5,6 +5,7 @@ import br.com.stockshift.model.entity.Batch;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -83,5 +84,17 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
         @Param("warehouseId") UUID warehouseId,
         @Param("tenantId") UUID tenantId,
         Pageable pageable
+    );
+
+    @Modifying
+    @Query("UPDATE Batch b SET b.deletedAt = CURRENT_TIMESTAMP " +
+           "WHERE b.productId = :productId " +
+           "AND b.warehouseId = :warehouseId " +
+           "AND b.tenantId = :tenantId " +
+           "AND b.deletedAt IS NULL")
+    int softDeleteByProductAndWarehouse(
+        @Param("productId") UUID productId,
+        @Param("warehouseId") UUID warehouseId,
+        @Param("tenantId") UUID tenantId
     );
 }
