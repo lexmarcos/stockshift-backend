@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
+
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.model.entity.Batch;
 import br.com.stockshift.model.entity.Category;
@@ -178,5 +180,53 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data").isArray())
             .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "batchdeletion@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldReturn404WhenWarehouseNotFound() throws Exception {
+        UUID nonExistentWarehouseId = UUID.randomUUID();
+
+        mockMvc.perform(
+                delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                    nonExistentWarehouseId, productId))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "batchdeletion@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldReturn404WhenProductNotFound() throws Exception {
+        UUID nonExistentProductId = UUID.randomUUID();
+
+        mockMvc.perform(
+                delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                    warehouseId, nonExistentProductId))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "batchdeletion@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldReturn200WithZeroCountWhenNoBatchesExist() throws Exception {
+        // Don't create any batches
+
+        String responseContent = mockMvc.perform(
+                delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                    warehouseId, productId))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+
+        BatchDeletionResponse response = objectMapper.readValue(responseContent, BatchDeletionResponse.class);
+
+        assertThat(response.deletedCount()).isEqualTo(0);
+        assertThat(response.message()).contains("Successfully deleted 0 batches");
+    }
+
+    @Test
+    @WithMockUser(authorities = {"BATCH_READ"}) // Wrong permission
+    void shouldReturn403WhenUnauthorized() throws Exception {
+        mockMvc.perform(
+                delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                    warehouseId, productId))
+            .andExpect(status().isForbidden());
     }
 }
