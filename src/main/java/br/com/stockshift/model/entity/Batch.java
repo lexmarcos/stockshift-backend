@@ -5,9 +5,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
+@SQLRestriction("deleted_at IS NULL")
 @Entity
 @Table(name = "batches", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"tenant_id", "batch_code"})
@@ -35,6 +38,9 @@ public class Batch extends TenantAwareEntity {
     @Version
     @Column(name = "version", nullable = false)
     private Long version = 0L;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(name = "manufactured_date")
     private LocalDate manufacturedDate;
