@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
 import br.com.stockshift.dto.warehouse.ProductBatchRequest;
@@ -212,6 +213,38 @@ public class BatchService {
 
         batchRepository.delete(batch);
         log.info("Deleted batch {} for tenant {}", id, tenantId);
+    }
+
+    @Transactional
+    public BatchDeletionResponse deleteAllByProductAndWarehouse(
+        UUID warehouseId,
+        UUID productId
+    ) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        // Validate warehouse exists and belongs to tenant
+        warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Warehouse", "id", warehouseId));
+
+        // Validate product exists and belongs to tenant
+        productRepository.findByTenantIdAndId(tenantId, productId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Product", "id", productId));
+
+        // Soft delete all batches
+        int deletedCount = batchRepository.softDeleteByProductAndWarehouse(
+            productId, warehouseId, tenantId);
+
+        log.info("Soft deleted {} batches for product {} in warehouse {} for tenant {}",
+            deletedCount, productId, warehouseId, tenantId);
+
+        return new BatchDeletionResponse(
+            "Successfully deleted " + deletedCount + " batches",
+            deletedCount,
+            productId,
+            warehouseId
+        );
     }
 
     @Transactional
