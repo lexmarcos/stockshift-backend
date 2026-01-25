@@ -23,4 +23,10 @@ public interface BrandRepository extends JpaRepository<Brand, UUID> {
 
     @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END FROM Brand b WHERE b.name = :name AND b.tenantId = :tenantId AND b.deletedAt IS NULL AND b.id <> :id")
     boolean existsByNameAndTenantIdAndDeletedAtIsNullAndIdNot(String name, UUID tenantId, UUID id);
+
+    @Query("SELECT b FROM Brand b WHERE LOWER(b.name) = LOWER(:name) AND b.tenantId = :tenantId AND b.deletedAt IS NULL")
+    Optional<Brand> findByNameIgnoreCaseAndTenantId(String name, UUID tenantId);
+
+    @Query("SELECT b FROM Brand b WHERE b.tenantId = :tenantId AND b.deletedAt IS NULL")
+    List<Brand> findByTenantIdAndDeletedAtIsNull(UUID tenantId);
 }

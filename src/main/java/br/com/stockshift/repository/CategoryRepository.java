@@ -20,4 +20,10 @@ public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
     @Query("SELECT c FROM Category c WHERE c.parentCategory.id = :parentId AND c.deletedAt IS NULL")
     List<Category> findByParentCategoryId(UUID parentId);
+
+    @Query("SELECT c FROM Category c WHERE LOWER(c.name) = LOWER(:name) AND c.tenantId = :tenantId AND c.deletedAt IS NULL")
+    Optional<Category> findByNameIgnoreCaseAndTenantId(String name, UUID tenantId);
+
+    @Query("SELECT c FROM Category c WHERE c.tenantId = :tenantId AND c.deletedAt IS NULL")
+    List<Category> findByTenantIdAndDeletedAtIsNull(UUID tenantId);
 }
