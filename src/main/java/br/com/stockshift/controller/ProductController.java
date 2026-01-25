@@ -4,6 +4,8 @@ import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
 import br.com.stockshift.service.ProductService;
+import br.com.stockshift.service.OpenAiService;
+import br.com.stockshift.dto.ai.ProductClassificationResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +30,7 @@ import java.util.UUID;
 public class ProductController {
 
     private final ProductService productService;
+    private final OpenAiService openAiService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
@@ -112,5 +116,14 @@ public class ProductController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         productService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
+    }
+
+    @PostMapping(value = "/analyze-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
+    @Operation(summary = "Analyze product image using AI")
+    public ResponseEntity<ApiResponse<ProductClassificationResponse>> analyzeImage(
+            @RequestParam("image") MultipartFile image) throws IOException {
+        ProductClassificationResponse response = openAiService.analyzeImage(image);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

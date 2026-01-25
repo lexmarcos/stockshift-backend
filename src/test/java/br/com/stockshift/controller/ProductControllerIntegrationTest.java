@@ -27,6 +27,11 @@ import br.com.stockshift.model.entity.User;
 import br.com.stockshift.model.enums.BarcodeType;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import br.com.stockshift.dto.ai.ProductClassificationResponse;
+import br.com.stockshift.service.OpenAiService;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
@@ -54,6 +59,9 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @MockitoBean
+    private OpenAiService openAiService;
 
     private Tenant testTenant;
     private User testUser;
@@ -322,6 +330,32 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.name").value("Product With Auto SKU"))
                 .andExpect(jsonPath("$.data.sku").exists())
                 .andExpect(jsonPath("$.data.sku").isNotEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void shouldAnalyzeImage() throws Exception {
+        ProductClassificationResponse mockResponse = ProductClassificationResponse.builder()
+                .name("Analyzed Product")
+                .detectedBrand("Analyzed Brand")
+                .detectedCategory("Analyzed Category")
+                .build();
+
+        when(openAiService.analyzeImage(any())).thenReturn(mockResponse);
+
+        MockMultipartFile imagePart = new MockMultipartFile(
+                "image",
+                "test-image.jpg",
+                MediaType.IMAGE_JPEG_VALUE,
+                "fake-image-content".getBytes());
+
+        mockMvc.perform(multipart("/api/products/analyze-image")
+                .file(imagePart))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Analyzed Product"))
+                .andExpect(jsonPath("$.data.detectedBrand").value("Analyzed Brand"))
+                .andExpect(jsonPath("$.data.detectedCategory").value("Analyzed Category"));
     }
 
     private Product createTestProduct(String name, String barcode, String sku) {

@@ -24,6 +24,8 @@ public abstract class BaseIntegrationTest {
     // Singleton container shared across all test classes
     @SuppressWarnings("resource")
     static PostgreSQLContainer<?> postgres;
+    @SuppressWarnings("resource")
+    static org.testcontainers.containers.GenericContainer<?> redis;
 
     static {
         postgres = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -31,6 +33,10 @@ public abstract class BaseIntegrationTest {
                 .withUsername("test")
                 .withPassword("test");
         postgres.start();
+
+        redis = new org.testcontainers.containers.GenericContainer<>("redis:7.2-alpine")
+                .withExposedPorts(6379);
+        redis.start();
     }
 
     protected MockMvc mockMvc;
@@ -41,6 +47,9 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.flyway.enabled", () -> "true");
+
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
     }
 
     @BeforeEach
