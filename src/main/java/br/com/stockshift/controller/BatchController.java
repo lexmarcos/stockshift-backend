@@ -1,6 +1,7 @@
 package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
 import br.com.stockshift.dto.warehouse.ProductBatchRequest;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/batches")
 @RequiredArgsConstructor
@@ -114,5 +117,20 @@ public class BatchController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         batchService.delete(id);
         return ResponseEntity.ok(ApiResponse.success("Batch deleted successfully", null));
+    }
+
+    @DeleteMapping("/warehouses/{warehouseId}/products/{productId}/batches")
+    @PreAuthorize("hasAnyAuthority('BATCH_DELETE', 'ROLE_ADMIN')")
+    public ResponseEntity<BatchDeletionResponse> deleteAllBatchesByProductAndWarehouse(
+        @PathVariable UUID warehouseId,
+        @PathVariable UUID productId
+    ) {
+        log.info("Request to delete all batches for product {} in warehouse {}",
+            productId, warehouseId);
+
+        BatchDeletionResponse response = batchService.deleteAllByProductAndWarehouse(
+            warehouseId, productId);
+
+        return ResponseEntity.ok(response);
     }
 }
