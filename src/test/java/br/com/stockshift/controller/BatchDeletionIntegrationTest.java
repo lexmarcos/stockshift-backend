@@ -3,6 +3,7 @@ package br.com.stockshift.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -12,6 +13,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
+import br.com.stockshift.dto.warehouse.BatchRequest;
 
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.model.entity.Batch;
@@ -228,5 +231,39 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
                 delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
                     warehouseId, productId))
             .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"BATCH_CREATE", "BATCH_DELETE", "BATCH_READ"})
+    void shouldRespectTenantIsolation() throws Exception {
+        // Create batch for current tenant
+        BatchRequest batchRequest = new BatchRequest(
+            productId, warehouseId, "BATCH-TENANT-1", 10,
+            null, null, null, null
+        );
+        mockMvc.perform(post("/api/batches")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(batchRequest)))
+            .andExpect(status().isCreated());
+
+        // Switch to different tenant
+        UUID differentTenantId = UUID.randomUUID();
+        TenantContext.setTenantId(differentTenantId);
+
+        // Try to delete batches as different tenant
+        mockMvc.perform(
+                delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                    warehouseId, productId))
+            .andExpect(status().isNotFound()); // Warehouse doesn't exist for this tenant
+
+        // Switch back to original tenant
+        TenantContext.setTenantId(tenantId);
+
+        // Verify batch still exists for original tenant
+        mockMvc.perform(get("/api/batches/warehouse/{warehouseId}", warehouseId))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data").isArray())
+            .andExpect(jsonPath("$.data.length()").value(1));
     }
 }
