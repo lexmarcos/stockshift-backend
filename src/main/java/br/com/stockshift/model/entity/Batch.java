@@ -5,11 +5,13 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@SQLDelete(sql = "UPDATE batches SET deleted_at = current_timestamp WHERE id = ? AND version = ?")
 @SQLRestriction("deleted_at IS NULL")
 @Entity
 @Table(name = "batches", uniqueConstraints = {

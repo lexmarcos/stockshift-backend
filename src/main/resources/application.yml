@@ -42,7 +42,7 @@ jwt:
     http-only: true
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://ranks-chocolate-mountain-thursday.trycloudflare.com}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://stag-above-hog.ngrok-free.app}
 
 management:
   endpoints:

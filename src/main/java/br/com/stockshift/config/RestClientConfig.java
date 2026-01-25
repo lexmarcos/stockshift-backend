@@ -9,7 +9,8 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
 
     @Bean
-    public RestClient restClient(@Value("${openai.api-url:https://api.openai.com/v1}") String baseUrl) {
+    public RestClient restClient(@Value("${openai.api-url:https://api.openai.com}") String baseUrl) {
+        System.out.println("DEBUG: RestClient Base URL configured as: " + baseUrl);
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .build();
