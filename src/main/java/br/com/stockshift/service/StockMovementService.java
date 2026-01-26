@@ -324,12 +324,38 @@ public class StockMovementService {
     }
 
     private StockMovementItemResponse mapItemToResponse(StockMovementItem item) {
+        UUID batchId = null;
+        String batchCode = null;
+        
+        if (item.getBatch() != null) {
+            try {
+                // Check if it's a Hibernate proxy and extract ID without initialization
+                if (item.getBatch() instanceof org.hibernate.proxy.HibernateProxy) {
+                    org.hibernate.proxy.HibernateProxy proxy = (org.hibernate.proxy.HibernateProxy) item.getBatch();
+                    batchId = (UUID) proxy.getHibernateLazyInitializer().getIdentifier();
+                    // Try to get batch code - this may fail if soft-deleted
+                    try {
+                        batchCode = item.getBatch().getBatchCode();
+                    } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+                        batchCode = "(deleted)";
+                    }
+                } else {
+                    // Not a proxy, direct access is safe
+                    batchId = item.getBatch().getId();
+                    batchCode = item.getBatch().getBatchCode();
+                }
+            } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+                // Batch was soft-deleted
+                batchCode = "(deleted)";
+            }
+        }
+        
         return StockMovementItemResponse.builder()
                 .id(item.getId())
                 .productId(item.getProduct().getId())
                 .productName(item.getProduct().getName())
-                .batchId(item.getBatch() != null ? item.getBatch().getId() : null)
-                .batchCode(item.getBatch() != null ? item.getBatch().getBatchCode() : null)
+                .batchId(batchId)
+                .batchCode(batchCode)
                 .quantity(item.getQuantity())
                 .unitPrice(item.getUnitPrice())
                 .totalPrice(item.getTotalPrice())

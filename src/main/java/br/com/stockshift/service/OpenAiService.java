@@ -103,7 +103,7 @@ public class OpenAiService {
                     )
                 )
             ),
-            "max_tokens", 500
+            "max_completion_tokens", 500
         );
     }
 
