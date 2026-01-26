@@ -97,6 +97,43 @@ public class SaleService {
             .map(this::mapToResponse);
     }
     
+    @Transactional
+    public SaleResponse cancelSale(Long id, CancelSaleRequest request, User user) {
+        log.info("Cancelling sale {} by user {}", id, user.getId());
+        
+        UUID saleUuid = convertLongToUUID(id);
+        Sale sale = saleRepository.findByIdAndTenantId(saleUuid, user.getTenantId())
+            .orElseThrow(() -> new SaleNotFoundException("Sale not found: " + id));
+        
+        // Validate cancellation
+        if (sale.getStatus() == SaleStatus.CANCELLED) {
+            throw new InvalidSaleCancellationException("Sale is already cancelled");
+        }
+        
+        // Return stock to batches
+        for (SaleItem item : sale.getItems()) {
+            if (item.getBatch() != null) {
+                Batch batch = batchRepository.findById(item.getBatch().getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Batch not found"));
+                
+                batch.setQuantity(batch.getQuantity() + item.getQuantity());
+                batchRepository.save(batch);
+            }
+        }
+        
+        // Update sale status
+        sale.setStatus(SaleStatus.CANCELLED);
+        sale.setCancelledAt(java.time.LocalDateTime.now());
+        sale.setCancelledBy(user);
+        sale.setCancellationReason(request.getReason());
+        
+        sale = saleRepository.save(sale);
+        
+        log.info("Sale {} cancelled successfully", id);
+        
+        return mapToResponse(sale);
+    }
+    
     private void validateSaleItems(CreateSaleRequest request, UUID tenantId) {
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new EmptySaleException("Sale must have at least one item");

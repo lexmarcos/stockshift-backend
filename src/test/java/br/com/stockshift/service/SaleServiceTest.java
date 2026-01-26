@@ -1,9 +1,11 @@
 package br.com.stockshift.service;
 
+import br.com.stockshift.dto.sale.CancelSaleRequest;
 import br.com.stockshift.dto.sale.CreateSaleRequest;
 import br.com.stockshift.dto.sale.SaleItemRequest;
 import br.com.stockshift.dto.sale.SaleResponse;
 import br.com.stockshift.exception.InsufficientStockException;
+import br.com.stockshift.exception.InvalidSaleCancellationException;
 import br.com.stockshift.exception.SaleNotFoundException;
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.PaymentMethod;
@@ -205,5 +207,69 @@ class SaleServiceTest {
         // When & Then
         assertThrows(SaleNotFoundException.class, 
             () -> saleService.getSaleById(1L, tenantId));
+    }
+    
+    @Test
+    void shouldCancelSaleSuccessfully() {
+        // Given
+        Sale sale = new Sale();
+        sale.setId(UUID.fromString("00000001-0000-0000-0000-000000000000"));
+        sale.setWarehouse(warehouse);
+        sale.setUser(user);
+        sale.setTenantId(tenantId);
+        sale.setPaymentMethod(PaymentMethod.CASH);
+        sale.setStatus(SaleStatus.COMPLETED);
+        sale.setSubtotal(new BigDecimal("100.00"));
+        sale.setTotal(new BigDecimal("100.00"));
+        
+        SaleItem item = new SaleItem();
+        item.setId(UUID.fromString("00000003-0000-0000-0000-000000000000"));
+        item.setProduct(product);
+        item.setQuantity(10);
+        item.setUnitPrice(BigDecimal.TEN);
+        item.setSubtotal(new BigDecimal("100.00"));
+        
+        Batch batch = new Batch();
+        batch.setId(UUID.fromString("00000002-0000-0000-0000-000000000000"));
+        batch.setQuantity(40);
+        item.setBatch(batch);
+        
+        sale.addItem(item);
+        
+        CancelSaleRequest request = new CancelSaleRequest();
+        request.setReason("Customer changed mind");
+        
+        UUID saleUuid = UUID.fromString("00000001-0000-0000-0000-000000000000");
+        when(saleRepository.findByIdAndTenantId(saleUuid, tenantId)).thenReturn(Optional.of(sale));
+        when(batchRepository.findById(batch.getId())).thenReturn(Optional.of(batch));
+        when(saleRepository.save(any(Sale.class))).thenReturn(sale);
+        
+        // When
+        SaleResponse response = saleService.cancelSale(1L, request, user);
+        
+        // Then
+        assertNotNull(response);
+        assertEquals(SaleStatus.CANCELLED, sale.getStatus());
+        assertEquals(50, batch.getQuantity()); // 40 + 10
+        verify(batchRepository, times(1)).save(batch);
+    }
+    
+    @Test
+    void shouldThrowExceptionWhenCancellingAlreadyCancelledSale() {
+        // Given
+        Sale sale = new Sale();
+        sale.setId(UUID.fromString("00000001-0000-0000-0000-000000000000"));
+        sale.setStatus(SaleStatus.CANCELLED);
+        sale.setTenantId(tenantId);
+        
+        UUID saleUuid = UUID.fromString("00000001-0000-0000-0000-000000000000");
+        when(saleRepository.findByIdAndTenantId(saleUuid, tenantId)).thenReturn(Optional.of(sale));
+        
+        CancelSaleRequest request = new CancelSaleRequest();
+        request.setReason("Test");
+        
+        // When & Then
+        assertThrows(InvalidSaleCancellationException.class,
+            () -> saleService.cancelSale(1L, request, user));
     }
 }
