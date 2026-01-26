@@ -79,4 +79,7 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	systemProperty 'DOCKER_HOST', 'unix:///var/run/docker.sock'
+	environment 'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE', '/var/run/docker.sock'
+	environment 'DOCKER_HOST', 'unix:///var/run/docker.sock'
 }
