@@ -11,6 +11,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +23,7 @@ public class SaleController {
     private final SaleService saleService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('SALES:CREATE')")
     public ResponseEntity<SaleResponse> createSale(
             @Valid @RequestBody CreateSaleRequest request,
             @AuthenticationPrincipal User user) {
@@ -31,6 +33,7 @@ public class SaleController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('SALES:READ')")
     public ResponseEntity<Page<SaleResponse>> getAllSales(
             @AuthenticationPrincipal User user,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) 
@@ -41,6 +44,7 @@ public class SaleController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('SALES:READ')")
     public ResponseEntity<SaleResponse> getSaleById(
             @PathVariable Long id,
             @AuthenticationPrincipal User user) {
@@ -50,6 +54,7 @@ public class SaleController {
     }
 
     @PutMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('SALES:CANCEL')")
     public ResponseEntity<SaleResponse> cancelSale(
             @PathVariable Long id,
             @Valid @RequestBody CancelSaleRequest request,

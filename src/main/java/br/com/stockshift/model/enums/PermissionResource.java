@@ -4,6 +4,7 @@ public enum PermissionResource {
     PRODUCT,
     STOCK,
     SALE,
+    SALES,
     USER,
     REPORT,
     WAREHOUSE
