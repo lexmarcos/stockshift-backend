@@ -7,6 +7,8 @@ import br.com.stockshift.model.enums.SaleStatus;
 import br.com.stockshift.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +80,21 @@ public class SaleService {
         log.info("Sale created successfully: {}", sale.getId());
         
         return mapToResponse(sale);
+    }
+    
+    @Transactional(readOnly = true)
+    public SaleResponse getSaleById(Long id, UUID tenantId) {
+        UUID saleUuid = convertLongToUUID(id);
+        Sale sale = saleRepository.findByIdAndTenantId(saleUuid, tenantId)
+            .orElseThrow(() -> new SaleNotFoundException("Sale not found: " + id));
+        
+        return mapToResponse(sale);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SaleResponse> getAllSales(UUID tenantId, Pageable pageable) {
+        return saleRepository.findAllByTenantId(tenantId, pageable)
+            .map(this::mapToResponse);
     }
     
     private void validateSaleItems(CreateSaleRequest request, UUID tenantId) {

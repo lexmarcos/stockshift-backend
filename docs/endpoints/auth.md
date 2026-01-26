@@ -19,13 +19,15 @@ These endpoints handle user authentication, registration, and session management
 ```json
 {
   "email": "user@example.com",
-  "password": "userpassword"
+  "password": "userpassword",
+  "captchaToken": "03AHJ_ASjnLA23KSD... (optional)"
 }
 ```
 
 **Field Validations**:
 - `email`: Required, must be a valid email format
 - `password`: Required, cannot be blank
+- `captchaToken`: Optional, required when `requiresCaptcha` is true from previous attempt
 
 ### Response
 **Status Code**: `200 OK`
@@ -82,22 +84,16 @@ When `requiresCaptcha: true` is returned, the frontend should display a captcha 
 ---
 
 ## POST /api/auth/refresh
-**Summary**: Generate new access token using refresh token
+**Summary**: Generate new access and refresh tokens using refresh token cookie
 
 ### Request
-**Method**: `POST`  
-**Content-Type**: `application/json`  
+**Method**: `POST`
+**Content-Type**: `application/json`
 **Authentication**: Not required
 
-#### Request Body
-```json
-{
-  "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
+**Request Body**: None
 
-**Field Validations**:
-- `refreshToken`: Required, must be a valid UUID string
+**Note**: This endpoint reads the refresh token from HTTP-only cookies automatically. No request body is needed.
 
 ### Response
 **Status Code**: `200 OK`
@@ -105,38 +101,33 @@ When `requiresCaptcha: true` is returned, the frontend should display a captcha 
 ```json
 {
   "success": true,
-  "message": null,
-  "data": {
-    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "tokenType": "Bearer",
-    "expiresIn": 3600000
-  }
+  "message": "Tokens refreshed successfully",
+  "data": null
 }
 ```
+
+> **Note**: New access and refresh tokens are set as HTTP-only cookies. The refresh token is automatically rotated for security.
 
 ### Frontend Implementation Guide
 1. **Auto-Refresh**: Implement automatic token refresh before expiration (e.g., 5 minutes before)
 2. **401 Handler**: On 401 responses, attempt token refresh automatically
-3. **Token Update**: Update stored accessToken with new token
+3. **Cookie Handling**: Cookies are managed automatically by the browser
 4. **Failure Handling**: On refresh failure, redirect to login page
 5. **Request Queue**: Queue failed requests and retry after successful refresh
 
 ---
 
 ## POST /api/auth/logout
-**Summary**: Revoke refresh token and logout user
+**Summary**: Revoke tokens and clear HTTP-only cookies
 
 ### Request
-**Method**: `POST`  
-**Content-Type**: `application/json`  
-**Authentication**: Not required (but refreshToken must be valid)
+**Method**: `POST`
+**Content-Type**: `application/json`
+**Authentication**: Not required
 
-#### Request Body
-```json
-{
-  "refreshToken": "550e8400-e29b-41d4-a716-446655440000"
-}
-```
+**Request Body**: None
+
+**Note**: This endpoint reads access and refresh tokens from HTTP-only cookies automatically. No request body is needed.
 
 ### Response
 **Status Code**: `200 OK`
@@ -149,8 +140,10 @@ When `requiresCaptcha: true` is returned, the frontend should display a captcha 
 }
 ```
 
+> **Note**: Both access and refresh token cookies are automatically cleared by the server.
+
 ### Frontend Implementation Guide
-1. **Clear Storage**: Remove all stored tokens and user data
+1. **Cookie Clearing**: Cookies are cleared automatically by the server
 2. **Reset State**: Clear application state (Redux/Context)
 3. **Redirect**: Navigate to login page
 4. **API Call**: Always call logout endpoint before clearing local data

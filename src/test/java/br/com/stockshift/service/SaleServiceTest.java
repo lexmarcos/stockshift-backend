@@ -4,6 +4,7 @@ import br.com.stockshift.dto.sale.CreateSaleRequest;
 import br.com.stockshift.dto.sale.SaleItemRequest;
 import br.com.stockshift.dto.sale.SaleResponse;
 import br.com.stockshift.exception.InsufficientStockException;
+import br.com.stockshift.exception.SaleNotFoundException;
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.PaymentMethod;
 import br.com.stockshift.model.enums.SaleStatus;
@@ -169,5 +170,40 @@ class SaleServiceTest {
         verify(saleRepository, times(1)).save(any(Sale.class));
         verify(batchRepository, times(1)).save(batch);
         assertEquals(40, batch.getQuantity()); // 50 - 10
+    }
+    
+    @Test
+    void shouldGetSaleById() {
+        // Given
+        Sale sale = new Sale();
+        sale.setId(UUID.fromString("00000001-0000-0000-0000-000000000000"));
+        sale.setWarehouse(warehouse);
+        sale.setUser(user);
+        sale.setTenantId(tenantId);
+        sale.setPaymentMethod(PaymentMethod.CASH);
+        sale.setStatus(SaleStatus.COMPLETED);
+        sale.setSubtotal(BigDecimal.TEN);
+        sale.setTotal(BigDecimal.TEN);
+        
+        UUID saleUuid = UUID.fromString("00000001-0000-0000-0000-000000000000");
+        when(saleRepository.findByIdAndTenantId(saleUuid, tenantId)).thenReturn(Optional.of(sale));
+        
+        // When
+        SaleResponse response = saleService.getSaleById(1L, tenantId);
+        
+        // Then
+        assertNotNull(response);
+        assertEquals(1L, response.getId());
+    }
+    
+    @Test
+    void shouldThrowExceptionWhenSaleNotFound() {
+        // Given
+        UUID saleUuid = UUID.fromString("00000001-0000-0000-0000-000000000000");
+        when(saleRepository.findByIdAndTenantId(saleUuid, tenantId)).thenReturn(Optional.empty());
+        
+        // When & Then
+        assertThrows(SaleNotFoundException.class, 
+            () -> saleService.getSaleById(1L, tenantId));
     }
 }
