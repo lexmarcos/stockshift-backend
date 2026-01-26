@@ -361,4 +361,13 @@ public class BatchService {
                 .updatedAt(batch.getUpdatedAt())
                 .build();
     }
+    
+    public int getAvailableQuantity(UUID productId, UUID warehouseId, UUID tenantId) {
+        List<Batch> batches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
+            productId, warehouseId, tenantId);
+        
+        return batches.stream()
+            .mapToInt(Batch::getQuantity)
+            .sum();
+    }
 }
