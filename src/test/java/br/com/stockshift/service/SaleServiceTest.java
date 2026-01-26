@@ -2,9 +2,11 @@ package br.com.stockshift.service;
 
 import br.com.stockshift.dto.sale.CreateSaleRequest;
 import br.com.stockshift.dto.sale.SaleItemRequest;
+import br.com.stockshift.dto.sale.SaleResponse;
 import br.com.stockshift.exception.InsufficientStockException;
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.PaymentMethod;
+import br.com.stockshift.model.enums.SaleStatus;
 import br.com.stockshift.repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,9 +60,9 @@ class SaleServiceTest {
     @BeforeEach
     void setUp() {
         tenantId = UUID.randomUUID();
-        warehouseId = UUID.randomUUID();
-        productId = UUID.randomUUID();
-        userId = UUID.randomUUID();
+        warehouseId = UUID.fromString("00000001-0000-0000-0000-000000000000");
+        productId = UUID.fromString("00000001-0000-0000-0000-000000000000");
+        userId = UUID.fromString("00000005-0000-0000-0000-000000000000");
         
         tenant = new Tenant();
         tenant.setId(tenantId);
@@ -78,6 +80,7 @@ class SaleServiceTest {
         user = new User();
         user.setId(userId);
         user.setTenantId(tenantId);
+        user.setFullName("Test User");
     }
     
     @Test
@@ -104,5 +107,67 @@ class SaleServiceTest {
         // When & Then
         assertThrows(InsufficientStockException.class, 
             () -> saleService.createSale(request, user));
+    }
+    
+    @Test
+    void shouldCreateSaleSuccessfully() {
+        // Given
+        CreateSaleRequest request = new CreateSaleRequest();
+        request.setWarehouseId(1L);
+        request.setPaymentMethod(PaymentMethod.CASH);
+        request.setDiscount(BigDecimal.ZERO);
+        
+        SaleItemRequest itemRequest = new SaleItemRequest();
+        itemRequest.setProductId(1L);
+        itemRequest.setQuantity(10);
+        itemRequest.setUnitPrice(BigDecimal.TEN);
+        request.setItems(List.of(itemRequest));
+        
+        Batch batch = new Batch();
+        batch.setId(UUID.fromString("00000002-0000-0000-0000-000000000000"));
+        batch.setQuantity(50);
+        batch.setProduct(product);
+        
+        Sale savedSale = new Sale();
+        savedSale.setId(UUID.fromString("00000003-0000-0000-0000-000000000000"));
+        savedSale.setWarehouse(warehouse);
+        savedSale.setUser(user);
+        savedSale.setPaymentMethod(PaymentMethod.CASH);
+        savedSale.setStatus(SaleStatus.COMPLETED);
+        savedSale.setSubtotal(new BigDecimal("100.00"));
+        savedSale.setDiscount(BigDecimal.ZERO);
+        savedSale.setTotal(new BigDecimal("100.00"));
+        savedSale.setCompletedAt(java.time.LocalDateTime.now());
+        savedSale.setCreatedAt(java.time.LocalDateTime.now());
+        
+        SaleItem saleItem = new SaleItem();
+        saleItem.setId(UUID.fromString("00000004-0000-0000-0000-000000000000"));
+        saleItem.setProduct(product);
+        saleItem.setQuantity(10);
+        saleItem.setUnitPrice(BigDecimal.TEN);
+        saleItem.setSubtotal(new BigDecimal("100.00"));
+        saleItem.setBatch(batch);
+        savedSale.addItem(saleItem);
+        
+        // Convert Long IDs to UUIDs (as the service does)
+        UUID expectedWarehouseId = UUID.fromString(String.format("%08d-0000-0000-0000-000000000000", 1L));
+        UUID expectedProductId = UUID.fromString(String.format("%08d-0000-0000-0000-000000000000", 1L));
+        
+        when(warehouseRepository.findById(expectedWarehouseId)).thenReturn(Optional.of(warehouse));
+        when(productRepository.findById(expectedProductId)).thenReturn(Optional.of(product));
+        when(batchService.getAvailableQuantity(expectedProductId, expectedWarehouseId, tenantId)).thenReturn(50);
+        when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(expectedProductId, warehouseId, tenantId))
+            .thenReturn(List.of(batch));
+        when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
+        
+        // When
+        SaleResponse response = saleService.createSale(request, user);
+        
+        // Then
+        assertNotNull(response);
+        assertNotNull(response.getId());
+        verify(saleRepository, times(1)).save(any(Sale.class));
+        verify(batchRepository, times(1)).save(batch);
+        assertEquals(40, batch.getQuantity()); // 50 - 10
     }
 }

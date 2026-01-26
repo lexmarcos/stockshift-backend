@@ -3,6 +3,7 @@ package br.com.stockshift.service;
 import br.com.stockshift.dto.sale.*;
 import br.com.stockshift.exception.*;
 import br.com.stockshift.model.entity.*;
+import br.com.stockshift.model.enums.SaleStatus;
 import br.com.stockshift.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -38,7 +40,44 @@ public class SaleService {
         // Validate items and stock
         validateSaleItems(request, warehouse.getTenantId());
         
-        throw new UnsupportedOperationException("Not implemented yet");
+        // Create sale entity
+        Sale sale = new Sale();
+        sale.setTenantId(user.getTenantId());
+        sale.setWarehouse(warehouse);
+        sale.setUser(user);
+        sale.setCustomerId(request.getCustomerId());
+        sale.setCustomerName(request.getCustomerName());
+        sale.setPaymentMethod(request.getPaymentMethod());
+        sale.setStatus(SaleStatus.COMPLETED);
+        sale.setDiscount(request.getDiscount() != null ? request.getDiscount() : BigDecimal.ZERO);
+        sale.setNotes(request.getNotes());
+        sale.setCompletedAt(java.time.LocalDateTime.now());
+        
+        // Process items and reduce stock
+        for (SaleItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findById(convertLongToUUID(itemRequest.getProductId())).orElseThrow();
+            
+            SaleItem saleItem = new SaleItem();
+            saleItem.setProduct(product);
+            saleItem.setQuantity(itemRequest.getQuantity());
+            saleItem.setUnitPrice(itemRequest.getUnitPrice());
+            saleItem.calculateSubtotal();
+            
+            // Reduce stock using FIFO
+            reduceStockFromBatches(itemRequest, warehouse, user.getTenantId(), saleItem);
+            
+            sale.addItem(saleItem);
+        }
+        
+        // Calculate totals
+        sale.calculateTotals();
+        
+        // Save sale
+        sale = saleRepository.save(sale);
+        
+        log.info("Sale created successfully: {}", sale.getId());
+        
+        return mapToResponse(sale);
     }
     
     private void validateSaleItems(CreateSaleRequest request, UUID tenantId) {
@@ -83,6 +122,76 @@ public class SaleService {
     private UUID convertLongToUUID(Long id) {
         // Convert Long ID to UUID by formatting as string with leading zeros
         return UUID.fromString(String.format("%08d-0000-0000-0000-000000000000", id));
+    }
+    
+    private void reduceStockFromBatches(SaleItemRequest itemRequest, Warehouse warehouse, 
+                                        UUID tenantId, SaleItem saleItem) {
+        List<Batch> availableBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
+            convertLongToUUID(itemRequest.getProductId()), warehouse.getId(), tenantId);
+        
+        int remainingQuantity = itemRequest.getQuantity();
+        
+        for (Batch batch : availableBatches) {
+            if (remainingQuantity <= 0) break;
+            
+            int quantityToReduce = Math.min(remainingQuantity, batch.getQuantity());
+            batch.setQuantity(batch.getQuantity() - quantityToReduce);
+            batchRepository.save(batch);
+            
+            // Set batch reference on first item (for tracking)
+            if (saleItem.getBatch() == null) {
+                saleItem.setBatch(batch);
+            }
+            
+            remainingQuantity -= quantityToReduce;
+        }
+    }
+    
+    private SaleResponse mapToResponse(Sale sale) {
+        return SaleResponse.builder()
+            .id(convertUUIDToLong(sale.getId()))
+            .warehouseId(convertUUIDToLong(sale.getWarehouse().getId()))
+            .warehouseName(sale.getWarehouse().getName())
+            .userId(convertUUIDToLong(sale.getUser().getId()))
+            .userName(sale.getUser().getFullName())
+            .customerId(sale.getCustomerId())
+            .customerName(sale.getCustomerName())
+            .paymentMethod(sale.getPaymentMethod())
+            .status(sale.getStatus())
+            .subtotal(sale.getSubtotal())
+            .discount(sale.getDiscount())
+            .total(sale.getTotal())
+            .notes(sale.getNotes())
+            .stockMovementId(sale.getStockMovement() != null ? convertUUIDToLong(sale.getStockMovement().getId()) : null)
+            .createdAt(sale.getCreatedAt())
+            .completedAt(sale.getCompletedAt())
+            .cancelledAt(sale.getCancelledAt())
+            .cancelledBy(sale.getCancelledBy() != null ? convertUUIDToLong(sale.getCancelledBy().getId()) : null)
+            .cancelledByName(sale.getCancelledBy() != null ? sale.getCancelledBy().getFullName() : null)
+            .cancellationReason(sale.getCancellationReason())
+            .items(sale.getItems().stream().map(this::mapItemToResponse).toList())
+            .build();
+    }
+    
+    private SaleItemResponse mapItemToResponse(SaleItem item) {
+        return SaleItemResponse.builder()
+            .id(convertUUIDToLong(item.getId()))
+            .productId(convertUUIDToLong(item.getProduct().getId()))
+            .productName(item.getProduct().getName())
+            .productSku(item.getProduct().getSku())
+            .batchId(item.getBatch() != null ? convertUUIDToLong(item.getBatch().getId()) : null)
+            .batchCode(item.getBatch() != null ? item.getBatch().getBatchCode() : null)
+            .quantity(item.getQuantity())
+            .unitPrice(item.getUnitPrice())
+            .subtotal(item.getSubtotal())
+            .build();
+    }
+    
+    private Long convertUUIDToLong(UUID uuid) {
+        // Extract the numeric part from formatted UUID
+        String uuidStr = uuid.toString();
+        String numericPart = uuidStr.substring(0, 8);
+        return Long.parseLong(numericPart);
     }
 }
 
