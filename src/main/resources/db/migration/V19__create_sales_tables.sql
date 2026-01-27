@@ -1,9 +1,9 @@
 -- Create sales table
 CREATE TABLE sales (
-    id BIGSERIAL PRIMARY KEY,
-    tenant_id BIGINT NOT NULL,
-    warehouse_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+    warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE RESTRICT,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     customer_id BIGINT,
     customer_name VARCHAR(200),
     payment_method VARCHAR(20) NOT NULL,
@@ -12,34 +12,26 @@ CREATE TABLE sales (
     discount DECIMAL(15, 2) DEFAULT 0,
     total DECIMAL(15, 2) NOT NULL,
     notes TEXT,
-    stock_movement_id BIGINT,
+    stock_movement_id UUID REFERENCES stock_movements(id) ON DELETE SET NULL,
     completed_at TIMESTAMP,
     cancelled_at TIMESTAMP,
-    cancelled_by BIGINT,
+    cancelled_by UUID REFERENCES users(id) ON DELETE SET NULL,
     cancellation_reason TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sales_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id),
-    CONSTRAINT fk_sales_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses(id),
-    CONSTRAINT fk_sales_user FOREIGN KEY (user_id) REFERENCES users(id),
-    CONSTRAINT fk_sales_stock_movement FOREIGN KEY (stock_movement_id) REFERENCES stock_movements(id),
-    CONSTRAINT fk_sales_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users(id)
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create sale_items table
 CREATE TABLE sale_items (
-    id BIGSERIAL PRIMARY KEY,
-    sale_id BIGINT NOT NULL,
-    product_id BIGINT NOT NULL,
-    batch_id BIGINT,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sale_id UUID NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    batch_id UUID REFERENCES batches(id) ON DELETE SET NULL,
     quantity INTEGER NOT NULL,
     unit_price DECIMAL(15, 2) NOT NULL,
     subtotal DECIMAL(15, 2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sale_items_sale FOREIGN KEY (sale_id) REFERENCES sales(id),
-    CONSTRAINT fk_sale_items_product FOREIGN KEY (product_id) REFERENCES products(id),
-    CONSTRAINT fk_sale_items_batch FOREIGN KEY (batch_id) REFERENCES batches(id)
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create indexes for performance
