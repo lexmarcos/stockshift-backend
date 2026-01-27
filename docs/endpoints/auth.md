@@ -155,27 +155,23 @@ When `requiresCaptcha: true` is returned, the frontend should display a captcha 
 **Summary**: Register new tenant with first admin user
 
 ### Request
-**Method**: `POST`  
-**Content-Type**: `application/json`  
+**Method**: `POST`
+**Content-Type**: `application/json`
 **Authentication**: Not required
 
 #### Request Body
 ```json
 {
-  "tenantName": "My Company",
-  "tenantSlug": "my-company",
-  "userFullName": "John Doe",
-  "userEmail": "admin@mycompany.com",
-  "userPassword": "securePassword123"
+  "companyName": "My Company",
+  "email": "admin@mycompany.com",
+  "password": "securePassword123"
 }
 ```
 
 **Field Validations**:
-- `tenantName`: Required, 2-100 characters
-- `tenantSlug`: Required, 2-50 characters, lowercase, alphanumeric with hyphens
-- `userFullName`: Required, 2-100 characters
-- `userEmail`: Required, valid email format
-- `userPassword`: Required, minimum 8 characters
+- `companyName`: Required, cannot be blank
+- `email`: Required, valid email format
+- `password`: Required, minimum 6 characters
 
 ### Response
 **Status Code**: `201 CREATED`
@@ -186,23 +182,24 @@ When `requiresCaptcha: true` is returned, the frontend should display a captcha 
   "message": "Registration successful",
   "data": {
     "tenantId": "550e8400-e29b-41d4-a716-446655440000",
-    "tenantName": "My Company",
-    "tenantSlug": "my-company",
+    "businessName": "My Company",
     "userId": "660e8400-e29b-41d4-a716-446655440001",
     "userEmail": "admin@mycompany.com",
-    "userFullName": "John Doe"
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4...",
+    "tokenType": "Bearer",
+    "expiresIn": 3600000
   }
 }
 ```
 
 ### Frontend Implementation Guide
-1. **Registration Form**: Create multi-step or single form with all required fields
-2. **Slug Validation**: Auto-generate slug from tenant name, validate format
-3. **Password Strength**: Implement password strength indicator
-4. **Email Validation**: Validate email format and check availability
-5. **Success Flow**: After registration, automatically log user in or redirect to login
-6. **Error Handling**: Display specific validation errors per field
-7. **Tenant Context**: Store tenant information for branding/customization
+1. **Registration Form**: Create simple form with company name, email, and password
+2. **Password Strength**: Implement password strength indicator (minimum 6 characters)
+3. **Email Validation**: Validate email format before submission
+4. **Success Flow**: After registration, user is automatically authenticated with tokens
+5. **Error Handling**: Display specific validation errors per field
+6. **Token Storage**: Store tokens for authenticated API calls
 
 ---
 

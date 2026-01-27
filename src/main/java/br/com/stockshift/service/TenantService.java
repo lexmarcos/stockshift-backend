@@ -35,29 +35,22 @@ public class TenantService {
 
   @Transactional
   public RegisterResponse register(RegisterRequest request) {
-    log.info("Starting registration for business: {}", request.getBusinessName());
+    log.info("Starting registration for company: {}", request.getCompanyName());
 
-    // Validate unique document
-    if (tenantRepository.findByDocument(request.getDocument()).isPresent()) {
-      throw new BusinessException("Document already registered");
-    }
-
-    // Validate unique tenant email
-    if (tenantRepository.findByEmail(request.getTenantEmail()).isPresent()) {
-      throw new BusinessException("Tenant email already registered");
+    // Validate unique email
+    if (tenantRepository.findByEmail(request.getEmail()).isPresent()) {
+      throw new BusinessException("Email already registered");
     }
 
     // Validate unique user email
-    if (userRepository.findByEmail(request.getUserEmail()).isPresent()) {
-      throw new BusinessException("User email already registered");
+    if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+      throw new BusinessException("Email already registered");
     }
 
     // Create tenant
     Tenant tenant = new Tenant();
-    tenant.setBusinessName(request.getBusinessName());
-    tenant.setDocument(request.getDocument());
-    tenant.setEmail(request.getTenantEmail());
-    tenant.setPhone(request.getPhone());
+    tenant.setBusinessName(request.getCompanyName());
+    tenant.setEmail(request.getEmail());
     tenant.setIsActive(true);
     tenant = tenantRepository.save(tenant);
     log.info("Created tenant with ID: {}", tenant.getId());
@@ -74,9 +67,9 @@ public class TenantService {
     // Create first admin user
     User user = new User();
     user.setTenantId(tenant.getId());
-    user.setEmail(request.getUserEmail());
+    user.setEmail(request.getEmail());
     user.setPassword(passwordEncoder.encode(request.getPassword()));
-    user.setFullName(request.getFullName());
+    user.setFullName("Admin");
     user.setIsActive(true);
     user.setRoles(new HashSet<>());
     user.getRoles().add(adminRole);

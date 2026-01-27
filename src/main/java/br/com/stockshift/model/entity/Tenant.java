@@ -17,7 +17,7 @@ public class Tenant extends BaseEntity {
     @Column(name = "business_name", nullable = false)
     private String businessName;
 
-    @Column(name = "document", nullable = false, unique = true, length = 20)
+    @Column(name = "document", unique = true, length = 20)
     private String document;
 
     @Column(name = "email", nullable = false)
