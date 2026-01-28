@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -48,10 +49,19 @@ public class StockMovementService {
     private final BatchRepository batchRepository;
     private final WarehouseRepository warehouseRepository;
     private final UserRepository userRepository;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public StockMovementResponse create(StockMovementRequest request) {
         UUID tenantId = TenantContext.getTenantId();
+
+        // Validate warehouse access
+        if (request.getSourceWarehouseId() != null) {
+            warehouseAccessService.validateWarehouseAccess(request.getSourceWarehouseId());
+        }
+        if (request.getDestinationWarehouseId() != null) {
+            warehouseAccessService.validateWarehouseAccess(request.getDestinationWarehouseId());
+        }
 
         // Get current user
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -176,7 +186,17 @@ public class StockMovementService {
     @Transactional(readOnly = true)
     public List<StockMovementResponse> findAll() {
         UUID tenantId = TenantContext.getTenantId();
-        return stockMovementRepository.findAllByTenantId(tenantId).stream()
+
+        List<StockMovement> movements = stockMovementRepository.findAllByTenantId(tenantId);
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            movements = movements.stream()
+                    .filter(m -> hasAccessToMovement(m, userWarehouseIds))
+                    .collect(Collectors.toList());
+        }
+
+        return movements.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -186,13 +206,31 @@ public class StockMovementService {
         UUID tenantId = TenantContext.getTenantId();
         StockMovement movement = stockMovementRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("StockMovement", "id", id));
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            if (!hasAccessToMovement(movement, userWarehouseIds)) {
+                throw new ResourceNotFoundException("StockMovement", "id", id);
+            }
+        }
+
         return mapToResponse(movement);
     }
 
     @Transactional(readOnly = true)
     public List<StockMovementResponse> findByType(MovementType movementType) {
         UUID tenantId = TenantContext.getTenantId();
-        return stockMovementRepository.findByTenantIdAndMovementType(tenantId, movementType).stream()
+
+        List<StockMovement> movements = stockMovementRepository.findByTenantIdAndMovementType(tenantId, movementType);
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            movements = movements.stream()
+                    .filter(m -> hasAccessToMovement(m, userWarehouseIds))
+                    .collect(Collectors.toList());
+        }
+
+        return movements.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -200,9 +238,27 @@ public class StockMovementService {
     @Transactional(readOnly = true)
     public List<StockMovementResponse> findByStatus(MovementStatus status) {
         UUID tenantId = TenantContext.getTenantId();
-        return stockMovementRepository.findByTenantIdAndStatus(tenantId, status).stream()
+
+        List<StockMovement> movements = stockMovementRepository.findByTenantIdAndStatus(tenantId, status);
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            movements = movements.stream()
+                    .filter(m -> hasAccessToMovement(m, userWarehouseIds))
+                    .collect(Collectors.toList());
+        }
+
+        return movements.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+    private boolean hasAccessToMovement(StockMovement movement, Set<UUID> userWarehouseIds) {
+        UUID sourceId = movement.getSourceWarehouse() != null ? movement.getSourceWarehouse().getId() : null;
+        UUID destId = movement.getDestinationWarehouse() != null ? movement.getDestinationWarehouse().getId() : null;
+
+        return (sourceId != null && userWarehouseIds.contains(sourceId)) ||
+               (destId != null && userWarehouseIds.contains(destId));
     }
 
     private void validateWarehouses(StockMovementRequest request, UUID tenantId) {

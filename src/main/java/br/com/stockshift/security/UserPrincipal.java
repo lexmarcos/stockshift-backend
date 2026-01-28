@@ -1,6 +1,7 @@
 package br.com.stockshift.security;
 
 import br.com.stockshift.model.entity.User;
+import br.com.stockshift.model.entity.Warehouse;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
@@ -8,6 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -21,11 +23,20 @@ public class UserPrincipal implements UserDetails {
     private String password;
     private boolean active;
     private Collection<? extends GrantedAuthority> authorities;
+    private Set<UUID> warehouseIds;
+    private boolean hasFullAccess;
 
     public static UserPrincipal create(User user) {
         Collection<GrantedAuthority> authorities = user.getRoles().stream()
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
                 .collect(Collectors.toList());
+
+        boolean isAdmin = user.getRoles().stream()
+                .anyMatch(role -> "ADMIN".equals(role.getName()));
+
+        Set<UUID> warehouseIds = user.getWarehouses().stream()
+                .map(warehouse -> warehouse.getId())
+                .collect(Collectors.toSet());
 
         return new UserPrincipal(
                 user.getId(),
@@ -33,7 +44,9 @@ public class UserPrincipal implements UserDetails {
                 user.getEmail(),
                 user.getPassword(),
                 user.getIsActive(),
-                authorities
+                authorities,
+                warehouseIds,
+                isAdmin
         );
     }
 

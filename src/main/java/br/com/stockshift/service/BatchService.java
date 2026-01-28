@@ -3,6 +3,7 @@ package br.com.stockshift.service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -39,6 +40,7 @@ public class BatchService {
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
+    private final WarehouseAccessService warehouseAccessService;
 
     /**
      * Generates a unique batch code in the format: BATCH-YYYYMMDD-XXX
@@ -63,6 +65,9 @@ public class BatchService {
     @Transactional
     public BatchResponse create(BatchRequest request) {
         UUID tenantId = TenantContext.getTenantId();
+
+        // Validate warehouse access
+        warehouseAccessService.validateWarehouseAccess(request.getWarehouseId());
 
         // Generate batch code if not provided
         String batchCode = request.getBatchCode();
@@ -111,7 +116,18 @@ public class BatchService {
     @Transactional(readOnly = true)
     public List<BatchResponse> findAll() {
         UUID tenantId = TenantContext.getTenantId();
-        return batchRepository.findAllByTenantId(tenantId).stream()
+
+        List<Batch> batches;
+        if (warehouseAccessService.hasFullAccess()) {
+            batches = batchRepository.findAllByTenantId(tenantId);
+        } else {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            batches = batchRepository.findAllByTenantId(tenantId).stream()
+                    .filter(b -> userWarehouseIds.contains(b.getWarehouse().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return batches.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -121,12 +137,18 @@ public class BatchService {
         UUID tenantId = TenantContext.getTenantId();
         Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
+
+        warehouseAccessService.validateWarehouseAccess(batch.getWarehouse().getId());
+
         return mapToResponse(batch);
     }
 
     @Transactional(readOnly = true)
     public List<BatchResponse> findByWarehouse(UUID warehouseId) {
         UUID tenantId = TenantContext.getTenantId();
+
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
+
         return batchRepository.findByWarehouseIdAndTenantId(warehouseId, tenantId).stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -146,7 +168,16 @@ public class BatchService {
         LocalDate startDate = LocalDate.now();
         LocalDate endDate = startDate.plusDays(daysAhead);
 
-        return batchRepository.findExpiringBatches(startDate, endDate, tenantId).stream()
+        List<Batch> batches = batchRepository.findExpiringBatches(startDate, endDate, tenantId);
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            batches = batches.stream()
+                    .filter(b -> userWarehouseIds.contains(b.getWarehouse().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return batches.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -154,7 +185,17 @@ public class BatchService {
     @Transactional(readOnly = true)
     public List<BatchResponse> findLowStock(Integer threshold) {
         UUID tenantId = TenantContext.getTenantId();
-        return batchRepository.findLowStock(threshold, tenantId).stream()
+
+        List<Batch> batches = batchRepository.findLowStock(threshold, tenantId);
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            batches = batches.stream()
+                    .filter(b -> userWarehouseIds.contains(b.getWarehouse().getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return batches.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }

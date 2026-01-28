@@ -7,6 +7,7 @@ import br.com.stockshift.model.entity.RefreshToken;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
+import br.com.stockshift.repository.PermissionRepository;
 import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,7 @@ public class TenantService {
   private final TenantRepository tenantRepository;
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
+  private final PermissionRepository permissionRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final RefreshTokenService refreshTokenService;
@@ -55,14 +58,16 @@ public class TenantService {
     tenant = tenantRepository.save(tenant);
     log.info("Created tenant with ID: {}", tenant.getId());
 
-    // Create ADMIN role for the tenant
+    // Create ADMIN role for the tenant with all permissions
     Role adminRole = new Role();
     adminRole.setTenantId(tenant.getId());
     adminRole.setName("ADMIN");
     adminRole.setDescription("Administrator role with full access");
     adminRole.setIsSystemRole(true);
+    adminRole.setPermissions(new HashSet<>(permissionRepository.findAll()));
     adminRole = roleRepository.save(adminRole);
-    log.info("Created ADMIN role with ID: {} for tenant: {}", adminRole.getId(), tenant.getId());
+    log.info("Created ADMIN role with ID: {} for tenant: {} with {} permissions",
+        adminRole.getId(), tenant.getId(), adminRole.getPermissions().size());
 
     // Create first admin user
     User user = new User();
@@ -76,11 +81,17 @@ public class TenantService {
     user = userRepository.save(user);
     log.info("Created admin user with ID: {} for tenant: {}", user.getId(), tenant.getId());
 
+    // Admin users get ADMIN role and wildcard permission
+    List<String> roles = List.of("ADMIN");
+    List<String> permissions = List.of("*");
+
     // Generate tokens
     String accessToken = jwtTokenProvider.generateAccessToken(
         user.getId(),
         user.getTenantId(),
-        user.getEmail());
+        user.getEmail(),
+        roles,
+        permissions);
 
     RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 

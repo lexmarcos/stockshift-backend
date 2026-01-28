@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import br.com.stockshift.dto.warehouse.ProductWithStockResponse;
@@ -30,6 +31,7 @@ public class WarehouseService {
 
     private final WarehouseRepository warehouseRepository;
     private final BatchRepository batchRepository;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public WarehouseResponse create(WarehouseRequest request) {
@@ -63,7 +65,18 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public List<WarehouseResponse> findAll() {
         UUID tenantId = TenantContext.getTenantId();
-        return warehouseRepository.findAllByTenantId(tenantId).stream()
+
+        List<Warehouse> warehouses;
+        if (warehouseAccessService.hasFullAccess()) {
+            warehouses = warehouseRepository.findAllByTenantId(tenantId);
+        } else {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            warehouses = warehouseRepository.findAllByTenantId(tenantId).stream()
+                    .filter(w -> userWarehouseIds.contains(w.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return warehouses.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -71,6 +84,9 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public WarehouseResponse findById(UUID id) {
         UUID tenantId = TenantContext.getTenantId();
+
+        warehouseAccessService.validateWarehouseAccess(id);
+
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
         return mapToResponse(warehouse);

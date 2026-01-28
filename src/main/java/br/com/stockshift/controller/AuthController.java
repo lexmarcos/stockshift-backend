@@ -1,8 +1,10 @@
 package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.auth.ChangePasswordRequest;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.LoginResponse;
+import br.com.stockshift.dto.auth.MeResponse;
 import br.com.stockshift.dto.auth.RefreshTokenRequest;
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
 import br.com.stockshift.dto.auth.RegisterRequest;
@@ -117,5 +119,19 @@ public class AuthController {
         RegisterResponse response = tenantService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Registration successful", response));
+    }
+
+    @PostMapping("/change-password")
+    @Operation(summary = "Change Password", description = "Change the authenticated user's password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Get Current User", description = "Get authenticated user information and permissions")
+    public ResponseEntity<ApiResponse<MeResponse>> me() {
+        MeResponse response = authService.getMe();
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

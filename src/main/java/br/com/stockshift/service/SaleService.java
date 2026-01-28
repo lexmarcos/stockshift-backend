@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -27,14 +28,18 @@ public class SaleService {
     private final BatchRepository batchRepository;
     private final BatchService batchService;
     private final StockMovementService stockMovementService;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public SaleResponse createSale(CreateSaleRequest request, User user) {
         log.info("Creating sale for user {} at warehouse {}", user.getId(), request.getWarehouseId());
-        
+
         // Convert Long IDs from DTO to UUID for entity lookups
         UUID warehouseUuid = convertLongToUUID(request.getWarehouseId());
-        
+
+        // Validate warehouse access
+        warehouseAccessService.validateWarehouseAccess(warehouseUuid);
+
         // Validate warehouse
         Warehouse warehouse = warehouseRepository.findById(warehouseUuid)
             .orElseThrow(() -> new ResourceNotFoundException("Warehouse not found"));

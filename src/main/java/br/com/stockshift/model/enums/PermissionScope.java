@@ -1,7 +1,17 @@
 package br.com.stockshift.model.enums;
 
 public enum PermissionScope {
-    ALL,           // All resources
-    OWN_WAREHOUSE, // Only own warehouse
-    OWN            // Only own resources
+    ALL("Todos"),
+    OWN_WAREHOUSE("Próprio Depósito"),
+    OWN("Próprio");
+
+    private final String displayName;
+
+    PermissionScope(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
 }

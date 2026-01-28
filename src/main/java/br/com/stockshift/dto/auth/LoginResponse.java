@@ -27,4 +27,11 @@ public class LoginResponse {
      */
     @Builder.Default
     private Boolean requiresCaptcha = false;
+
+    /**
+     * Indicates if the user must change their password.
+     * Set to true for users created by admin with temporary password.
+     */
+    @Builder.Default
+    private Boolean mustChangePassword = false;
 }

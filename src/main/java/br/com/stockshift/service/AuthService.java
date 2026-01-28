@@ -5,21 +5,31 @@ import java.time.LocalDateTime;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.com.stockshift.config.JwtProperties;
+import br.com.stockshift.dto.auth.ChangePasswordRequest;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.LoginResponse;
+import br.com.stockshift.dto.auth.MeResponse;
 import br.com.stockshift.dto.auth.RefreshTokenRequest;
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
+import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.UnauthorizedException;
 import br.com.stockshift.model.entity.RefreshToken;
 import br.com.stockshift.model.entity.User;
 import br.com.stockshift.repository.UserRepository;
+import br.com.stockshift.model.entity.Permission;
+import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.security.JwtTokenProvider;
+import br.com.stockshift.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +42,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final JwtProperties jwtProperties;
     private final TokenDenylistService tokenDenylistService;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -50,11 +61,17 @@ public class AuthService {
                 throw new UnauthorizedException("User account is disabled");
             }
 
+            // Extract roles and permissions from user
+            List<String> roles = extractRoles(user);
+            List<String> permissions = extractPermissions(user);
+
             // Generate tokens
             String accessToken = jwtTokenProvider.generateAccessToken(
                     user.getId(),
                     user.getTenantId(),
-                    user.getEmail());
+                    user.getEmail(),
+                    roles,
+                    permissions);
 
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
@@ -70,6 +87,7 @@ public class AuthService {
                     .userId(user.getId())
                     .email(user.getEmail())
                     .fullName(user.getFullName())
+                    .mustChangePassword(user.getMustChangePassword())
                     .build();
 
         } catch (AuthenticationException e) {
@@ -93,11 +111,17 @@ public class AuthService {
             throw new UnauthorizedException("User account is disabled");
         }
 
+        // Extract roles and permissions from user
+        List<String> roles = extractRoles(user);
+        List<String> permissions = extractPermissions(user);
+
         // Generate new access token
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getTenantId(),
-                user.getEmail());
+                user.getEmail(),
+                roles,
+                permissions);
 
         // Rotate refresh token - create new one (this deletes the old one)
         RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user);
@@ -130,5 +154,75 @@ public class AuthService {
                 log.warn("Failed to add access token to denylist: {}", e.getMessage());
             }
         }
+    }
+
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        UserPrincipal principal = (UserPrincipal) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BusinessException("Current password is incorrect");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setMustChangePassword(false);
+        userRepository.save(user);
+
+        log.info("Password changed successfully for user: {}", user.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public MeResponse getMe() {
+        UserPrincipal principal = (UserPrincipal) SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getPrincipal();
+
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(() -> new UnauthorizedException("User not found"));
+
+        List<String> roles = extractRoles(user);
+        List<String> permissions = extractPermissions(user);
+
+        return MeResponse.builder()
+                .id(user.getId())
+                .tenantId(user.getTenantId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .mustChangePassword(user.getMustChangePassword())
+                .roles(roles)
+                .permissions(permissions)
+                .build();
+    }
+
+    private List<String> extractRoles(User user) {
+        return user.getRoles().stream()
+                .map(role -> role.getName())
+                .sorted()
+                .toList();
+    }
+
+    private List<String> extractPermissions(User user) {
+        // Check if user has ADMIN role
+        boolean isAdmin = user.getRoles().stream()
+                .anyMatch(role -> "ADMIN".equals(role.getName()));
+
+        if (isAdmin) {
+            return List.of("*");
+        }
+
+        return user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(permission -> String.format("%s:%s:%s",
+                        permission.getResource().name(),
+                        permission.getAction().name(),
+                        permission.getScope().name()))
+                .distinct()
+                .sorted()
+                .toList();
     }
 }

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -24,7 +25,7 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateAccessToken(UUID userId, UUID tenantId, String email) {
+    public String generateAccessToken(UUID userId, UUID tenantId, String email, List<String> roles, List<String> permissions) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessExpiration());
         String jti = UUID.randomUUID().toString();
@@ -34,6 +35,8 @@ public class JwtTokenProvider {
                 .subject(userId.toString())
                 .claim("tenantId", tenantId.toString())
                 .claim("email", email)
+                .claim("roles", roles)
+                .claim("permissions", permissions)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey(), Jwts.SIG.HS256)
