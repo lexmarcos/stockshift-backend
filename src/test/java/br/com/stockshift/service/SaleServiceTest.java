@@ -47,7 +47,10 @@ class SaleServiceTest {
     
     @Mock
     private StockMovementService stockMovementService;
-    
+
+    @Mock
+    private WarehouseAccessService warehouseAccessService;
+
     @InjectMocks
     private SaleService saleService;
     

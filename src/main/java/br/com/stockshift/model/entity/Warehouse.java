@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "warehouses", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"tenant_id", "name"})
+    @UniqueConstraint(columnNames = {"tenant_id", "name"}),
+    @UniqueConstraint(columnNames = {"tenant_id", "code"})
 })
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -18,6 +19,9 @@ public class Warehouse extends TenantAwareEntity {
 
     @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "code", nullable = false, length = 20)
+    private String code;
 
     @Column(name = "city", nullable = false, length = 100)
     private String city;

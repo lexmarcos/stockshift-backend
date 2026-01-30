@@ -10,7 +10,7 @@ class TransferItemTest {
     @Test
     void shouldCreateItemWithPendingStatus() {
         TransferItem item = new TransferItem();
-        assertThat(item.getItemStatus()).isEqualTo(TransferItemStatus.PENDING);
+        assertThat(item.getStatus()).isEqualTo(TransferItemStatus.PENDING);
     }
 
     @Test

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -33,13 +34,13 @@ public class TransferItem extends TenantAwareEntity {
     @JoinColumn(name = "destination_batch_id")
     private Batch destinationBatch;
 
-    @Column(name = "expected_quantity", nullable = false)
-    private Integer expectedQuantity;
+    @Column(name = "expected_quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal expectedQuantity;
 
-    @Column(name = "received_quantity")
-    private Integer receivedQuantity;
+    @Column(name = "received_quantity", precision = 15, scale = 3)
+    private BigDecimal receivedQuantity;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "item_status", nullable = false, length = 30)
-    private TransferItemStatus itemStatus = TransferItemStatus.PENDING;
+    private TransferItemStatus status = TransferItemStatus.PENDING;
 }

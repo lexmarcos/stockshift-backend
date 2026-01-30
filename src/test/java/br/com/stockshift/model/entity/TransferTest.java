@@ -3,6 +3,7 @@ package br.com.stockshift.model.entity;
 import br.com.stockshift.model.enums.TransferStatus;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +27,7 @@ class TransferTest {
     void shouldAddItemToTransfer() {
         Transfer transfer = new Transfer();
         TransferItem item = new TransferItem();
-        item.setExpectedQuantity(10);
+        item.setExpectedQuantity(new BigDecimal("10"));
 
         transfer.addItem(item);
 
