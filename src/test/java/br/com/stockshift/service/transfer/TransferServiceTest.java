@@ -1,15 +1,19 @@
 package br.com.stockshift.service.transfer;
 
+import br.com.stockshift.dto.transfer.CreateTransferRequest;
+import br.com.stockshift.dto.transfer.TransferItemRequest;
+import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.ForbiddenException;
 import br.com.stockshift.exception.InvalidTransferStateException;
 import br.com.stockshift.exception.ResourceNotFoundException;
-import br.com.stockshift.model.entity.Transfer;
-import br.com.stockshift.model.entity.User;
-import br.com.stockshift.model.entity.Warehouse;
+import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.TransferAction;
 import br.com.stockshift.model.enums.TransferRole;
 import br.com.stockshift.model.enums.TransferStatus;
+import br.com.stockshift.repository.BatchRepository;
+import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TransferRepository;
+import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.service.WarehouseAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -20,6 +24,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -44,6 +50,15 @@ class TransferServiceTest {
     @Mock
     private WarehouseAccessService warehouseAccessService;
 
+    @Mock
+    private WarehouseRepository warehouseRepository;
+
+    @Mock
+    private ProductRepository productRepository;
+
+    @Mock
+    private BatchRepository batchRepository;
+
     @Captor
     private ArgumentCaptor<Transfer> transferCaptor;
 
@@ -55,6 +70,8 @@ class TransferServiceTest {
     private UUID destinationWarehouseId;
     private Transfer transfer;
     private User user;
+    private Warehouse sourceWarehouse;
+    private Warehouse destinationWarehouse;
 
     @BeforeEach
     void setUp() {
@@ -62,7 +79,10 @@ class TransferServiceTest {
             transferRepository,
             securityService,
             stateMachine,
-            warehouseAccessService
+            warehouseAccessService,
+            warehouseRepository,
+            productRepository,
+            batchRepository
         );
 
         tenantId = UUID.randomUUID();
@@ -70,10 +90,10 @@ class TransferServiceTest {
         sourceWarehouseId = UUID.randomUUID();
         destinationWarehouseId = UUID.randomUUID();
 
-        Warehouse sourceWarehouse = new Warehouse();
+        sourceWarehouse = new Warehouse();
         sourceWarehouse.setId(sourceWarehouseId);
 
-        Warehouse destinationWarehouse = new Warehouse();
+        destinationWarehouse = new Warehouse();
         destinationWarehouse.setId(destinationWarehouseId);
 
         transfer = new Transfer();
@@ -87,6 +107,54 @@ class TransferServiceTest {
         user = new User();
         user.setId(UUID.randomUUID());
         user.setTenantId(tenantId);
+    }
+
+    @Nested
+    class CreateTransfer {
+
+        @Test
+        void shouldCreateTransferSuccessfully() {
+            CreateTransferRequest request = new CreateTransferRequest();
+            request.setSourceWarehouseId(sourceWarehouseId);
+            request.setDestinationWarehouseId(destinationWarehouseId);
+            request.setNotes("Test transfer");
+
+            TransferItemRequest itemRequest = new TransferItemRequest();
+            itemRequest.setProductId(UUID.randomUUID());
+            itemRequest.setBatchId(UUID.randomUUID());
+            itemRequest.setQuantity(new BigDecimal("50"));
+            request.setItems(List.of(itemRequest));
+
+            when(warehouseRepository.findById(sourceWarehouseId)).thenReturn(Optional.of(sourceWarehouse));
+            when(warehouseRepository.findById(destinationWarehouseId)).thenReturn(Optional.of(destinationWarehouse));
+            when(productRepository.findById(any())).thenReturn(Optional.of(new Product()));
+            when(batchRepository.findById(any())).thenReturn(Optional.of(new Batch()));
+            when(warehouseAccessService.getTenantId()).thenReturn(tenantId);
+            doNothing().when(securityService).validateSourceWarehouseAccess(any());
+            when(transferRepository.save(any())).thenAnswer(inv -> {
+                Transfer t = inv.getArgument(0);
+                t.setId(UUID.randomUUID());
+                return t;
+            });
+
+            Transfer result = transferService.createTransfer(request, user);
+
+            assertThat(result.getStatus()).isEqualTo(TransferStatus.DRAFT);
+            assertThat(result.getTransferCode()).startsWith("TRF-");
+            assertThat(result.getSourceWarehouse().getId()).isEqualTo(sourceWarehouseId);
+            assertThat(result.getCreatedBy()).isEqualTo(user);
+        }
+
+        @Test
+        void shouldRejectSameSourceAndDestination() {
+            CreateTransferRequest request = new CreateTransferRequest();
+            request.setSourceWarehouseId(sourceWarehouseId);
+            request.setDestinationWarehouseId(sourceWarehouseId); // Same!
+
+            assertThatThrownBy(() -> transferService.createTransfer(request, user))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("different");
+        }
     }
 
     @Nested
