@@ -17,6 +17,8 @@ public interface InventoryLedgerRepository extends JpaRepository<InventoryLedger
 
     List<InventoryLedger> findByReferenceTypeAndReferenceId(String referenceType, UUID referenceId);
 
+    List<InventoryLedger> findByBatchId(UUID batchId);
+
     List<InventoryLedger> findByBatchIdOrderByCreatedAtDesc(UUID batchId);
 
     List<InventoryLedger> findByWarehouseIdOrderByCreatedAtDesc(UUID warehouseId);
