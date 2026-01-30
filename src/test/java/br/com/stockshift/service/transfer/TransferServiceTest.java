@@ -7,13 +7,13 @@ import br.com.stockshift.exception.ForbiddenException;
 import br.com.stockshift.exception.InvalidTransferStateException;
 import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.*;
+import br.com.stockshift.model.enums.LedgerEntryType;
 import br.com.stockshift.model.enums.TransferAction;
 import br.com.stockshift.model.enums.TransferRole;
 import br.com.stockshift.model.enums.TransferStatus;
-import br.com.stockshift.repository.BatchRepository;
-import br.com.stockshift.repository.ProductRepository;
-import br.com.stockshift.repository.TransferRepository;
-import br.com.stockshift.repository.WarehouseRepository;
+import br.com.stockshift.model.enums.TransferItemStatus;
+import br.com.stockshift.model.enums.DiscrepancyType;
+import br.com.stockshift.repository.*;
 import br.com.stockshift.service.WarehouseAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -59,8 +59,20 @@ class TransferServiceTest {
     @Mock
     private BatchRepository batchRepository;
 
+    @Mock
+    private InventoryLedgerRepository inventoryLedgerRepository;
+
+    @Mock
+    private TransferInTransitRepository transferInTransitRepository;
+
+    @Mock
+    private DiscrepancyService discrepancyService;
+
     @Captor
     private ArgumentCaptor<Transfer> transferCaptor;
+
+    @Captor
+    private ArgumentCaptor<InventoryLedger> ledgerCaptor;
 
     private TransferService transferService;
 
@@ -72,6 +84,8 @@ class TransferServiceTest {
     private User user;
     private Warehouse sourceWarehouse;
     private Warehouse destinationWarehouse;
+    private Batch sourceBatch;
+    private Product product;
 
     @BeforeEach
     void setUp() {
@@ -82,7 +96,10 @@ class TransferServiceTest {
             warehouseAccessService,
             warehouseRepository,
             productRepository,
-            batchRepository
+            batchRepository,
+            inventoryLedgerRepository,
+            transferInTransitRepository,
+            discrepancyService
         );
 
         tenantId = UUID.randomUUID();
@@ -95,6 +112,13 @@ class TransferServiceTest {
 
         destinationWarehouse = new Warehouse();
         destinationWarehouse.setId(destinationWarehouseId);
+
+        sourceBatch = new Batch();
+        sourceBatch.setId(UUID.randomUUID());
+        sourceBatch.setQuantity(new BigDecimal("100"));
+
+        product = new Product();
+        product.setId(UUID.randomUUID());
 
         transfer = new Transfer();
         transfer.setId(transferId);
@@ -194,6 +218,43 @@ class TransferServiceTest {
         }
 
         @Test
+        void shouldCreateLedgerEntriesOnDispatch() {
+            transfer.setStatus(TransferStatus.DRAFT);
+            TransferItem item = new TransferItem();
+            item.setId(UUID.randomUUID());
+            item.setProduct(product);
+            item.setSourceBatch(sourceBatch);
+            item.setExpectedQuantity(new BigDecimal("50"));
+            transfer.setItems(List.of(item));
+
+            sourceBatch.setQuantity(new BigDecimal("100"));
+
+            when(transferRepository.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+            when(warehouseAccessService.getTenantId()).thenReturn(tenantId);
+            doNothing().when(securityService).validateAction(any(), any());
+            when(securityService.determineUserRole(transfer)).thenReturn(TransferRole.OUTBOUND);
+            when(stateMachine.transition(any(), any(), any())).thenReturn(TransferStatus.IN_TRANSIT);
+            when(batchRepository.findByIdForUpdate(any())).thenReturn(Optional.of(sourceBatch));
+            when(transferRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            Transfer result = transferService.dispatch(transferId, user);
+
+            // Verify ledger entries were created
+            verify(inventoryLedgerRepository, times(2)).save(ledgerCaptor.capture());
+            List<InventoryLedger> ledgerEntries = ledgerCaptor.getAllValues();
+
+            assertThat(ledgerEntries).hasSize(2);
+            assertThat(ledgerEntries.get(0).getEntryType()).isEqualTo(LedgerEntryType.TRANSFER_OUT);
+            assertThat(ledgerEntries.get(1).getEntryType()).isEqualTo(LedgerEntryType.TRANSFER_IN_TRANSIT);
+
+            // Verify TransferInTransit was created
+            verify(transferInTransitRepository).save(any());
+
+            // Verify batch was updated
+            assertThat(sourceBatch.getQuantity()).isEqualTo(new BigDecimal("50"));
+        }
+
+        @Test
         void shouldThrowNotFoundForInvalidTransferId() {
             when(transferRepository.findByIdForUpdate(transferId)).thenReturn(Optional.empty());
 
@@ -208,6 +269,54 @@ class TransferServiceTest {
 
             assertThatThrownBy(() -> transferService.dispatch(transferId, user))
                 .isInstanceOf(ForbiddenException.class);
+        }
+    }
+
+    @Nested
+    class ScanItem {
+
+        @Test
+        void shouldScanItemSuccessfully() {
+            transfer.setStatus(TransferStatus.VALIDATION_IN_PROGRESS);
+            TransferItem item = new TransferItem();
+            item.setId(UUID.randomUUID());
+            Product scannedProduct = new Product();
+            scannedProduct.setBarcode("1234567890");
+            item.setProduct(scannedProduct);
+            item.setExpectedQuantity(new BigDecimal("50"));
+            item.setReceivedQuantity(BigDecimal.ZERO);
+            item.setStatus(TransferItemStatus.PENDING);
+            transfer.setItems(List.of(item));
+
+            br.com.stockshift.dto.transfer.ScanItemRequest request = new br.com.stockshift.dto.transfer.ScanItemRequest();
+            request.setBarcode("1234567890");
+            request.setQuantity(new BigDecimal("10"));
+
+            when(transferRepository.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+            when(warehouseAccessService.getTenantId()).thenReturn(tenantId);
+            doNothing().when(securityService).validateAction(any(), any());
+            when(transferRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            Transfer result = transferService.scanItem(transferId, request, user);
+
+            TransferItem scannedItem = result.getItems().get(0);
+            assertThat(scannedItem.getReceivedQuantity()).isEqualByComparingTo(new BigDecimal("10"));
+            assertThat(scannedItem.getStatus()).isEqualTo(TransferItemStatus.PARTIAL);
+        }
+
+        @Test
+        void shouldRejectScanWhenNotInValidation() {
+            transfer.setStatus(TransferStatus.IN_TRANSIT);
+
+            br.com.stockshift.dto.transfer.ScanItemRequest request = new br.com.stockshift.dto.transfer.ScanItemRequest();
+            request.setBarcode("1234567890");
+            request.setQuantity(BigDecimal.ONE);
+
+            when(transferRepository.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+            when(warehouseAccessService.getTenantId()).thenReturn(tenantId);
+
+            assertThatThrownBy(() -> transferService.scanItem(transferId, request, user))
+                .isInstanceOf(InvalidTransferStateException.class);
         }
     }
 
@@ -246,6 +355,95 @@ class TransferServiceTest {
 
             assertThat(result.getStatus()).isEqualTo(TransferStatus.VALIDATION_IN_PROGRESS);
             verify(transferRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    class CompleteValidation {
+
+        @Test
+        void shouldCreateDiscrepancyForShortage() {
+            transfer.setStatus(TransferStatus.VALIDATION_IN_PROGRESS);
+
+            TransferItem item = new TransferItem();
+            item.setId(UUID.randomUUID());
+            item.setProduct(product);
+            item.setSourceBatch(sourceBatch);
+            item.setExpectedQuantity(new BigDecimal("50"));
+            item.setReceivedQuantity(new BigDecimal("40")); // Shortage of 10
+            item.setStatus(TransferItemStatus.PARTIAL);
+            transfer.setItems(List.of(item));
+
+            Warehouse destWarehouse = new Warehouse();
+            destWarehouse.setId(destinationWarehouseId);
+            destWarehouse.setCode("WH02");
+            transfer.setDestinationWarehouse(destWarehouse);
+
+            Batch destBatch = new Batch();
+            destBatch.setId(UUID.randomUUID());
+            destBatch.setQuantity(BigDecimal.ZERO);
+
+            TransferInTransit inTransit = new TransferInTransit();
+            inTransit.setQuantity(new BigDecimal("50"));
+
+            when(transferRepository.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+            when(warehouseAccessService.getTenantId()).thenReturn(tenantId);
+            doNothing().when(securityService).validateAction(any(), any());
+            when(batchRepository.findByWarehouseIdAndBatchCode(any(), any())).thenReturn(Optional.of(destBatch));
+            when(transferInTransitRepository.findByTransferItemId(any())).thenReturn(Optional.of(inTransit));
+            when(transferRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // Mock discrepancy service
+            when(discrepancyService.evaluateItem(any())).thenReturn(
+                new DiscrepancyService.ValidationResult(true, DiscrepancyType.SHORTAGE, new BigDecimal("10"))
+            );
+
+            Transfer result = transferService.completeValidation(transferId, user);
+
+            assertThat(result.getStatus()).isEqualTo(TransferStatus.COMPLETED_WITH_DISCREPANCY);
+            verify(discrepancyService).createDiscrepancy(eq(transfer), eq(item), eq(DiscrepancyType.SHORTAGE));
+        }
+
+        @Test
+        void shouldNotCreateDiscrepancyWhenQuantitiesMatch() {
+            transfer.setStatus(TransferStatus.VALIDATION_IN_PROGRESS);
+
+            TransferItem item = new TransferItem();
+            item.setId(UUID.randomUUID());
+            item.setProduct(product);
+            item.setSourceBatch(sourceBatch);
+            item.setExpectedQuantity(new BigDecimal("50"));
+            item.setReceivedQuantity(new BigDecimal("50")); // Exact match
+            item.setStatus(TransferItemStatus.RECEIVED);
+            transfer.setItems(List.of(item));
+
+            Warehouse destWarehouse = new Warehouse();
+            destWarehouse.setId(destinationWarehouseId);
+            destWarehouse.setCode("WH02");
+            transfer.setDestinationWarehouse(destWarehouse);
+
+            Batch destBatch = new Batch();
+            destBatch.setId(UUID.randomUUID());
+            destBatch.setQuantity(BigDecimal.ZERO);
+
+            TransferInTransit inTransit = new TransferInTransit();
+            inTransit.setQuantity(new BigDecimal("50"));
+
+            when(transferRepository.findByIdForUpdate(transferId)).thenReturn(Optional.of(transfer));
+            when(warehouseAccessService.getTenantId()).thenReturn(tenantId);
+            doNothing().when(securityService).validateAction(any(), any());
+            when(batchRepository.findByWarehouseIdAndBatchCode(any(), any())).thenReturn(Optional.of(destBatch));
+            when(transferInTransitRepository.findByTransferItemId(any())).thenReturn(Optional.of(inTransit));
+            when(transferRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            when(discrepancyService.evaluateItem(any())).thenReturn(
+                new DiscrepancyService.ValidationResult(false, null, BigDecimal.ZERO)
+            );
+
+            Transfer result = transferService.completeValidation(transferId, user);
+
+            assertThat(result.getStatus()).isEqualTo(TransferStatus.COMPLETED);
+            verify(discrepancyService, never()).createDiscrepancy(any(), any(), any());
         }
     }
 
