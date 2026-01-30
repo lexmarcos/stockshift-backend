@@ -68,6 +68,9 @@ class TransferServiceTest {
     @Mock
     private DiscrepancyService discrepancyService;
 
+    @Mock
+    private TransferEventPublisher eventPublisher;
+
     @Captor
     private ArgumentCaptor<Transfer> transferCaptor;
 
@@ -99,7 +102,8 @@ class TransferServiceTest {
             batchRepository,
             inventoryLedgerRepository,
             transferInTransitRepository,
-            discrepancyService
+            discrepancyService,
+            eventPublisher
         );
 
         tenantId = UUID.randomUUID();

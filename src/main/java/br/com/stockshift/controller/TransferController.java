@@ -1,5 +1,6 @@
 package br.com.stockshift.controller;
 
+import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.transfer.*;
 import br.com.stockshift.mapper.TransferMapper;
 import br.com.stockshift.model.entity.Transfer;
@@ -8,6 +9,7 @@ import br.com.stockshift.model.entity.NewTransferDiscrepancy;
 import br.com.stockshift.model.enums.DiscrepancyResolution;
 import br.com.stockshift.model.enums.TransferAction;
 import br.com.stockshift.model.enums.TransferRole;
+import br.com.stockshift.service.transfer.TransferHistoryService;
 import br.com.stockshift.service.transfer.TransferSecurityService;
 import br.com.stockshift.service.transfer.TransferService;
 import jakarta.validation.Valid;
@@ -34,6 +36,7 @@ public class TransferController {
     private final br.com.stockshift.service.transfer.DiscrepancyService discrepancyService;
     private final br.com.stockshift.service.LedgerQueryService ledgerQueryService;
     private final TransferSecurityService securityService;
+    private final TransferHistoryService historyService;
     private final TransferMapper mapper;
 
     @PostMapping
@@ -190,6 +193,18 @@ public class TransferController {
         return ResponseEntity.ok(ledgerEntries.stream()
             .map(this::toLedgerEntryResponse)
             .toList());
+    }
+
+    @GetMapping("/{id}/history")
+    @PreAuthorize("hasAuthority('TRANSFER:READ')")
+    public ResponseEntity<ApiResponse<TransferHistoryResponse>> getTransferHistory(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+
+        Transfer transfer = transferService.getTransfer(id);
+        TransferHistoryResponse history = historyService.getHistory(transfer);
+
+        return ResponseEntity.ok(ApiResponse.success(history));
     }
 
     private LedgerEntryResponse toLedgerEntryResponse(br.com.stockshift.model.entity.InventoryLedger entry) {
