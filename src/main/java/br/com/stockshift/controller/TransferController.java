@@ -32,6 +32,7 @@ public class TransferController {
 
     private final TransferService transferService;
     private final br.com.stockshift.service.transfer.DiscrepancyService discrepancyService;
+    private final br.com.stockshift.service.LedgerQueryService ledgerQueryService;
     private final TransferSecurityService securityService;
     private final TransferMapper mapper;
 
@@ -176,6 +177,38 @@ public class TransferController {
 
         NewTransferDiscrepancy discrepancy = discrepancyService.resolveDiscrepancy(discrepancyId, resolution, notes, user);
         return ResponseEntity.ok(toDiscrepancyResponse(discrepancy));
+    }
+
+    @GetMapping("/{id}/ledger")
+    @PreAuthorize("hasAuthority('TRANSFER:READ')")
+    public ResponseEntity<List<LedgerEntryResponse>> getTransferLedger(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal User user) {
+
+        List<br.com.stockshift.model.entity.InventoryLedger> ledgerEntries = ledgerQueryService.findByTransferId(id);
+
+        return ResponseEntity.ok(ledgerEntries.stream()
+            .map(this::toLedgerEntryResponse)
+            .toList());
+    }
+
+    private LedgerEntryResponse toLedgerEntryResponse(br.com.stockshift.model.entity.InventoryLedger entry) {
+        return new LedgerEntryResponse(
+            entry.getId(),
+            entry.getWarehouseId(),
+            entry.getProductId(),
+            entry.getBatchId(),
+            entry.getEntryType(),
+            entry.getEntryType().isDebit(),
+            entry.getQuantity(),
+            entry.getBalanceAfter(),
+            entry.getReferenceType(),
+            entry.getReferenceId(),
+            entry.getTransferItemId(),
+            entry.getNotes(),
+            entry.getCreatedBy(),
+            entry.getCreatedAt()
+        );
     }
 
     private DiscrepancyResponse toDiscrepancyResponse(NewTransferDiscrepancy discrepancy) {
