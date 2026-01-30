@@ -31,8 +31,10 @@ CREATE TABLE inventory_ledger (
 -- Indexes for inventory_ledger
 CREATE INDEX idx_ledger_tenant ON inventory_ledger(tenant_id);
 CREATE INDEX idx_ledger_warehouse ON inventory_ledger(warehouse_id);
+CREATE INDEX idx_ledger_product ON inventory_ledger(product_id);
 CREATE INDEX idx_ledger_batch ON inventory_ledger(batch_id);
 CREATE INDEX idx_ledger_reference ON inventory_ledger(reference_type, reference_id);
+CREATE INDEX idx_ledger_transfer_item ON inventory_ledger(transfer_item_id);
 CREATE INDEX idx_ledger_created_at ON inventory_ledger(created_at DESC);
 CREATE INDEX idx_ledger_entry_type ON inventory_ledger(entry_type);
 
