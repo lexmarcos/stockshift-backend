@@ -31,12 +31,13 @@ public interface TransferRepository extends JpaRepository<Transfer, UUID> {
     Page<Transfer> findByTenantIdAndStatus(UUID tenantId, TransferStatus status, Pageable pageable);
 
     @Query("SELECT t FROM Transfer t WHERE t.tenantId = :tenantId " +
-           "AND (t.sourceWarehouseId = :warehouseId OR t.destinationWarehouseId = :warehouseId)")
+            "AND (t.sourceWarehouse.id = :warehouseId OR t.destinationWarehouse.id = :warehouseId)")
     Page<Transfer> findByTenantIdAndWarehouseId(
-        @Param("tenantId") UUID tenantId,
-        @Param("warehouseId") UUID warehouseId,
-        Pageable pageable
-    );
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            Pageable pageable);
+
+    Page<Transfer> findAllByTenantId(UUID tenantId, Pageable pageable);
 
     boolean existsByTenantIdAndTransferCode(UUID tenantId, String transferCode);
 }

@@ -3,7 +3,6 @@ package br.com.stockshift.service;
 import br.com.stockshift.dto.report.DashboardResponse;
 import br.com.stockshift.dto.report.StockReportResponse;
 import br.com.stockshift.model.entity.Batch;
-import br.com.stockshift.model.enums.MovementStatus;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.TenantContext;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,6 @@ public class ReportService {
     private final ProductRepository productRepository;
     private final WarehouseRepository warehouseRepository;
     private final BatchRepository batchRepository;
-    private final StockMovementRepository stockMovementRepository;
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
@@ -38,23 +36,14 @@ public class ReportService {
 
         List<Batch> allBatches = batchRepository.findAllByTenantId(tenantId);
 
-        int totalStockQuantity = allBatches.stream()
-                .mapToInt(Batch::getQuantity)
-                .sum();
+        BigDecimal totalStockQuantity = allBatches.stream()
+                .map(Batch::getQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalStockValue = allBatches.stream()
                 .filter(b -> b.getCostPrice() != null)
-                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(BigDecimal.valueOf(b.getQuantity())))
+                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(b.getQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        long pendingMovements = stockMovementRepository.findByTenantIdAndStatus(tenantId, MovementStatus.PENDING).size();
-
-        LocalDateTime todayStart = LocalDateTime.now().toLocalDate().atStartOfDay();
-        LocalDateTime todayEnd = todayStart.plusDays(1);
-        long completedMovementsToday = stockMovementRepository.findByTenantIdAndDateRange(tenantId, todayStart, todayEnd)
-                .stream()
-                .filter(m -> m.getStatus() == MovementStatus.COMPLETED)
-                .count();
 
         List<StockReportResponse> lowStockProducts = getLowStockReport(10, 10);
         List<StockReportResponse> expiringProducts = getExpiringProductsReport(30, 10);
@@ -64,8 +53,6 @@ public class ReportService {
                 .totalWarehouses(totalWarehouses)
                 .totalStockQuantity(totalStockQuantity)
                 .totalStockValue(totalStockValue)
-                .pendingMovements(pendingMovements)
-                .completedMovementsToday(completedMovementsToday)
                 .lowStockProducts(lowStockProducts)
                 .expiringProducts(expiringProducts)
                 .build();
@@ -114,13 +101,13 @@ public class ReportService {
     private StockReportResponse aggregateBatches(List<Batch> batches) {
         Batch first = batches.get(0);
 
-        int totalQuantity = batches.stream()
-                .mapToInt(Batch::getQuantity)
-                .sum();
+        BigDecimal totalQuantity = batches.stream()
+                .map(Batch::getQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalValue = batches.stream()
                 .filter(b -> b.getCostPrice() != null)
-                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(BigDecimal.valueOf(b.getQuantity())))
+                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(b.getQuantity()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         LocalDate nearestExpiration = batches.stream()
@@ -143,7 +130,7 @@ public class ReportService {
 
     private StockReportResponse batchToReport(Batch batch) {
         BigDecimal totalValue = batch.getCostPrice() != null ?
-                BigDecimal.valueOf(batch.getCostPrice()).multiply(BigDecimal.valueOf(batch.getQuantity())) :
+                BigDecimal.valueOf(batch.getCostPrice()).multiply(batch.getQuantity()) :
                 BigDecimal.ZERO;
 
         return StockReportResponse.builder()

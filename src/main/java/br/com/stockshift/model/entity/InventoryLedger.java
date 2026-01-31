@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -24,27 +25,24 @@ public class InventoryLedger {
     @Column(name = "tenant_id", nullable = false)
     private UUID tenantId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "warehouse_id")
-    private Warehouse warehouse;
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "product_id", nullable = false)
-    private Product product;
+    @Column(name = "product_id", nullable = false)
+    private UUID productId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "batch_id")
-    private Batch batch;
+    @Column(name = "batch_id")
+    private UUID batchId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "entry_type", nullable = false, length = 50)
     private LedgerEntryType entryType;
 
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    @Column(name = "quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantity;
 
-    @Column(name = "balance_after")
-    private Integer balanceAfter;
+    @Column(name = "balance_after", precision = 15, scale = 3)
+    private BigDecimal balanceAfter;
 
     @Column(name = "reference_type", nullable = false, length = 50)
     private String referenceType;
@@ -52,16 +50,14 @@ public class InventoryLedger {
     @Column(name = "reference_id", nullable = false)
     private UUID referenceId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transfer_item_id")
-    private TransferItem transferItem;
+    @Column(name = "transfer_item_id")
+    private UUID transferItemId;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", nullable = false, updatable = false)
-    private User createdBy;
+    @Column(name = "created_by", nullable = false, updatable = false)
+    private UUID createdBy;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

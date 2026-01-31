@@ -23,4 +23,7 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
 
     @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.name = :name")
     Optional<Warehouse> findByTenantIdAndName(UUID tenantId, String name);
+
+    @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.code = :code")
+    Optional<Warehouse> findByTenantIdAndCode(UUID tenantId, String code);
 }

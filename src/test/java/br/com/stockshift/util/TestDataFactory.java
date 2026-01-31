@@ -5,6 +5,7 @@ import br.com.stockshift.model.enums.BarcodeType;
 import br.com.stockshift.repository.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -93,7 +94,7 @@ public class TestDataFactory {
         batch.setProduct(product);
         batch.setWarehouse(warehouse);
         batch.setBatchCode("BATCH-" + UUID.randomUUID().toString().substring(0, 8));
-        batch.setQuantity(quantity);
+        batch.setQuantity(BigDecimal.valueOf(quantity));
         batch.setCostPrice(1000L);  // R$10.00 in cents
         batch.setSellingPrice(1500L);  // R$15.00 in cents
         batch.setExpirationDate(LocalDate.now().plusMonths(6));
@@ -108,7 +109,7 @@ public class TestDataFactory {
         batch.setProduct(product);
         batch.setWarehouse(warehouse);
         batch.setBatchCode(batchCode);
-        batch.setQuantity(quantity);
+        batch.setQuantity(BigDecimal.valueOf(quantity));
         batch.setCostPrice(1000L);  // R$10.00 in cents
         batch.setSellingPrice(1500L);  // R$15.00 in cents
         batch.setExpirationDate(LocalDate.now().plusMonths(6));

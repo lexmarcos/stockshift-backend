@@ -1,5 +1,6 @@
 package br.com.stockshift.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -403,12 +404,12 @@ public class BatchService {
                 .build();
     }
     
-    public int getAvailableQuantity(UUID productId, UUID warehouseId, UUID tenantId) {
+    public BigDecimal getAvailableQuantity(UUID productId, UUID warehouseId, UUID tenantId) {
         List<Batch> batches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
             productId, warehouseId, tenantId);
-        
+
         return batches.stream()
-            .mapToInt(Batch::getQuantity)
-            .sum();
+            .map(Batch::getQuantity)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

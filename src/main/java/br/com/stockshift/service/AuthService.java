@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -178,9 +179,13 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public MeResponse getMe() {
-        UserPrincipal principal = (UserPrincipal) SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getPrincipal();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal)) {
+            throw new UnauthorizedException("User not authenticated");
+        }
+
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
 
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new UnauthorizedException("User not found"));

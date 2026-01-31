@@ -71,6 +71,9 @@ class TransferServiceTest {
     @Mock
     private TransferEventPublisher eventPublisher;
 
+    @Mock
+    private ScanLogRepository scanLogRepository;
+
     @Captor
     private ArgumentCaptor<Transfer> transferCaptor;
 
@@ -103,7 +106,8 @@ class TransferServiceTest {
             inventoryLedgerRepository,
             transferInTransitRepository,
             discrepancyService,
-            eventPublisher
+            eventPublisher,
+            scanLogRepository
         );
 
         tenantId = UUID.randomUUID();

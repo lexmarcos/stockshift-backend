@@ -77,6 +77,8 @@ class SaleControllerIntegrationTest extends BaseIntegrationTest {
         warehouse = TestDataFactory.createWarehouse(warehouseRepository, testTenant.getId(), "Test Warehouse");
         product = TestDataFactory.createProduct(productRepository, testTenant.getId(), testCategory, "Test Product", "TEST-SKU");
         batch = TestDataFactory.createBatch(batchRepository, testTenant.getId(), product, warehouse, "BATCH-001", 100);
+        batch.setQuantity(new BigDecimal("100"));
+        batchRepository.save(batch);
     }
     
     private Long convertUUIDToLong(java.util.UUID uuid) {
@@ -96,10 +98,10 @@ class SaleControllerIntegrationTest extends BaseIntegrationTest {
         
         SaleItemRequest item = new SaleItemRequest();
         item.setProductId(convertUUIDToLong(product.getId()));
-        item.setQuantity(10);
+        item.setQuantity(new BigDecimal("10"));
         item.setUnitPrice(new BigDecimal("50.00"));
         request.setItems(List.of(item));
-        
+
         // When & Then
         mockMvc.perform(post("/api/sales")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -112,10 +114,10 @@ class SaleControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.total").value(500.00))
                 .andExpect(jsonPath("$.items", hasSize(1)))
                 .andExpect(jsonPath("$.items[0].quantity").value(10));
-        
+
         // Verify stock was reduced
         Batch updatedBatch = batchRepository.findById(batch.getId()).orElseThrow();
-        assertThat(updatedBatch.getQuantity()).isEqualTo(90);
+        assertThat(updatedBatch.getQuantity()).isEqualByComparingTo(new BigDecimal("90"));
     }
 
     @Test
@@ -128,7 +130,7 @@ class SaleControllerIntegrationTest extends BaseIntegrationTest {
         
         SaleItemRequest item = new SaleItemRequest();
         item.setProductId(convertUUIDToLong(product.getId()));
-        item.setQuantity(200); // More than available
+        item.setQuantity(new BigDecimal("200")); // More than available
         item.setUnitPrice(new BigDecimal("50.00"));
         request.setItems(List.of(item));
         
@@ -178,15 +180,15 @@ class SaleControllerIntegrationTest extends BaseIntegrationTest {
         SaleItem item = new SaleItem();
         item.setProduct(product);
         item.setBatch(batch);
-        item.setQuantity(10);
+        item.setQuantity(new BigDecimal("10"));
         item.setUnitPrice(new BigDecimal("10.00"));
         item.setSubtotal(new BigDecimal("100.00"));
         sale.addItem(item);
-        
+
         sale = saleRepository.save(sale);
-        
+
         // Reduce stock manually
-        batch.setQuantity(90);
+        batch.setQuantity(new BigDecimal("90"));
         batchRepository.save(batch);
         
         CancelSaleRequest request = new CancelSaleRequest();
@@ -202,7 +204,7 @@ class SaleControllerIntegrationTest extends BaseIntegrationTest {
         
         // Verify stock was returned
         Batch updatedBatch = batchRepository.findById(batch.getId()).orElseThrow();
-        assertThat(updatedBatch.getQuantity()).isEqualTo(100);
+        assertThat(updatedBatch.getQuantity()).isEqualByComparingTo(new BigDecimal("100"));
     }
 
     @Test

@@ -28,8 +28,8 @@ public class SaleItem extends BaseEntity {
     @JoinColumn(name = "batch_id")
     private Batch batch;
 
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    @Column(name = "quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantity;
 
     @Column(name = "unit_price", precision = 15, scale = 2, nullable = false)
     private BigDecimal unitPrice;
@@ -38,6 +38,6 @@ public class SaleItem extends BaseEntity {
     private BigDecimal subtotal;
 
     public void calculateSubtotal() {
-        this.subtotal = this.unitPrice.multiply(BigDecimal.valueOf(this.quantity));
+        this.subtotal = this.unitPrice.multiply(this.quantity);
     }
 }

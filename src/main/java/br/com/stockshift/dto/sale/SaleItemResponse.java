@@ -18,7 +18,7 @@ public class SaleItemResponse {
     private String productSku;
     private Long batchId;
     private String batchCode;
-    private Integer quantity;
+    private BigDecimal quantity;
     private BigDecimal unitPrice;
     private BigDecimal subtotal;
 }

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -34,8 +35,8 @@ public class Batch extends TenantAwareEntity {
     @Column(name = "batch_code", nullable = false, length = 100)
     private String batchCode;
 
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    @Column(name = "quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantity;
 
     @Version
     @Column(name = "version", nullable = false)

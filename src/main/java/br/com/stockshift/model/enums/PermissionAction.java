@@ -5,7 +5,11 @@ public enum PermissionAction {
     READ("Visualizar"),
     UPDATE("Atualizar"),
     DELETE("Excluir"),
-    APPROVE("Aprovar");
+    APPROVE("Aprovar"),
+    EXECUTE("Executar"),
+    VALIDATE("Validar"),
+    RESOLVE("Resolver"),
+    CANCEL("Cancelar");
 
     private final String displayName;
 

@@ -15,6 +15,7 @@ import java.util.UUID;
 public class WarehouseResponse {
     private UUID id;
     private String name;
+    private String code;
     private String city;
     private String state;
     private String address;

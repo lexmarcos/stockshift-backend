@@ -27,7 +27,6 @@ public class SaleService {
     private final WarehouseRepository warehouseRepository;
     private final BatchRepository batchRepository;
     private final BatchService batchService;
-    private final StockMovementService stockMovementService;
     private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
@@ -121,7 +120,7 @@ public class SaleService {
                 Batch batch = batchRepository.findById(item.getBatch().getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Batch not found"));
                 
-                batch.setQuantity(batch.getQuantity() + item.getQuantity());
+                batch.setQuantity(batch.getQuantity().add(item.getQuantity()));
                 batchRepository.save(batch);
             }
         }
@@ -163,15 +162,15 @@ public class SaleService {
             }
             
             // Validate stock availability
-            int availableStock = batchService.getAvailableQuantity(
-                productUuid, 
-                warehouseUuid, 
+            BigDecimal availableStock = batchService.getAvailableQuantity(
+                productUuid,
+                warehouseUuid,
                 tenantId
             );
-            
-            if (availableStock < item.getQuantity()) {
+
+            if (availableStock.compareTo(item.getQuantity()) < 0) {
                 throw new InsufficientStockException(
-                    String.format("Insufficient stock for product %s. Available: %d, Required: %d",
+                    String.format("Insufficient stock for product %s. Available: %s, Required: %s",
                         product.getName(), availableStock, item.getQuantity())
                 );
             }
@@ -183,26 +182,26 @@ public class SaleService {
         return UUID.fromString(String.format("%08d-0000-0000-0000-000000000000", id));
     }
     
-    private void reduceStockFromBatches(SaleItemRequest itemRequest, Warehouse warehouse, 
+    private void reduceStockFromBatches(SaleItemRequest itemRequest, Warehouse warehouse,
                                         UUID tenantId, SaleItem saleItem) {
         List<Batch> availableBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
             convertLongToUUID(itemRequest.getProductId()), warehouse.getId(), tenantId);
-        
-        int remainingQuantity = itemRequest.getQuantity();
-        
+
+        BigDecimal remainingQuantity = itemRequest.getQuantity();
+
         for (Batch batch : availableBatches) {
-            if (remainingQuantity <= 0) break;
-            
-            int quantityToReduce = Math.min(remainingQuantity, batch.getQuantity());
-            batch.setQuantity(batch.getQuantity() - quantityToReduce);
+            if (remainingQuantity.compareTo(BigDecimal.ZERO) <= 0) break;
+
+            BigDecimal quantityToReduce = remainingQuantity.min(batch.getQuantity());
+            batch.setQuantity(batch.getQuantity().subtract(quantityToReduce));
             batchRepository.save(batch);
-            
+
             // Set batch reference on first item (for tracking)
             if (saleItem.getBatch() == null) {
                 saleItem.setBatch(batch);
             }
-            
-            remainingQuantity -= quantityToReduce;
+
+            remainingQuantity = remainingQuantity.subtract(quantityToReduce);
         }
     }
     
@@ -221,7 +220,6 @@ public class SaleService {
             .discount(sale.getDiscount())
             .total(sale.getTotal())
             .notes(sale.getNotes())
-            .stockMovementId(sale.getStockMovement() != null ? convertUUIDToLong(sale.getStockMovement().getId()) : null)
             .createdAt(sale.getCreatedAt())
             .completedAt(sale.getCompletedAt())
             .cancelledAt(sale.getCancelledAt())

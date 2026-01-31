@@ -3,7 +3,9 @@ package br.com.stockshift.model.enums;
 public enum PermissionScope {
     ALL("Todos"),
     OWN_WAREHOUSE("Próprio Depósito"),
-    OWN("Próprio");
+    OWN("Próprio"),
+    TENANT("Inquilino"),
+    OWNED("Próprio");
 
     private final String displayName;
 

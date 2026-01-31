@@ -37,6 +37,8 @@ public class TransferService {
     private final InventoryLedgerRepository inventoryLedgerRepository;
     private final TransferInTransitRepository transferInTransitRepository;
     private final DiscrepancyService discrepancyService;
+    private final TransferEventPublisher eventPublisher;
+    private final ScanLogRepository scanLogRepository;
 
     @Transactional
     public Transfer createTransfer(CreateTransferRequest request, User user) {
@@ -86,6 +88,18 @@ public class TransferService {
 
         transfer = transferRepository.save(transfer);
         log.info("Transfer {} created successfully", transfer.getTransferCode());
+
+        eventPublisher.publish(
+            transfer,
+            TransferEventType.CREATED,
+            null,
+            user,
+            Map.of(
+                "itemCount", transfer.getItems().size(),
+                "sourceWarehouseId", transfer.getSourceWarehouse().getId(),
+                "destinationWarehouseId", transfer.getDestinationWarehouse().getId()
+            )
+        );
 
         return transfer;
     }
@@ -187,6 +201,7 @@ public class TransferService {
         log.info("Dispatching transfer {} by user {}", transferId, user.getId());
 
         Transfer transfer = getTransferForUpdate(transferId);
+        TransferStatus fromStatus = transfer.getStatus();
 
         // Idempotency: if already dispatched, return success
         if (transfer.getStatus() == TransferStatus.IN_TRANSIT) {
@@ -279,6 +294,21 @@ public class TransferService {
         transfer = transferRepository.save(transfer);
         log.info("Transfer {} dispatched successfully", transferId);
 
+        BigDecimal totalQuantity = transfer.getItems().stream()
+            .map(TransferItem::getExpectedQuantity)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        eventPublisher.publish(
+            transfer,
+            TransferEventType.DISPATCHED,
+            fromStatus,
+            user,
+            Map.of(
+                "itemCount", transfer.getItems().size(),
+                "totalQuantity", totalQuantity
+            )
+        );
+
         return transfer;
     }
 
@@ -287,6 +317,7 @@ public class TransferService {
         log.info("Starting validation for transfer {} by user {}", transferId, user.getId());
 
         Transfer transfer = getTransferForUpdate(transferId);
+        TransferStatus fromStatus = transfer.getStatus();
 
         // Idempotency: if already in validation, return success
         if (transfer.getStatus() == TransferStatus.VALIDATION_IN_PROGRESS) {
@@ -309,6 +340,14 @@ public class TransferService {
         transfer = transferRepository.save(transfer);
         log.info("Transfer {} validation started successfully", transferId);
 
+        eventPublisher.publish(
+            transfer,
+            TransferEventType.VALIDATION_STARTED,
+            fromStatus,
+            user,
+            null
+        );
+
         return transfer;
     }
 
@@ -317,6 +356,7 @@ public class TransferService {
         log.info("Cancelling transfer {} by user {}", transferId, user.getId());
 
         Transfer transfer = getTransferForUpdate(transferId);
+        TransferStatus fromStatus = transfer.getStatus();
 
         // Idempotency: if already cancelled, return success
         if (transfer.getStatus() == TransferStatus.CANCELLED) {
@@ -340,6 +380,14 @@ public class TransferService {
         transfer = transferRepository.save(transfer);
         log.info("Transfer {} cancelled successfully", transferId);
 
+        eventPublisher.publish(
+            transfer,
+            TransferEventType.CANCELLED,
+            fromStatus,
+            user,
+            reason != null ? Map.of("reason", reason) : null
+        );
+
         return transfer;
     }
 
@@ -348,6 +396,15 @@ public class TransferService {
         log.info("Scanning item {} for transfer {} by user {}", request.getBarcode(), transferId, user.getId());
 
         Transfer transfer = getTransferForUpdate(transferId);
+
+        // Check idempotency
+        if (request.getIdempotencyKey() != null) {
+            Optional<ScanLog> existingLog = scanLogRepository.findByIdempotencyKey(request.getIdempotencyKey());
+            if (existingLog.isPresent()) {
+                log.info("Duplicate scan detected with idempotency key {}. Returning existing state.", request.getIdempotencyKey());
+                return transfer;
+            }
+        }
 
         // Validate status
         if (transfer.getStatus() != TransferStatus.VALIDATION_IN_PROGRESS) {
@@ -385,7 +442,34 @@ public class TransferService {
         }
 
         transfer = transferRepository.save(transfer);
+
+        // Save scan log for idempotency
+        if (request.getIdempotencyKey() != null) {
+            ScanLog scanLog = new ScanLog();
+            scanLog.setTenantId(transfer.getTenantId());
+            scanLog.setIdempotencyKey(request.getIdempotencyKey());
+            scanLog.setTransferId(transfer.getId());
+            scanLog.setTransferItemId(item.getId());
+            scanLog.setBarcode(request.getBarcode());
+            scanLog.setQuantity(request.getQuantity());
+            scanLog.setProcessedAt(LocalDateTime.now());
+            scanLog.setExpiresAt(LocalDateTime.now().plusHours(24));
+            scanLogRepository.save(scanLog);
+        }
+
         log.info("Item scanned successfully for transfer {}", transferId);
+
+        eventPublisher.publish(
+            transfer,
+            TransferEventType.ITEM_SCANNED,
+            null,
+            user,
+            Map.of(
+                "barcode", request.getBarcode(),
+                "quantity", request.getQuantity(),
+                "transferItemId", item.getId()
+            )
+        );
 
         return transfer;
     }
@@ -395,6 +479,7 @@ public class TransferService {
         log.info("Completing validation for transfer {} by user {}", transferId, user.getId());
 
         Transfer transfer = getTransferForUpdate(transferId);
+        TransferStatus fromStatus = transfer.getStatus();
 
         // Idempotency
         if (transfer.getStatus() == TransferStatus.COMPLETED ||
@@ -494,6 +579,21 @@ public class TransferService {
 
         transfer = transferRepository.save(transfer);
         log.info("Transfer {} completed with status {}", transferId, finalStatus);
+
+        long itemsReceived = transfer.getItems().stream()
+            .filter(i -> i.getReceivedQuantity() != null && i.getReceivedQuantity().compareTo(BigDecimal.ZERO) > 0)
+            .count();
+
+        eventPublisher.publish(
+            transfer,
+            hasDiscrepancy ? TransferEventType.COMPLETED_WITH_DISCREPANCY : TransferEventType.COMPLETED,
+            fromStatus,
+            user,
+            Map.of(
+                "hasDiscrepancy", hasDiscrepancy,
+                "itemsReceived", itemsReceived
+            )
+        );
 
         return transfer;
     }

@@ -27,7 +27,7 @@ public class BatchRequest {
 
     @NotNull(message = "Quantity is required")
     @PositiveOrZero(message = "Quantity must be zero or positive")
-    private Integer quantity;
+    private java.math.BigDecimal quantity;
 
     private LocalDate manufacturedDate;
     private LocalDate expirationDate;

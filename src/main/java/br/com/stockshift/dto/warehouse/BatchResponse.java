@@ -21,7 +21,7 @@ public class BatchResponse {
     private UUID warehouseId;
     private String warehouseName;
     private String batchCode;
-    private Integer quantity;
+    private java.math.BigDecimal quantity;
     private LocalDate manufacturedDate;
     private LocalDate expirationDate;
     @Schema(description = "Cost price in cents", example = "1050")

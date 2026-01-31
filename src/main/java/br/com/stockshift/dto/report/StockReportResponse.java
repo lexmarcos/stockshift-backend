@@ -18,7 +18,7 @@ public class StockReportResponse {
     private String productName;
     private UUID warehouseId;
     private String warehouseName;
-    private Integer totalQuantity;
+    private BigDecimal totalQuantity;
     private BigDecimal totalValue;
     private LocalDate nearestExpiration;
     private Integer batchCount;

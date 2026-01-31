@@ -29,7 +29,6 @@ public class SaleResponse {
     private BigDecimal discount;
     private BigDecimal total;
     private String notes;
-    private Long stockMovementId;
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
     private LocalDateTime cancelledAt;

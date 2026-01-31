@@ -28,6 +28,8 @@ import br.com.stockshift.repository.*;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.util.TestDataFactory;
 
+import java.math.BigDecimal;
+
 class BatchControllerIntegrationTest extends BaseIntegrationTest {
 
         private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -88,7 +90,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .productId(testProduct.getId())
                                 .warehouseId(testWarehouse.getId())
                                 .batchCode("BATCH-20251228-001")
-                                .quantity(100)
+                                .quantity(new BigDecimal("100"))
                                 .costPrice(1550L)  // R$15.50 in cents
                                 .sellingPrice(2500L)  // R$25.00 in cents
                                 .expirationDate(LocalDate.now().plusMonths(12))
@@ -109,7 +111,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 BatchRequest request = BatchRequest.builder()
                                 .productId(testProduct.getId())
                                 .warehouseId(testWarehouse.getId())
-                                .quantity(50)
+                                .quantity(new BigDecimal("50"))
                                 .costPrice(1000L)  // R$10.00 in cents
                                 .sellingPrice(1800L)  // R$18.00 in cents
                                 .expirationDate(LocalDate.now().plusMonths(6))
@@ -163,7 +165,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 expiringBatch.setProduct(testProduct);
                 expiringBatch.setWarehouse(testWarehouse);
                 expiringBatch.setBatchCode("BATCH-EXP-001");
-                expiringBatch.setQuantity(25);
+                expiringBatch.setQuantity(new BigDecimal("25"));
                 expiringBatch.setCostPrice(1000L);  // R$10.00 in cents
                 expiringBatch.setSellingPrice(1500L);  // R$15.00 in cents
                 expiringBatch.setExpirationDate(LocalDate.now().plusDays(15));
@@ -185,7 +187,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .barcode("9876543210")
                                 .warehouseId(testWarehouse.getId())
                                 .batchCode("BATCH-NEW-001")
-                                .quantity(50)
+                                .quantity(new BigDecimal("50"))
                                 .costPrice(1200L)  // R$12.00 in cents
                                 .sellingPrice(2200L)  // R$22.00 in cents
                                 .build();
@@ -214,7 +216,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .sku(testProduct.getSku()) // Use existing SKU
                                 .warehouseId(testWarehouse.getId())
                                 .batchCode("BATCH-DUP-001")
-                                .quantity(50)
+                                .quantity(new BigDecimal("50"))
                                 .build();
 
                 MockMultipartFile productPart = new MockMultipartFile(
@@ -238,7 +240,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .sku("SKU-NEW-002")
                                 .warehouseId(UUID.randomUUID()) // Non-existent warehouse
                                 .batchCode("BATCH-NEW-002")
-                                .quantity(50)
+                                .quantity(new BigDecimal("50"))
                                 .build();
 
                 MockMultipartFile productPart = new MockMultipartFile(

@@ -41,6 +41,7 @@ public class WarehouseService {
         String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
         String sanitizedCity = SanitizationUtil.sanitizeForHtml(request.getCity());
         String sanitizedAddress = SanitizationUtil.sanitizeForHtml(request.getAddress());
+        String sanitizedCode = SanitizationUtil.sanitizeForHtml(request.getCode());
 
         // Validate unique name
         warehouseRepository.findByTenantIdAndName(tenantId, sanitizedName)
@@ -48,9 +49,16 @@ public class WarehouseService {
                     throw new BusinessException("Warehouse with name " + sanitizedName + " already exists");
                 });
 
+        // Validate unique code
+        warehouseRepository.findByTenantIdAndCode(tenantId, sanitizedCode)
+                .ifPresent(w -> {
+                    throw new BusinessException("Warehouse with code " + sanitizedCode + " already exists");
+                });
+
         Warehouse warehouse = new Warehouse();
         warehouse.setTenantId(tenantId);
         warehouse.setName(sanitizedName);
+        warehouse.setCode(sanitizedCode);
         warehouse.setCity(sanitizedCity);
         warehouse.setState(request.getState());
         warehouse.setAddress(sanitizedAddress);
@@ -111,6 +119,7 @@ public class WarehouseService {
         String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
         String sanitizedCity = SanitizationUtil.sanitizeForHtml(request.getCity());
         String sanitizedAddress = SanitizationUtil.sanitizeForHtml(request.getAddress());
+        String sanitizedCode = SanitizationUtil.sanitizeForHtml(request.getCode());
 
         // Validate unique name if changed
         if (!warehouse.getName().equals(sanitizedName)) {
@@ -120,7 +129,16 @@ public class WarehouseService {
                     });
         }
 
+        // Validate unique code if changed
+        if (!warehouse.getCode().equals(sanitizedCode)) {
+            warehouseRepository.findByTenantIdAndCode(tenantId, sanitizedCode)
+                    .ifPresent(w -> {
+                        throw new BusinessException("Warehouse with code " + sanitizedCode + " already exists");
+                    });
+        }
+
         warehouse.setName(sanitizedName);
+        warehouse.setCode(sanitizedCode);
         warehouse.setCity(sanitizedCity);
         warehouse.setState(request.getState());
         warehouse.setAddress(sanitizedAddress);
@@ -147,6 +165,7 @@ public class WarehouseService {
         return WarehouseResponse.builder()
                 .id(warehouse.getId())
                 .name(warehouse.getName())
+                .code(warehouse.getCode())
                 .city(warehouse.getCity())
                 .state(warehouse.getState())
                 .address(warehouse.getAddress())

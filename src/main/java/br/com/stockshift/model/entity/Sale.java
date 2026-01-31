@@ -55,10 +55,6 @@ public class Sale extends TenantAwareEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stock_movement_id")
-    private StockMovement stockMovement;
-
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 

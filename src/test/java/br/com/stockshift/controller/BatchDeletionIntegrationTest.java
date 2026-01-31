@@ -238,7 +238,7 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
     void shouldRespectTenantIsolation() throws Exception {
         // Create batch for current tenant
         BatchRequest batchRequest = new BatchRequest(
-            productId, warehouseId, "BATCH-TENANT-1", 10,
+            productId, warehouseId, "BATCH-TENANT-1", java.math.BigDecimal.TEN,
             null, null, null, null
         );
         mockMvc.perform(post("/api/batches")

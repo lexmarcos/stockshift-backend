@@ -44,9 +44,6 @@ class SaleServiceTest {
     
     @Mock
     private BatchService batchService;
-    
-    @Mock
-    private StockMovementService stockMovementService;
 
     @Mock
     private WarehouseAccessService warehouseAccessService;
@@ -98,7 +95,7 @@ class SaleServiceTest {
         
         SaleItemRequest itemRequest = new SaleItemRequest();
         itemRequest.setProductId(1L);
-        itemRequest.setQuantity(100);
+        itemRequest.setQuantity(new BigDecimal("100"));
         itemRequest.setUnitPrice(BigDecimal.TEN);
         request.setItems(List.of(itemRequest));
         
@@ -108,8 +105,8 @@ class SaleServiceTest {
         
         when(warehouseRepository.findById(expectedWarehouseId)).thenReturn(Optional.of(warehouse));
         when(productRepository.findById(expectedProductId)).thenReturn(Optional.of(product));
-        when(batchService.getAvailableQuantity(expectedProductId, expectedWarehouseId, tenantId)).thenReturn(50);
-        
+        when(batchService.getAvailableQuantity(expectedProductId, expectedWarehouseId, tenantId)).thenReturn(new BigDecimal("50"));
+
         // When & Then
         assertThrows(InsufficientStockException.class, 
             () -> saleService.createSale(request, user));
@@ -125,13 +122,13 @@ class SaleServiceTest {
         
         SaleItemRequest itemRequest = new SaleItemRequest();
         itemRequest.setProductId(1L);
-        itemRequest.setQuantity(10);
+        itemRequest.setQuantity(new BigDecimal("10"));
         itemRequest.setUnitPrice(BigDecimal.TEN);
         request.setItems(List.of(itemRequest));
-        
+
         Batch batch = new Batch();
         batch.setId(UUID.fromString("00000002-0000-0000-0000-000000000000"));
-        batch.setQuantity(50);
+        batch.setQuantity(new BigDecimal("50"));
         batch.setProduct(product);
         
         Sale savedSale = new Sale();
@@ -149,32 +146,32 @@ class SaleServiceTest {
         SaleItem saleItem = new SaleItem();
         saleItem.setId(UUID.fromString("00000004-0000-0000-0000-000000000000"));
         saleItem.setProduct(product);
-        saleItem.setQuantity(10);
+        saleItem.setQuantity(new BigDecimal("10"));
         saleItem.setUnitPrice(BigDecimal.TEN);
         saleItem.setSubtotal(new BigDecimal("100.00"));
         saleItem.setBatch(batch);
         savedSale.addItem(saleItem);
-        
+
         // Convert Long IDs to UUIDs (as the service does)
         UUID expectedWarehouseId = UUID.fromString(String.format("%08d-0000-0000-0000-000000000000", 1L));
         UUID expectedProductId = UUID.fromString(String.format("%08d-0000-0000-0000-000000000000", 1L));
-        
+
         when(warehouseRepository.findById(expectedWarehouseId)).thenReturn(Optional.of(warehouse));
         when(productRepository.findById(expectedProductId)).thenReturn(Optional.of(product));
-        when(batchService.getAvailableQuantity(expectedProductId, expectedWarehouseId, tenantId)).thenReturn(50);
+        when(batchService.getAvailableQuantity(expectedProductId, expectedWarehouseId, tenantId)).thenReturn(new BigDecimal("50"));
         when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(expectedProductId, warehouseId, tenantId))
             .thenReturn(List.of(batch));
         when(saleRepository.save(any(Sale.class))).thenReturn(savedSale);
-        
+
         // When
         SaleResponse response = saleService.createSale(request, user);
-        
+
         // Then
         assertNotNull(response);
         assertNotNull(response.getId());
         verify(saleRepository, times(1)).save(any(Sale.class));
         verify(batchRepository, times(1)).save(batch);
-        assertEquals(40, batch.getQuantity()); // 50 - 10
+        assertEquals(new BigDecimal("40"), batch.getQuantity()); // 50 - 10
     }
     
     @Test
@@ -228,32 +225,32 @@ class SaleServiceTest {
         SaleItem item = new SaleItem();
         item.setId(UUID.fromString("00000003-0000-0000-0000-000000000000"));
         item.setProduct(product);
-        item.setQuantity(10);
+        item.setQuantity(new BigDecimal("10"));
         item.setUnitPrice(BigDecimal.TEN);
         item.setSubtotal(new BigDecimal("100.00"));
-        
+
         Batch batch = new Batch();
         batch.setId(UUID.fromString("00000002-0000-0000-0000-000000000000"));
-        batch.setQuantity(40);
+        batch.setQuantity(new BigDecimal("40"));
         item.setBatch(batch);
-        
+
         sale.addItem(item);
-        
+
         CancelSaleRequest request = new CancelSaleRequest();
         request.setReason("Customer changed mind");
-        
+
         UUID saleUuid = UUID.fromString("00000001-0000-0000-0000-000000000000");
         when(saleRepository.findByIdAndTenantId(saleUuid, tenantId)).thenReturn(Optional.of(sale));
         when(batchRepository.findById(batch.getId())).thenReturn(Optional.of(batch));
         when(saleRepository.save(any(Sale.class))).thenReturn(sale);
-        
+
         // When
         SaleResponse response = saleService.cancelSale(1L, request, user);
-        
+
         // Then
         assertNotNull(response);
         assertEquals(SaleStatus.CANCELLED, sale.getStatus());
-        assertEquals(50, batch.getQuantity()); // 40 + 10
+        assertEquals(new BigDecimal("50"), batch.getQuantity()); // 40 + 10
         verify(batchRepository, times(1)).save(batch);
     }
     

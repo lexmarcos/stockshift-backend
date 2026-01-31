@@ -15,10 +15,8 @@ import java.util.List;
 public class DashboardResponse {
     private Long totalProducts;
     private Long totalWarehouses;
-    private Integer totalStockQuantity;
+    private BigDecimal totalStockQuantity;
     private BigDecimal totalStockValue;
-    private Long pendingMovements;
-    private Long completedMovementsToday;
     private List<StockReportResponse> lowStockProducts;
     private List<StockReportResponse> expiringProducts;
 }

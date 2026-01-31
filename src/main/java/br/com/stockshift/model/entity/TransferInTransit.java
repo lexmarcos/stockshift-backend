@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -33,8 +34,8 @@ public class TransferInTransit extends TenantAwareEntity {
     @JoinColumn(name = "source_batch_id", nullable = false)
     private Batch sourceBatch;
 
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    @Column(name = "quantity", nullable = false, precision = 15, scale = 3)
+    private BigDecimal quantity;
 
     @Column(name = "consumed_at")
     private LocalDateTime consumedAt;

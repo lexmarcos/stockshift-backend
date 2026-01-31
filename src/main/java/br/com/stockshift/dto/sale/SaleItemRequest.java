@@ -20,8 +20,8 @@ public class SaleItemRequest {
     private Long batchId;
     
     @NotNull(message = "Quantity is required")
-    @Min(value = 1, message = "Quantity must be at least 1")
-    private Integer quantity;
+    @Positive(message = "Quantity must be positive")
+    private BigDecimal quantity;
     
     @NotNull(message = "Unit price is required")
     @Positive(message = "Unit price must be positive")

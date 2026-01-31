@@ -7,20 +7,22 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
+
 class InventoryLedgerTest {
 
     @Test
     void shouldRequirePositiveQuantity() {
         InventoryLedger ledger = new InventoryLedger();
-        ledger.setQuantity(100);
-        assertThat(ledger.getQuantity()).isEqualTo(100);
+        ledger.setQuantity(new BigDecimal("100"));
+        assertThat(ledger.getQuantity()).isEqualTo(new BigDecimal("100"));
     }
 
     @Test
     void shouldAllowNullWarehouseForVirtualEntries() {
         InventoryLedger ledger = new InventoryLedger();
         ledger.setEntryType(LedgerEntryType.TRANSFER_IN_TRANSIT);
-        assertThat(ledger.getWarehouse()).isNull();
+        assertThat(ledger.getWarehouseId()).isNull();
     }
 
     @Test

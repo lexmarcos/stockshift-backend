@@ -70,7 +70,7 @@ class BatchServiceTest {
                 .barcode("1234567890")
                 .warehouseId(warehouseId)
                 .batchCode("BATCH-001")
-                .quantity(100)
+                .quantity(new BigDecimal("100"))
                 .costPrice(1000L)  // R$10.00 in cents
                 .sellingPrice(2000L)  // R$20.00 in cents
                 .build();
@@ -113,7 +113,7 @@ class BatchServiceTest {
         savedBatch.setProduct(product);
         savedBatch.setWarehouse(warehouse);
         savedBatch.setBatchCode("BATCH-001");
-        savedBatch.setQuantity(100);
+        savedBatch.setQuantity(new BigDecimal("100"));
 
         when(productRepository.findByTenantIdAndId(tenantId, productId))
                 .thenReturn(Optional.of(product));
