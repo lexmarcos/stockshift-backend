@@ -58,10 +58,6 @@ public class Batch extends TenantAwareEntity {
     private Long sellingPrice;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "origin_transfer_id")
-    private Transfer originTransfer;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "origin_batch_id")
     private Batch originBatch;
 }

@@ -132,12 +132,10 @@ CREATE TABLE permissions (
         resource IN (
             'PRODUCT',
             'STOCK',
-            'SALE',
             'USER',
             'REPORT',
             'WAREHOUSE',
-            'TRANSFER',
-            'SALES'
+            'TRANSFER'
         )
     ),
     CONSTRAINT permissions_action_check CHECK (
@@ -415,66 +413,15 @@ CREATE TABLE inventory_ledger (
     CONSTRAINT inventory_ledger_entry_type_check CHECK (
         entry_type IN (
             'PURCHASE_IN',
-            'SALE_OUT',
             'ADJUSTMENT_IN',
             'ADJUSTMENT_OUT',
             'TRANSFER_OUT',
             'TRANSFER_IN_TRANSIT',
             'TRANSFER_IN',
             'TRANSFER_TRANSIT_CONSUMED',
-            'TRANSFER_LOSS',
-            'RETURN_IN'
+            'TRANSFER_LOSS'
         )
     )
-);
-
--- Sales
-CREATE TABLE sales (
-    id uuid NOT NULL PRIMARY KEY,
-    tenant_id uuid NOT NULL,
-    warehouse_id uuid NOT NULL,
-    user_id uuid NOT NULL,
-    cancelled_by uuid,
-    customer_id bigint,
-    customer_name character varying(200),
-    status character varying(20) NOT NULL,
-    payment_method character varying(20) NOT NULL,
-    subtotal numeric(15, 2) NOT NULL,
-    discount numeric(15, 2),
-    total numeric(15, 2) NOT NULL,
-    notes text,
-    cancellation_reason text,
-    completed_at timestamp(6) without time zone,
-    cancelled_at timestamp(6) without time zone,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL,
-    CONSTRAINT sales_status_check CHECK (
-        status IN ('COMPLETED', 'CANCELLED')
-    ),
-    CONSTRAINT sales_payment_method_check CHECK (
-        payment_method IN (
-            'CASH',
-            'DEBIT_CARD',
-            'CREDIT_CARD',
-            'INSTALLMENT',
-            'PIX',
-            'BANK_TRANSFER',
-            'OTHER'
-        )
-    )
-);
-
--- Sale Items
-CREATE TABLE sale_items (
-    id uuid NOT NULL PRIMARY KEY,
-    sale_id uuid NOT NULL,
-    product_id uuid NOT NULL,
-    batch_id uuid,
-    quantity numeric(15, 3) NOT NULL,
-    unit_price numeric(15, 2) NOT NULL,
-    subtotal numeric(15, 2) NOT NULL,
-    created_at timestamp(6) without time zone NOT NULL,
-    updated_at timestamp(6) without time zone NOT NULL
 );
 
 -- =============================================
@@ -555,15 +502,3 @@ ALTER TABLE transfer_discrepancy
 ADD CONSTRAINT fk_transfer_discrepancy_transfer FOREIGN KEY (transfer_id) REFERENCES transfers (id),
 ADD CONSTRAINT fk_transfer_discrepancy_transfer_item FOREIGN KEY (transfer_item_id) REFERENCES transfer_items (id),
 ADD CONSTRAINT fk_transfer_discrepancy_resolved_by FOREIGN KEY (resolved_by) REFERENCES users (id);
-
--- Sales references
-ALTER TABLE sales
-ADD CONSTRAINT fk_sales_warehouse FOREIGN KEY (warehouse_id) REFERENCES warehouses (id),
-ADD CONSTRAINT fk_sales_user FOREIGN KEY (user_id) REFERENCES users (id),
-ADD CONSTRAINT fk_sales_cancelled_by FOREIGN KEY (cancelled_by) REFERENCES users (id);
-
--- Sale Items references
-ALTER TABLE sale_items
-ADD CONSTRAINT fk_sale_items_sale FOREIGN KEY (sale_id) REFERENCES sales (id),
-ADD CONSTRAINT fk_sale_items_product FOREIGN KEY (product_id) REFERENCES products (id),
-ADD CONSTRAINT fk_sale_items_batch FOREIGN KEY (batch_id) REFERENCES batches (id);

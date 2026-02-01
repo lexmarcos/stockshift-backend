@@ -163,13 +163,6 @@ src/main/resources/
 - Rastreamento de movimentações com estados
 - Soft deletes para auditoria
 
-### Movimentações
-- PURCHASE (Compra)
-- SALE (Venda)
-- TRANSFER (Transferência entre estoques)
-- ADJUSTMENT (Ajuste de inventário)
-- RETURN (Devolução)
-
 ## 🧪 Testes
 
 ```bash
@@ -190,10 +183,6 @@ POST   /api/auth/logout         # Logout
 GET    /api/products            # Listar produtos
 POST   /api/products            # Criar produto
 GET    /api/products/:id        # Detalhes do produto
-
-POST   /api/movements/purchase  # Registrar compra
-POST   /api/movements/sale      # Registrar venda
-POST   /api/movements/transfer  # Criar transferência
 
 GET    /api/reports/stock-summary        # Resumo de estoque
 GET    /api/reports/expiring-products    # Produtos vencendo

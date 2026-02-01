@@ -32,6 +32,9 @@ public class RefreshToken {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "warehouse_id")
+    private UUID warehouseId;
+
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt);
     }

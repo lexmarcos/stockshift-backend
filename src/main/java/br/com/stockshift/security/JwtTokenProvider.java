@@ -26,11 +26,15 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(UUID userId, UUID tenantId, String email, List<String> roles, List<String> permissions) {
+        return generateAccessToken(userId, tenantId, null, email, roles, permissions);
+    }
+
+    public String generateAccessToken(UUID userId, UUID tenantId, UUID warehouseId, String email, List<String> roles, List<String> permissions) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessExpiration());
         String jti = UUID.randomUUID().toString();
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .id(jti)
                 .subject(userId.toString())
                 .claim("tenantId", tenantId.toString())
@@ -38,9 +42,13 @@ public class JwtTokenProvider {
                 .claim("roles", roles)
                 .claim("permissions", permissions)
                 .issuedAt(now)
-                .expiration(expiryDate)
-                .signWith(getSigningKey(), Jwts.SIG.HS256)
-                .compact();
+                .expiration(expiryDate);
+
+        if (warehouseId != null) {
+            builder.claim("warehouseId", warehouseId.toString());
+        }
+
+        return builder.signWith(getSigningKey(), Jwts.SIG.HS256).compact();
     }
 
     public UUID getUserIdFromToken(String token) {

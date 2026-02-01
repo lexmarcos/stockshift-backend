@@ -16,10 +16,6 @@ public class LedgerQueryService {
 
     private final InventoryLedgerRepository ledgerRepository;
 
-    public List<InventoryLedger> findByTransferId(UUID transferId) {
-        return ledgerRepository.findByReferenceTypeAndReferenceId("TRANSFER", transferId);
-    }
-
     public List<InventoryLedger> findByBatchId(UUID batchId) {
         return ledgerRepository.findByBatchIdOrderByCreatedAtDesc(batchId);
     }

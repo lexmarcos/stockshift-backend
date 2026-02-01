@@ -3,12 +3,9 @@ package br.com.stockshift.model.enums;
 public enum PermissionResource {
     PRODUCT("Produto"),
     STOCK("Estoque"),
-    SALE("Venda"),
     USER("Usuário"),
     REPORT("Relatório"),
-    WAREHOUSE("Depósito"),
-    TRANSFER("Transferência"),
-    SALES("Vendas");
+    WAREHOUSE("Depósito");
 
     private final String displayName;
 

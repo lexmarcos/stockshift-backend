@@ -21,12 +21,18 @@ public class RefreshTokenService {
 
     @Transactional
     public RefreshToken createRefreshToken(User user) {
+        return createRefreshToken(user, null);
+    }
+
+    @Transactional
+    public RefreshToken createRefreshToken(User user, UUID warehouseId) {
         // Revoke existing refresh tokens for this user
         refreshTokenRepository.deleteByUser(user);
 
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setToken(UUID.randomUUID().toString());
         refreshToken.setUser(user);
+        refreshToken.setWarehouseId(warehouseId);
         refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshExpiration() / 1000));
         refreshToken.setCreatedAt(LocalDateTime.now());
 

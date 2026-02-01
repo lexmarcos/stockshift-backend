@@ -52,7 +52,3 @@ Controller → Service → Repository → Entity
 - All endpoints return `ApiResponse<T>` wrapper
 - Pagination via Spring's `Pageable`
 - Validation via `@Valid` annotations
-
-### Movement Types
-
-`PURCHASE`, `SALE`, `TRANSFER`, `ADJUSTMENT`, `RETURN`

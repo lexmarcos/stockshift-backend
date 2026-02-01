@@ -49,7 +49,7 @@ class ReconciliationServiceTest {
         entry1.setQuantity(new BigDecimal("100"));
 
         InventoryLedger entry2 = new InventoryLedger();
-        entry2.setEntryType(LedgerEntryType.TRANSFER_OUT); // Debit
+        entry2.setEntryType(LedgerEntryType.ADJUSTMENT_OUT); // Debit
         entry2.setQuantity(new BigDecimal("50"));
 
         when(batchRepository.findAllByTenantId(tenantId)).thenReturn(List.of(batch));
@@ -75,7 +75,7 @@ class ReconciliationServiceTest {
         entry1.setQuantity(new BigDecimal("100"));
 
         InventoryLedger entry2 = new InventoryLedger();
-        entry2.setEntryType(LedgerEntryType.TRANSFER_OUT);
+        entry2.setEntryType(LedgerEntryType.ADJUSTMENT_OUT);
         entry2.setQuantity(new BigDecimal("50"));
 
         when(batchRepository.findAllByTenantId(tenantId)).thenReturn(List.of(batch));

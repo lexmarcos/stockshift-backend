@@ -9,6 +9,7 @@ import br.com.stockshift.dto.auth.RefreshTokenRequest;
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
 import br.com.stockshift.dto.auth.RegisterRequest;
 import br.com.stockshift.dto.auth.RegisterResponse;
+import br.com.stockshift.dto.auth.SwitchWarehouseRequest;
 import br.com.stockshift.security.ratelimit.RateLimitService;
 import br.com.stockshift.service.AuthService;
 import br.com.stockshift.service.HCaptchaService;
@@ -133,5 +134,19 @@ public class AuthController {
     public ResponseEntity<ApiResponse<MeResponse>> me() {
         MeResponse response = authService.getMe();
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/switch-warehouse")
+    @Operation(summary = "Switch Warehouse", description = "Switch to a different warehouse and get a new token")
+    public ResponseEntity<ApiResponse<Void>> switchWarehouse(
+            @Valid @RequestBody SwitchWarehouseRequest request,
+            HttpServletResponse response) {
+
+        String accessToken = authService.switchWarehouse(request);
+
+        // Update access token cookie
+        cookieUtil.addAccessTokenCookie(response, accessToken);
+
+        return ResponseEntity.ok(ApiResponse.success("Warehouse switched successfully"));
     }
 }

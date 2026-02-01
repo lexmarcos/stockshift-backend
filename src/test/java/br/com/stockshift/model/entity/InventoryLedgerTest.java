@@ -19,13 +19,6 @@ class InventoryLedgerTest {
     }
 
     @Test
-    void shouldAllowNullWarehouseForVirtualEntries() {
-        InventoryLedger ledger = new InventoryLedger();
-        ledger.setEntryType(LedgerEntryType.TRANSFER_IN_TRANSIT);
-        assertThat(ledger.getWarehouseId()).isNull();
-    }
-
-    @Test
     void shouldHaveReferenceFields() {
         InventoryLedger ledger = new InventoryLedger();
         UUID refId = UUID.randomUUID();

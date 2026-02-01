@@ -539,10 +539,6 @@ interface WarehouseFilters {
 - GET `/api/batches/warehouse/{warehouseId}` - Get all batches in warehouse
 - Used in warehouse detail view to show inventory
 
-### With Stock Movements
-- Filter stock movements by warehouse
-- Show recent movements in warehouse detail
-
 ### With Reports
 - GET `/api/reports/stock` - Filter by warehouse
 - Warehouse-specific stock reports and analytics

@@ -334,7 +334,6 @@ Users are associated with specific warehouses. This controls what data they can 
 When a non-admin user accesses the system:
 - **Warehouses**: Only sees assigned warehouses
 - **Batches**: Only sees batches from assigned warehouses
-- **Stock Movements**: Only sees movements involving assigned warehouses
 - **Sales**: Can only create sales in assigned warehouses
 
 ### Frontend Implementation Guide

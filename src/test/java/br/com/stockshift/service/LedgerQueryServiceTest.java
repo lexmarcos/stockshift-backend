@@ -30,29 +30,6 @@ class LedgerQueryServiceTest {
     }
 
     @Test
-    void shouldFindLedgerEntriesByTransferId() {
-        UUID transferId = UUID.randomUUID();
-
-        InventoryLedger entry1 = new InventoryLedger();
-        entry1.setId(UUID.randomUUID());
-        entry1.setEntryType(LedgerEntryType.TRANSFER_OUT);
-        entry1.setQuantity(new BigDecimal("50"));
-
-        InventoryLedger entry2 = new InventoryLedger();
-        entry2.setId(UUID.randomUUID());
-        entry2.setEntryType(LedgerEntryType.TRANSFER_IN_TRANSIT);
-        entry2.setQuantity(new BigDecimal("50"));
-
-        when(ledgerRepository.findByReferenceTypeAndReferenceId("TRANSFER", transferId))
-            .thenReturn(List.of(entry1, entry2));
-
-        List<InventoryLedger> result = ledgerQueryService.findByTransferId(transferId);
-
-        assertThat(result).hasSize(2);
-        assertThat(result.get(0).getEntryType()).isEqualTo(LedgerEntryType.TRANSFER_OUT);
-    }
-
-    @Test
     void shouldFindLedgerEntriesByBatchId() {
         UUID batchId = UUID.randomUUID();
 
