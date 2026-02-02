@@ -60,4 +60,7 @@ public class Batch extends TenantAwareEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "origin_batch_id")
     private Batch originBatch;
+
+    @Column(name = "transit_quantity", nullable = false, precision = 19, scale = 4)
+    private BigDecimal transitQuantity = BigDecimal.ZERO;
 }
