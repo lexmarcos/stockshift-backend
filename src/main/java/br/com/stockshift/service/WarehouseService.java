@@ -41,7 +41,14 @@ public class WarehouseService {
         String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
         String sanitizedCity = SanitizationUtil.sanitizeForHtml(request.getCity());
         String sanitizedAddress = SanitizationUtil.sanitizeForHtml(request.getAddress());
-        String sanitizedCode = SanitizationUtil.sanitizeForHtml(request.getCode());
+
+        // Generate code if not provided
+        String code;
+        if (request.getCode() != null && !request.getCode().isBlank()) {
+            code = SanitizationUtil.sanitizeForHtml(request.getCode());
+        } else {
+            code = generateWarehouseCode(sanitizedName, sanitizedCity, tenantId);
+        }
 
         // Validate unique name
         warehouseRepository.findByTenantIdAndName(tenantId, sanitizedName)
@@ -50,15 +57,15 @@ public class WarehouseService {
                 });
 
         // Validate unique code
-        warehouseRepository.findByTenantIdAndCode(tenantId, sanitizedCode)
+        warehouseRepository.findByTenantIdAndCode(tenantId, code)
                 .ifPresent(w -> {
-                    throw new BusinessException("Warehouse with code " + sanitizedCode + " already exists");
+                    throw new BusinessException("Warehouse with code " + code + " already exists");
                 });
 
         Warehouse warehouse = new Warehouse();
         warehouse.setTenantId(tenantId);
         warehouse.setName(sanitizedName);
-        warehouse.setCode(sanitizedCode);
+        warehouse.setCode(code);
         warehouse.setCity(sanitizedCity);
         warehouse.setState(request.getState());
         warehouse.setAddress(sanitizedAddress);
@@ -159,6 +166,39 @@ public class WarehouseService {
 
         warehouseRepository.delete(warehouse);
         log.info("Deleted warehouse {} for tenant {}", id, tenantId);
+    }
+
+    private String generateWarehouseCode(String name, String city, UUID tenantId) {
+        // Extract prefix from name (first 3 letters, uppercase)
+        String namePrefix = name.replaceAll("[^a-zA-Z]", "")
+                .toUpperCase()
+                .substring(0, Math.min(3, name.replaceAll("[^a-zA-Z]", "").length()));
+
+        // Extract city prefix (first 2 letters, uppercase)
+        String cityPrefix = city.replaceAll("[^a-zA-Z]", "")
+                .toUpperCase()
+                .substring(0, Math.min(2, city.replaceAll("[^a-zA-Z]", "").length()));
+
+        String baseCode = namePrefix + "-" + cityPrefix;
+
+        // Find existing warehouse codes
+        List<Warehouse> existingWarehouses = warehouseRepository.findAllByTenantId(tenantId);
+        Set<String> existingCodes = existingWarehouses.stream()
+                .map(Warehouse::getCode)
+                .collect(Collectors.toSet());
+
+        // Check if base code is available
+        if (!existingCodes.contains(baseCode)) {
+            return baseCode;
+        }
+
+        // Find next available suffix
+        int suffix = 2;
+        while (existingCodes.contains(baseCode + "-" + String.format("%02d", suffix))) {
+            suffix++;
+        }
+
+        return baseCode + "-" + String.format("%02d", suffix);
     }
 
     private WarehouseResponse mapToResponse(Warehouse warehouse) {

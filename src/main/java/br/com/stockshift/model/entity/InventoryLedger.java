@@ -3,6 +3,7 @@ package br.com.stockshift.model.entity;
 import br.com.stockshift.model.enums.LedgerEntryType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
@@ -16,6 +17,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class InventoryLedger {
 
     @Id

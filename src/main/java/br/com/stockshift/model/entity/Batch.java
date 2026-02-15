@@ -2,6 +2,7 @@ package br.com.stockshift.model.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Batch extends TenantAwareEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -40,6 +42,7 @@ public class Batch extends TenantAwareEntity {
 
     @Version
     @Column(name = "version", nullable = false)
+    @Builder.Default
     private Long version = 0L;
 
     @Column(name = "deleted_at")
@@ -62,5 +65,6 @@ public class Batch extends TenantAwareEntity {
     private Batch originBatch;
 
     @Column(name = "transit_quantity", nullable = false, precision = 19, scale = 4)
+    @Builder.Default
     private BigDecimal transitQuantity = BigDecimal.ZERO;
 }

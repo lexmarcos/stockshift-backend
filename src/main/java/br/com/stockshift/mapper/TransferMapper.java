@@ -30,8 +30,8 @@ public class TransferMapper {
                 .cancelledByUserId(transfer.getCancelledByUserId())
                 .cancelledAt(transfer.getCancelledAt())
                 .cancellationReason(transfer.getCancellationReason())
-                .createdAt(transfer.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
-                .updatedAt(transfer.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
+                .createdAt(transfer.getCreatedAt() != null ? transfer.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant() : null)
+                .updatedAt(transfer.getUpdatedAt() != null ? transfer.getUpdatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant() : null)
                 .items(toItemResponseList(transfer.getItems()))
                 .build();
     }

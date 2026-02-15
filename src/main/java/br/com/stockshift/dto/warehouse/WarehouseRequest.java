@@ -24,9 +24,8 @@ public class WarehouseRequest {
     @Pattern(regexp = "^[\\p{L}\\s\\-']+$", message = "City contains invalid characters")
     private String city;
 
-    @NotBlank(message = "Code is required")
     @Size(max = 20, message = "Code cannot exceed 20 characters")
-    @Pattern(regexp = "^[A-Z0-9\\-]+$", message = "Code must contain only uppercase letters, numbers and hyphens")
+    @Pattern(regexp = "^[A-Z0-9\\-]*$", message = "Code must contain only uppercase letters, numbers and hyphens")
     private String code;
 
     @NotBlank(message = "State is required")

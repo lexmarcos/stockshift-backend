@@ -71,6 +71,17 @@ public class JwtTokenProvider {
         return UUID.fromString(claims.get("tenantId", String.class));
     }
 
+    public UUID getWarehouseIdFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        String warehouseId = claims.get("warehouseId", String.class);
+        return warehouseId != null ? UUID.fromString(warehouseId) : null;
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
