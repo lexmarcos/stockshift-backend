@@ -10,17 +10,15 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "transfers")
+@Table(name = "transfers", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"tenant_id", "code"})
+})
 @Data
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Transfer extends TenantAwareEntity {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
 
     @Column(nullable = false, length = 50)
     private String code;

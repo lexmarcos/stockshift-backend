@@ -9,6 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,8 +28,17 @@ public class UserPrincipal implements UserDetails {
     private boolean hasFullAccess;
 
     public static UserPrincipal create(User user) {
-        Collection<GrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
+        Set<String> authorityNames = new LinkedHashSet<>();
+        user.getRoles().forEach(role -> {
+            authorityNames.add("ROLE_" + role.getName());
+            if (role.getPermissions() != null) {
+                role.getPermissions().forEach(permission ->
+                        authorityNames.add(permission.getResource().name() + "_" + permission.getAction().name()));
+            }
+        });
+
+        Collection<GrantedAuthority> authorities = authorityNames.stream()
+                .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toList());
 
         boolean isAdmin = user.getRoles().stream()

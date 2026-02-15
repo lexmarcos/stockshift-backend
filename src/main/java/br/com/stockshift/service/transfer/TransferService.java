@@ -21,13 +21,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TransferService {
+
+    private static final int TRANSFER_CODE_SEQUENCE_PADDING = 4;
 
     private final TransferRepository transferRepository;
     private final TransferItemRepository transferItemRepository;
@@ -61,7 +62,6 @@ public class TransferService {
 
         // Create transfer
         Transfer transfer = Transfer.builder()
-                
                 .code(code)
                 .sourceWarehouseId(sourceWarehouseId)
                 .destinationWarehouseId(request.getDestinationWarehouseId())
@@ -110,8 +110,22 @@ public class TransferService {
 
     private String generateTransferCode(UUID tenantId) {
         String prefix = "TRF-" + LocalDate.now().getYear() + "-";
-        long count = transferRepository.countByTenantIdAndCodePrefix(tenantId, prefix);
-        return prefix + String.format("%04d", count + 1);
+        String latestCode = transferRepository.findLatestCodeByTenantIdAndCodePrefix(tenantId, prefix);
+
+        if (latestCode == null || latestCode.isBlank()) {
+            return prefix + String.format("%0" + TRANSFER_CODE_SEQUENCE_PADDING + "d", 1);
+        }
+
+        String sequencePart = latestCode.substring(prefix.length());
+        try {
+            long nextSequence = Long.parseLong(sequencePart) + 1;
+            return prefix + String.format("%0" + TRANSFER_CODE_SEQUENCE_PADDING + "d", nextSequence);
+        } catch (NumberFormatException ex) {
+            log.warn("Unexpected transfer code format '{}' for tenant {}. Falling back to count-based sequence.",
+                    latestCode, tenantId);
+            long count = transferRepository.countByTenantIdAndCodePrefix(tenantId, prefix);
+            return prefix + String.format("%0" + TRANSFER_CODE_SEQUENCE_PADDING + "d", count + 1);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -180,6 +194,125 @@ public class TransferService {
         }
 
         Transfer saved = transferRepository.save(transfer);
+
+        String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
+                .map(Warehouse::getName).orElse("Unknown");
+        String destinationWarehouseName = warehouseRepository.findById(transfer.getDestinationWarehouseId())
+                .map(Warehouse::getName).orElse("Unknown");
+
+        return transferMapper.toResponse(saved, sourceWarehouseName, destinationWarehouseName);
+    }
+
+    @Transactional
+    public TransferResponse execute(UUID id) {
+        UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+        UUID userId = securityUtils.getCurrentUserId();
+
+        Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
+
+        validateSourceWarehouseAccess(transfer, currentWarehouseId);
+        stateMachine.validateTransition(transfer.getStatus(), TransferStatus.IN_TRANSIT);
+
+        Warehouse destinationWarehouse = warehouseRepository.findById(transfer.getDestinationWarehouseId())
+                .orElseThrow(() -> new ResourceNotFoundException("Destination warehouse not found"));
+
+        // Process each item: validate stock, update batch quantities, create ledger entries
+        for (TransferItem item : transfer.getItems()) {
+            Batch batch = batchRepository.findByIdForUpdate(item.getSourceBatchId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + item.getSourceBatchId()));
+
+            if (batch.getQuantity().compareTo(item.getQuantitySent()) < 0) {
+                throw new BadRequestException("Insufficient quantity in batch " + batch.getBatchCode() +
+                        ". Available: " + batch.getQuantity() + ", Required: " + item.getQuantitySent());
+            }
+
+            // Update batch quantities
+            batch.setQuantity(batch.getQuantity().subtract(item.getQuantitySent()));
+            batch.setTransitQuantity(batch.getTransitQuantity().add(item.getQuantitySent()));
+            batchRepository.save(batch);
+
+            // Create ledger entry
+            InventoryLedger ledgerEntry = InventoryLedger.builder()
+                    .tenantId(tenantId)
+                    .warehouseId(transfer.getSourceWarehouseId())
+                    .batchId(batch.getId())
+                    .productId(item.getProductId())
+                    .entryType(LedgerEntryType.TRANSFER_OUT)
+                    .quantity(item.getQuantitySent().negate())
+                    .referenceType("TRANSFER")
+                    .referenceId(transfer.getId())
+                    .notes("Transfer to " + destinationWarehouse.getName())
+                    .createdBy(userId)
+                    .build();
+            ledgerRepository.save(ledgerEntry);
+        }
+
+        // Update transfer status
+        transfer.setStatus(TransferStatus.IN_TRANSIT);
+        transfer.setExecutedByUserId(userId);
+        transfer.setExecutedAt(Instant.now());
+
+        Transfer saved = transferRepository.save(transfer);
+        log.info("Transfer {} executed by user {}", saved.getCode(), userId);
+
+        String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
+                .map(Warehouse::getName).orElse("Unknown");
+
+        return transferMapper.toResponse(saved, sourceWarehouseName, destinationWarehouse.getName());
+    }
+
+    @Transactional
+    public TransferResponse cancel(UUID id, CancelTransferRequest request) {
+        UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+        UUID userId = securityUtils.getCurrentUserId();
+
+        Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
+
+        validateSourceWarehouseAccess(transfer, currentWarehouseId);
+        stateMachine.validateTransition(transfer.getStatus(), TransferStatus.CANCELLED);
+
+        if (transfer.getStatus() == TransferStatus.IN_TRANSIT) {
+            if (request.getReason() == null || request.getReason().isBlank()) {
+                throw new BadRequestException("Cancellation reason is required for in-transit transfers");
+            }
+
+            // Revert stock movements
+            for (TransferItem item : transfer.getItems()) {
+                Batch batch = batchRepository.findByIdForUpdate(item.getSourceBatchId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Batch not found"));
+
+                batch.setTransitQuantity(batch.getTransitQuantity().subtract(item.getQuantitySent()));
+                batch.setQuantity(batch.getQuantity().add(item.getQuantitySent()));
+                batchRepository.save(batch);
+
+                // Create reversal ledger entry
+                InventoryLedger ledgerEntry = InventoryLedger.builder()
+                        .tenantId(tenantId)
+                        .warehouseId(transfer.getSourceWarehouseId())
+                        .batchId(batch.getId())
+                        .productId(item.getProductId())
+                        .entryType(LedgerEntryType.TRANSFER_CANCELLED)
+                        .quantity(item.getQuantitySent())
+                        .referenceType("TRANSFER")
+                        .referenceId(transfer.getId())
+                        .notes("Transfer cancelled: " + request.getReason())
+                        .createdBy(userId)
+                        .build();
+                ledgerRepository.save(ledgerEntry);
+            }
+        }
+
+        transfer.setStatus(TransferStatus.CANCELLED);
+        transfer.setCancelledByUserId(userId);
+        transfer.setCancelledAt(Instant.now());
+        transfer.setCancellationReason(request.getReason());
+
+        Transfer saved = transferRepository.save(transfer);
+        log.info("Transfer {} cancelled by user {}", saved.getCode(), userId);
 
         String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");

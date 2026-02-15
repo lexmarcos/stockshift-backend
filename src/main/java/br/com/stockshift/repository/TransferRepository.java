@@ -30,6 +30,9 @@ public interface TransferRepository extends JpaRepository<Transfer, UUID> {
     @Query("SELECT t FROM Transfer t WHERE t.tenantId = :tenantId AND t.destinationWarehouseId = :warehouseId")
     Page<Transfer> findAllByTenantIdAndDestinationWarehouseId(@Param("tenantId") UUID tenantId, @Param("warehouseId") UUID warehouseId, Pageable pageable);
 
-    @Query("SELECT COUNT(t) FROM Transfer t WHERE t.tenantId = :tenantId AND t.code LIKE :prefix%")
+    @Query("SELECT MAX(t.code) FROM Transfer t WHERE t.tenantId = :tenantId AND t.code LIKE CONCAT(:prefix, '%')")
+    String findLatestCodeByTenantIdAndCodePrefix(@Param("tenantId") UUID tenantId, @Param("prefix") String prefix);
+
+    @Query("SELECT COUNT(t) FROM Transfer t WHERE t.tenantId = :tenantId AND t.code LIKE CONCAT(:prefix, '%')")
     long countByTenantIdAndCodePrefix(@Param("tenantId") UUID tenantId, @Param("prefix") String prefix);
 }

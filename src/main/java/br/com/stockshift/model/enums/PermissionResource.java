@@ -5,7 +5,8 @@ public enum PermissionResource {
     STOCK("Estoque"),
     USER("Usuário"),
     REPORT("Relatório"),
-    WAREHOUSE("Depósito");
+    WAREHOUSE("Depósito"),
+    TRANSFER("Transferência");
 
     private final String displayName;
 

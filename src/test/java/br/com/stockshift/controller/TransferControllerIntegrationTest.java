@@ -123,7 +123,7 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_EXECUTE"})
+    @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_CREATE"})
     void shouldCreateTransfer() throws Exception {
         CreateTransferRequest request = CreateTransferRequest.builder()
                 .destinationWarehouseId(destinationWarehouse.getId())
