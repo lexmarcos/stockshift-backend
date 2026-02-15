@@ -96,10 +96,12 @@ class BatchSoftDeleteTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.length()").value(2));
 
         // 2. Delete batch1 via API
+        TenantContext.setTenantId(testTenant.getId());
         mockMvc.perform(delete("/api/batches/{id}", batch1.getId()))
                 .andExpect(status().isOk());
 
         // 3. Verify findAll only returns batch2
+        TenantContext.setTenantId(testTenant.getId());
         mockMvc.perform(get("/api/batches"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))

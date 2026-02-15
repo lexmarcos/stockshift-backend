@@ -4,6 +4,7 @@ import br.com.stockshift.service.TokenDenylistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -20,6 +22,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -46,6 +49,7 @@ class JwtAuthenticationFilterTest {
   private UserDetails userDetails;
   private UUID userId;
   private UUID tenantId;
+  private UUID warehouseId;
 
   @BeforeEach
   void setUp() {
@@ -53,11 +57,19 @@ class JwtAuthenticationFilterTest {
     response = new MockHttpServletResponse();
     userId = UUID.randomUUID();
     tenantId = UUID.randomUUID();
+    warehouseId = UUID.randomUUID();
 
     userDetails = new User(
         userId.toString(),
         "password",
         Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+  }
+
+  @AfterEach
+  void tearDown() {
+    TenantContext.clear();
+    WarehouseContext.clear();
+    SecurityContextHolder.clearContext();
   }
 
   @Test
@@ -145,5 +157,36 @@ class JwtAuthenticationFilterTest {
     verify(tokenProvider, never()).validateToken(anyString());
     verify(userDetailsService, never()).loadUserById(anyString());
     verify(filterChain).doFilter(request, response);
+  }
+
+  @Test
+  void shouldClearContextsAfterAuthenticatedRequest() throws ServletException, IOException {
+    String token = "valid-jwt-token";
+    String jti = "test-jti";
+    request.addHeader("Authorization", "Bearer " + token);
+
+    when(tokenProvider.validateToken(token)).thenReturn(true);
+    when(tokenProvider.getJtiFromToken(token)).thenReturn(jti);
+    when(tokenDenylistService.isDenylisted(jti)).thenReturn(false);
+    when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
+    when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
+    when(tokenProvider.getWarehouseIdFromToken(token)).thenReturn(warehouseId);
+    when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+    assertThat(TenantContext.getTenantId()).isNull();
+    assertThat(WarehouseContext.getWarehouseId()).isNull();
+  }
+
+  @Test
+  void shouldClearContextsEvenWhenNoToken() throws ServletException, IOException {
+    TenantContext.setTenantId(UUID.randomUUID());
+    WarehouseContext.setWarehouseId(UUID.randomUUID());
+
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+    assertThat(TenantContext.getTenantId()).isNull();
+    assertThat(WarehouseContext.getWarehouseId()).isNull();
   }
 }

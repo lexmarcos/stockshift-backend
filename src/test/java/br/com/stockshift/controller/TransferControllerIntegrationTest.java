@@ -217,6 +217,8 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                 .barcode(testProduct.getBarcode())
                 .build();
 
+        TenantContext.setTenantId(tenantId);
+        WarehouseContext.setWarehouseId(destinationWarehouse.getId());
         mockMvc.perform(post("/api/transfers/{id}/scan", transfer.getId())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))

@@ -34,37 +34,46 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         try {
-            String jwt = getJwtFromRequest(request);
+            try {
+                String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                // Check if token is revoked
-                String jti = tokenProvider.getJtiFromToken(jwt);
-                if (tokenDenylistService.isDenylisted(jti)) {
-                    log.warn("Attempted use of revoked token: {}", jti);
-                    filterChain.doFilter(request, response);
-                    return;
+                if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                    // Check if token is revoked
+                    String jti = tokenProvider.getJtiFromToken(jwt);
+                    if (tokenDenylistService.isDenylisted(jti)) {
+                        log.warn("Attempted use of revoked token: {}", jti);
+                    } else {
+                        UUID userId = tokenProvider.getUserIdFromToken(jwt);
+                        UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
+                        UUID warehouseId = tokenProvider.getWarehouseIdFromToken(jwt);
+
+                        // Set tenant context
+                        TenantContext.setTenantId(tenantId);
+
+                        // Set warehouse context
+                        if (warehouseId != null) {
+                            WarehouseContext.setWarehouseId(warehouseId);
+                        }
+
+                        UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    }
                 }
-
-                UUID userId = tokenProvider.getUserIdFromToken(jwt);
-                UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
-
-                // Set tenant context
-                TenantContext.setTenantId(tenantId);
-
-                UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (Exception ex) {
+                log.error("Could not set user authentication in security context", ex);
             }
-        } catch (Exception ex) {
-            log.error("Could not set user authentication in security context", ex);
-        }
 
-        filterChain.doFilter(request, response);
+            filterChain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
+            WarehouseContext.clear();
+        }
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {

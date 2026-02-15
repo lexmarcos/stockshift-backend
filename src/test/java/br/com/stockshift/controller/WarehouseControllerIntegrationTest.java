@@ -257,6 +257,7 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.number").value(0));
 
         // When & Then: page 1, size 5
+        TenantContext.setTenantId(testTenant.getId());
         mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId())
                 .param("page", "1")
                 .param("size", "5"))
