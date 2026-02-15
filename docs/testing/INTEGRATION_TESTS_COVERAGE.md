@@ -1,235 +1,114 @@
-# Integration Tests Coverage Report
+# Integration Tests Coverage
 
-**Última Atualização:** 2025-12-28
-**Fase Atual:** Phase 11 - MVP Happy Paths
-**Status:** ✅ Phase 11 Completo - Todos os happy paths testados
+Ultima atualizacao: 2026-02-15
+Escopo: integration tests em `src/test/java/br/com/stockshift/controller`
 
----
+## Resumo Executivo
 
-## 📊 Resumo de Cobertura
+- Endpoints REST mapeados em controllers: **74**
+- Endpoints com cobertura de integration test: **37**
+- Cobertura de endpoints por integracao: **50%**
 
-| Controller | Happy Paths Testados | Endpoints Não Testados | Status |
-|------------|---------------------|------------------------|--------|
-| Authentication | 3/3 | 0 | ✅ Completo |
-| Product | 6/6 | 0 (happy paths) | ✅ Completo |
-| Category | 3/9 | 6 | ✅ Completo (happy paths) |
-| Warehouse | 3/7 | 4 | ✅ Completo (happy paths) |
-| Batch | 4/10 | 6 | ✅ Completo (happy paths) |
-| StockMovement | 3/7 | 4 | ✅ Completo (happy paths) |
-| Report | 2/4 | 2 | ✅ Completo (happy paths) |
+Observacao: esta metrica considera cobertura por endpoint (path+metodo), nao por cenario de erro.
 
----
+## Matriz Atual por Controller
 
-## ✅ Endpoints Testados (Happy Paths)
+| Controller | Endpoints Totais | Endpoints Cobertos | Status |
+|---|---:|---:|---|
+| AuthController | 8 | 3 | Parcial |
+| BrandController | 5 | 5 | Bom |
+| CategoryController | 6 | 3 | Parcial |
+| ProductController | 11 | 7 | Parcial |
+| WarehouseController | 7 | 4 | Parcial |
+| BatchController | 11 | 8 | Parcial |
+| ReportController | 4 | 2 | Parcial |
+| TransferController | 11 | 5 | Parcial |
+| UserController | 5 | 0 | Nao coberto |
+| RoleController | 5 | 0 | Nao coberto |
+| PermissionController | 1 | 0 | Nao coberto |
 
-### AuthenticationController
-- ✅ `POST /api/auth/login` - Login com credenciais válidas
-- ✅ `POST /api/auth/refresh` - Renovar access token com refresh token válido
-- ✅ `POST /api/auth/logout` - Logout e revogação de refresh token
+## Endpoints Cobertos Hoje
 
-### ProductController *(já implementado)*
-- ✅ `POST /api/products` - Criar produto
-- ✅ `GET /api/products/{id}` - Buscar produto por ID
-- ✅ `GET /api/products/barcode/{barcode}` - Buscar por código de barras
-- ✅ `PUT /api/products/{id}` - Atualizar produto
-- ✅ `DELETE /api/products/{id}` - Soft delete de produto
-- ✅ `GET /api/products/search?q={query}` - Buscar produtos
+### Auth
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
 
-### CategoryController
-- ✅ `POST /api/categories` - Criar categoria
-- ✅ `GET /api/categories/{id}` - Buscar categoria por ID
-- ✅ `GET /api/categories` - Listar todas as categorias
+### Brands
+- `POST /api/brands`
+- `GET /api/brands`
+- `GET /api/brands/{id}`
+- `PUT /api/brands/{id}`
+- `DELETE /api/brands/{id}`
 
-### WarehouseController
-- ✅ `POST /api/warehouses` - Criar warehouse
-- ✅ `GET /api/warehouses/{id}` - Buscar warehouse por ID
-- ✅ `GET /api/warehouses` - Listar todos warehouses
+### Categories
+- `POST /api/categories`
+- `GET /api/categories`
+- `GET /api/categories/{id}`
 
-### BatchController
-- ✅ `POST /api/batches` - Criar lote de estoque
-- ✅ `GET /api/batches/{id}` - Buscar lote por ID
-- ✅ `GET /api/batches/warehouse/{warehouseId}` - Listar lotes por warehouse
-- ✅ `GET /api/batches/expiring/{daysAhead}` - Buscar lotes expirando
+### Products
+- `POST /api/products`
+- `GET /api/products/{id}`
+- `GET /api/products/barcode/{barcode}`
+- `PUT /api/products/{id}`
+- `DELETE /api/products/{id}`
+- `GET /api/products/search`
+- `POST /api/products/analyze-image`
 
-### StockMovementController
-- ✅ `POST /api/stock-movements` - Criar movimento de estoque
-- ✅ `POST /api/stock-movements/{id}/execute` - Executar movimento (atualiza estoque)
-- ✅ `GET /api/stock-movements/{id}` - Buscar movimento por ID
+### Warehouses
+- `POST /api/warehouses`
+- `GET /api/warehouses`
+- `GET /api/warehouses/{id}`
+- `GET /api/warehouses/{id}/products`
 
-### ReportController
-- ✅ `GET /api/reports/dashboard` - Dashboard com métricas gerais
-- ✅ `GET /api/reports/stock` - Relatório completo de estoque
+### Batches
+- `POST /api/batches`
+- `POST /api/batches/with-product`
+- `GET /api/batches`
+- `GET /api/batches/{id}`
+- `GET /api/batches/warehouse/{warehouseId}`
+- `GET /api/batches/expiring/{daysAhead}`
+- `DELETE /api/batches/{id}`
+- `DELETE /api/batches/warehouses/{warehouseId}/products/{productId}/batches`
 
----
+### Reports
+- `GET /api/reports/dashboard`
+- `GET /api/reports/stock`
 
-## ⏳ Endpoints NÃO Testados (Backlog para Fase 2)
+### Transfers
+- `POST /api/transfers`
+- `GET /api/transfers`
+- `POST /api/transfers/{id}/execute`
+- `POST /api/transfers/{id}/start-validation`
+- `POST /api/transfers/{id}/scan`
 
-### CategoryController
-- ⏳ `PUT /api/categories/{id}` - Atualizar categoria
-- ⏳ `DELETE /api/categories/{id}` - Soft delete de categoria
-- ⏳ `GET /api/categories/parent/{parentId}` - Filtrar por categoria pai
-- ⏳ `GET /api/categories/search?q={query}` - Buscar categorias
-- ⏳ `GET /api/categories/active/{isActive}` - Filtrar por status ativo
-- ⏳ `GET /api/categories/{id}/products` - Produtos da categoria
+## Principais Gaps (Backlog Prioritario)
 
-### WarehouseController
-- ⏳ `PUT /api/warehouses/{id}` - Atualizar warehouse
-- ⏳ `DELETE /api/warehouses/{id}` - Deletar warehouse
-- ⏳ `GET /api/warehouses/active/{isActive}` - Filtrar por status ativo
-- ⏳ `GET /api/warehouses/{id}/batches` - Lotes do warehouse
+### 1. Cenarios de erro (prioridade alta)
+- 401/403 em endpoints sensiveis (especialmente transfer e auth).
+- 400 para payload invalido e validacoes de negocio.
+- 404 para recursos inexistentes em todos os modulos.
+- 409 para conflitos de integridade (ex.: codigo de transfer duplicado).
 
-### BatchController
-- ⏳ `PUT /api/batches/{id}` - Atualizar lote
-- ⏳ `DELETE /api/batches/{id}` - Deletar lote
-- ⏳ `GET /api/batches/product/{productId}` - Listar lotes por produto
-- ⏳ `GET /api/batches/low-stock/{threshold}` - Lotes com estoque baixo
-- ⏳ `GET /api/batches/expired` - Lotes já vencidos
-- ⏳ `GET /api/batches/active/{isActive}` - Filtrar por status
+### 2. Isolamento multi-tenant (prioridade alta)
+- Acesso cruzado entre tenants em transfer, warehouse e batch.
+- Validacao de filtros por tenant em listagens/paginacao.
+- Garantia de que usuario sem escopo nao acessa dados de outro tenant.
 
-### StockMovementController
-- ⏳ `POST /api/stock-movements/{id}/cancel` - Cancelar movimento
-- ⏳ `GET /api/stock-movements` - Listar todos movimentos
-- ⏳ `GET /api/stock-movements/type/{type}` - Filtrar por tipo (PURCHASE, SALE, etc.)
-- ⏳ `GET /api/stock-movements/status/{status}` - Filtrar por status
+### 3. Concorrencia (prioridade alta)
+- Colisao de codigo em criacao de transfer sob carga concorrente.
+- Transicoes de estado concorrentes no fluxo de transfer.
+- Atualizacoes de estoque sob lock/concorrencia (pessimistic/optimistic cases).
 
-### ReportController
-- ⏳ `GET /api/reports/stock/low-stock?threshold={n}&limit={n}` - Relatório de estoque baixo
-- ⏳ `GET /api/reports/stock/expiring?daysAhead={n}&limit={n}` - Relatório de produtos expirando
+## Referencias de Testes Existentes
 
-### ProductController *(happy paths completos, faltam edge cases)*
-- ⏳ `GET /api/products/sku/{sku}` - Buscar por SKU
-- ⏳ `GET /api/products/active/{isActive}` - Filtrar por status ativo
-- ⏳ `GET /api/products/category/{categoryId}` - Filtrar por categoria
-- ⏳ `GET /api/products/kit/{isKit}` - Filtrar produtos kit
-
----
-
-## 🚫 Cenários de Erro NÃO Testados
-
-### Autenticação e Autorização
-- ⏳ 401 Unauthorized - Token ausente, inválido ou expirado
-- ⏳ 403 Forbidden - Usuário sem permissão para a operação
-- ⏳ Login com credenciais inválidas
-- ⏳ Refresh token expirado ou revogado
-- ⏳ Múltiplas tentativas de uso do mesmo refresh token
-
-### Validações de Input (400 Bad Request)
-- ⏳ Campos obrigatórios ausentes
-- ⏳ Formatos inválidos (email, CNPJ, datas)
-- ⏳ Valores fora do range permitido (quantidades negativas)
-- ⏳ Constraints de tamanho (strings muito longas)
-
-### Recursos Não Encontrados (404)
-- ⏳ GET/PUT/DELETE de ID inexistente
-- ⏳ Relações com entidades inexistentes (categoria_id inválido)
-
-### Conflitos de Negócio (409 Conflict)
-- ⏳ SKU duplicado no mesmo tenant
-- ⏳ Barcode duplicado no mesmo tenant
-- ⏳ Email de usuário já existente
-- ⏳ Nome de warehouse duplicado
-
----
-
-## 🔬 Regras de Negócio Complexas NÃO Testadas
-
-### Multi-Tenancy
-- ⏳ **Isolamento entre tenants:** Usuário do tenant A não pode acessar recursos do tenant B
-- ⏳ **Tenant context obrigatório:** Operações sem TenantContext devem falhar
-- ⏳ **Filtros automáticos:** Queries devem retornar apenas dados do tenant corrente
-
-### Soft Delete
-- ⏳ **Produtos deletados invisíveis:** Não devem aparecer em listagens
-- ⏳ **Cascata de deleção:** Deletar categoria marca produtos como deletados
-- ⏳ **Reativação:** Possibilidade de restaurar recursos soft-deleted
-
-### Controle de Estoque
-- ⏳ **FEFO (First Expired First Out):** Consumir lotes pela ordem de validade
-- ⏳ **Quantidade insuficiente:** SALE com quantidade maior que disponível em estoque
-- ⏳ **Lotes expirados:** Não devem ser usados em SALEs
-- ⏳ **Optimistic locking:** Conflitos de versão ao atualizar batches concorrentemente
-- ⏳ **Warehouse validation:** TRANSFER requer source ≠ destination
-
-### Stock Movements
-- ⏳ **PURCHASE:** Apenas destination warehouse obrigatório
-- ⏳ **SALE:** Apenas source warehouse, valida quantidade disponível
-- ⏳ **TRANSFER:** Source + destination obrigatórios e diferentes
-- ⏳ **ADJUSTMENT:** Pode aumentar ou diminuir estoque
-- ⏳ **RETURN:** Devolução de produtos vendidos
-- ⏳ **Execução idempotente:** Executar movimento já COMPLETED deve falhar
-- ⏳ **Cancelamento:** Reverter movimento executado
-
-### Produtos Kit
-- ⏳ **Composição:** Kit deve ter componentes válidos com quantidades
-- ⏳ **Estoque calculado:** Kit disponível baseado em componentes
-- ⏳ **Movimentação:** SALE de kit deve decrementar componentes
-
-### Categorias Hierárquicas
-- ⏳ **Parent válido:** Categoria pai deve existir no mesmo tenant
-- ⏳ **Sem ciclos:** Categoria não pode ser pai de si mesma (direta/indiretamente)
-- ⏳ **Deleção com filhos:** Validar comportamento ao deletar categoria pai
-
----
-
-## 📝 Cenários de Edge Cases NÃO Testados
-
-- ⏳ Criar recurso com tenant_id diferente do TenantContext
-- ⏳ Operações simultâneas causando race conditions
-- ⏳ Warehouse inativo sendo usado em movimentos
-- ⏳ Transferência entre warehouses de tenants diferentes
-- ⏳ Batch com quantidade zero ou negativa
-- ⏳ Data de validade no passado
-- ⏳ Movimento com lista de items vazia
-- ⏳ Produto sem categoria (category_id null se permitido)
-- ⏳ Paginação com grandes volumes de dados
-- ⏳ Busca com caracteres especiais ou SQL injection attempts
-- ⏳ Upload de imagens de produtos (se implementado)
-- ⏳ Exportação de relatórios em diferentes formatos
-
----
-
-## 🎯 Plano para Fase 2
-
-### Prioridade Alta
-1. Testes de isolamento multi-tenant (segurança crítica)
-2. Validações de quantidade de estoque (integridade de dados)
-3. Testes de 401/403 (segurança)
-
-### Prioridade Média
-4. Soft delete behavior completo
-5. FEFO logic validation
-6. Optimistic locking em batches
-7. Validações de movimento por tipo (PURCHASE, SALE, TRANSFER)
-
-### Prioridade Baixa
-8. Endpoints de UPDATE e DELETE
-9. Filtros e buscas avançadas
-10. Edge cases de validação de input
-11. Performance tests com grandes volumes
-
----
-
-## 🔧 Como Rodar os Testes
-
-```bash
-# Rodar todos os testes
-./gradlew test
-
-# Rodar apenas integration tests
-./gradlew test --tests "*IntegrationTest"
-
-# Rodar com relatório de cobertura
-./gradlew test jacocoTestReport
-
-# Ver relatório de cobertura
-open build/reports/jacoco/test/html/index.html
-```
-
----
-
-## 📌 Notas
-
-- Testcontainers inicia PostgreSQL automaticamente para cada execução
-- `@Transactional` garante rollback após cada teste
-- `@WithMockUser` simula autenticação sem gerar JWT real
-- `TenantContext` deve ser configurado manualmente no `@BeforeEach`
+- `src/test/java/br/com/stockshift/controller/AuthenticationControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/BrandControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/CategoryControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/ProductControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/WarehouseControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/BatchControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/BatchSoftDeleteTest.java`
+- `src/test/java/br/com/stockshift/controller/BatchDeletionIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/ReportControllerIntegrationTest.java`
+- `src/test/java/br/com/stockshift/controller/TransferControllerIntegrationTest.java`
