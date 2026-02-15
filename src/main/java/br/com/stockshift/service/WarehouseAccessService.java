@@ -1,9 +1,11 @@
 package br.com.stockshift.service;
 
 import br.com.stockshift.exception.ForbiddenException;
+import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -16,18 +18,34 @@ import java.util.UUID;
 public class WarehouseAccessService {
 
     public Set<UUID> getUserWarehouseIds() {
-        UserPrincipal principal = getCurrentPrincipal();
+        UserPrincipal principal = getCurrentPrincipalIfAvailable();
+        if (principal == null || principal.getWarehouseIds() == null) {
+            return Set.of();
+        }
         return principal.getWarehouseIds();
     }
 
     public boolean hasFullAccess() {
-        UserPrincipal principal = getCurrentPrincipal();
-        return principal.isHasFullAccess();
+        UserPrincipal principal = getCurrentPrincipalIfAvailable();
+        if (principal != null) {
+            return principal.isHasFullAccess();
+        }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
     public UUID getTenantId() {
-        UserPrincipal principal = getCurrentPrincipal();
-        return principal.getTenantId();
+        UserPrincipal principal = getCurrentPrincipalIfAvailable();
+        if (principal != null) {
+            return principal.getTenantId();
+        }
+        return TenantContext.getTenantId();
     }
 
     public void validateWarehouseAccess(UUID warehouseId) {
@@ -38,7 +56,7 @@ public class WarehouseAccessService {
         Set<UUID> userWarehouseIds = getUserWarehouseIds();
         if (!userWarehouseIds.contains(warehouseId)) {
             log.warn("User {} attempted to access warehouse {} without permission",
-                    getCurrentPrincipal().getId(), warehouseId);
+                    getCurrentUserIdentifier(), warehouseId);
             throw new ForbiddenException("You don't have access to this warehouse");
         }
     }
@@ -50,14 +68,36 @@ public class WarehouseAccessService {
 
         Set<UUID> userWarehouseIds = getUserWarehouseIds();
         if (userWarehouseIds == null || userWarehouseIds.isEmpty()) {
-            log.warn("User {} has no warehouse access", getCurrentPrincipal().getId());
+            log.warn("User {} has no warehouse access", getCurrentUserIdentifier());
             throw new ForbiddenException("No warehouse access. Contact your administrator.");
         }
     }
 
-    private UserPrincipal getCurrentPrincipal() {
-        return (UserPrincipal) SecurityContextHolder.getContext()
-                .getAuthentication()
-                .getPrincipal();
+    private UserPrincipal getCurrentPrincipalIfAvailable() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return null;
+        }
+
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal userPrincipal) {
+            return userPrincipal;
+        }
+
+        return null;
+    }
+
+    private String getCurrentUserIdentifier() {
+        UserPrincipal principal = getCurrentPrincipalIfAvailable();
+        if (principal != null && principal.getId() != null) {
+            return principal.getId().toString();
+        }
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getName() != null) {
+            return authentication.getName();
+        }
+
+        return "unknown";
     }
 }

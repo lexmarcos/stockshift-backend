@@ -80,6 +80,7 @@ public class TestDataFactory {
         Warehouse warehouse = new Warehouse();
         warehouse.setTenantId(tenantId);
         warehouse.setName(name);
+        warehouse.setCode("WH-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         warehouse.setAddress("Test Address 123");
         warehouse.setCity("Test City");
         warehouse.setState("SP");

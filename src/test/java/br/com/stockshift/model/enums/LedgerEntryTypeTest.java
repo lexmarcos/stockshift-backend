@@ -11,7 +11,11 @@ class LedgerEntryTypeTest {
         assertThat(LedgerEntryType.values()).containsExactlyInAnyOrder(
             LedgerEntryType.PURCHASE_IN,
             LedgerEntryType.ADJUSTMENT_IN,
-            LedgerEntryType.ADJUSTMENT_OUT
+            LedgerEntryType.ADJUSTMENT_OUT,
+            LedgerEntryType.TRANSFER_OUT,
+            LedgerEntryType.TRANSFER_CANCELLED,
+            LedgerEntryType.TRANSFER_IN,
+            LedgerEntryType.TRANSFER_IN_DISCREPANCY
         );
     }
 

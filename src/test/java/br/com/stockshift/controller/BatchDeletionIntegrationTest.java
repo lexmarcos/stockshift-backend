@@ -234,7 +234,7 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(authorities = {"BATCH_CREATE", "BATCH_DELETE", "BATCH_READ"})
+    @WithMockUser(username = "batchdeletion@test.com", authorities = {"ROLE_ADMIN", "BATCH_CREATE", "BATCH_DELETE", "BATCH_READ"})
     void shouldRespectTenantIsolation() throws Exception {
         // Create batch for current tenant
         BatchRequest batchRequest = new BatchRequest(
