@@ -82,6 +82,12 @@ Observacao: esta metrica considera cobertura por endpoint (path+metodo), nao por
 - `POST /api/transfers/{id}/start-validation`
 - `POST /api/transfers/{id}/scan`
 
+### Transfer (novos cenarios cobertos no ponto 5)
+- `400` ao criar transfer com source/destination iguais.
+- `400` ao cancelar transfer `IN_TRANSIT` sem motivo.
+- `404` ao executar transfer com `TenantContext` de outro tenant (isolamento multi-tenant).
+- `409` ao tentar reexecutar transfer ja em `IN_TRANSIT` (conflito de estado/concurrency-like).
+
 ## Principais Gaps (Backlog Prioritario)
 
 ### 1. Cenarios de erro (prioridade alta)

@@ -143,6 +143,26 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_CREATE"})
+    void shouldReturnBadRequestWhenCreatingTransferWithSameSourceAndDestination() throws Exception {
+        CreateTransferRequest request = CreateTransferRequest.builder()
+                .destinationWarehouseId(sourceWarehouse.getId())
+                .notes("Invalid transfer")
+                .items(List.of(CreateTransferItemRequest.builder()
+                        .sourceBatchId(testBatch.getId())
+                        .quantity(new BigDecimal("10"))
+                        .build()))
+                .build();
+
+        mockMvc.perform(post("/api/transfers")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Source and destination warehouses must be different"));
+    }
+
+    @Test
     @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN"})
     void shouldListTransfers() throws Exception {
         mockMvc.perform(get("/api/transfers"))
@@ -152,29 +172,19 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_EXECUTE"})
+    void shouldReturnConflictWhenExecutingTransferAlreadyInTransit() throws Exception {
+        Transfer transfer = createTransferWithSingleItem(TransferStatus.IN_TRANSIT, "TRF-CONFLICT-01");
+
+        mockMvc.perform(post("/api/transfers/{id}/execute", transfer.getId()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value("Cannot transition from IN_TRANSIT to IN_TRANSIT"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_EXECUTE"})
     void shouldExecuteTransfer() throws Exception {
-        // Create transfer in DRAFT status first
-        Transfer transfer = Transfer.builder()
-                .code("TRF-TEST-1")
-                .sourceWarehouseId(sourceWarehouse.getId())
-                .destinationWarehouseId(destinationWarehouse.getId())
-                .status(TransferStatus.DRAFT)
-                .createdByUserId(UUID.randomUUID())
-                .build();
-        transfer.setTenantId(tenantId);
-        
-        TransferItem item = TransferItem.builder()
-                .sourceBatchId(testBatch.getId())
-                .productId(testProduct.getId())
-                .productBarcode(testProduct.getBarcode())
-                .productName(testProduct.getName())
-                .productSku(testProduct.getSku())
-                .quantitySent(new BigDecimal("10"))
-                .quantityReceived(BigDecimal.ZERO)
-                .build();
-        transfer.addItem(item);
-        
-        transfer = transferRepository.save(transfer);
+        Transfer transfer = createTransferWithSingleItem(TransferStatus.DRAFT, "TRF-TEST-1");
 
         mockMvc.perform(post("/api/transfers/{id}/execute", transfer.getId()))
                 .andExpect(status().isOk())
@@ -182,30 +192,37 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_CANCEL"})
+    void shouldReturnBadRequestWhenCancellingInTransitTransferWithoutReason() throws Exception {
+        Transfer transfer = createTransferWithSingleItem(TransferStatus.IN_TRANSIT, "TRF-CANCEL-01");
+
+        mockMvc.perform(delete("/api/transfers/{id}", transfer.getId()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Cancellation reason is required for in-transit transfers"));
+    }
+
+    @Test
+    @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_EXECUTE"})
+    void shouldReturnNotFoundWhenExecutingTransferFromAnotherTenantContext() throws Exception {
+        Transfer transfer = createTransferWithSingleItem(TransferStatus.DRAFT, "TRF-MT-01");
+
+        UUID otherTenantId = UUID.randomUUID();
+        TenantContext.setTenantId(otherTenantId);
+        WarehouseContext.setWarehouseId(sourceWarehouse.getId());
+        createUser(otherTenantId, "admin@test.com");
+
+        mockMvc.perform(post("/api/transfers/{id}/execute", transfer.getId()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Transfer not found"));
+    }
+
+    @Test
     @WithMockUser(username = "admin@test.com", authorities = {"ROLE_ADMIN", "TRANSFER_VALIDATE"})
     void shouldScanBarcode() throws Exception {
-        // Create and execute transfer first
-        Transfer transfer = Transfer.builder()
-                .code("TRF-TEST-2")
-                .sourceWarehouseId(sourceWarehouse.getId())
-                .destinationWarehouseId(destinationWarehouse.getId())
-                .status(TransferStatus.IN_TRANSIT)
-                .createdByUserId(UUID.randomUUID())
-                .build();
-        transfer.setTenantId(tenantId);
+        Transfer transfer = createTransferWithSingleItem(TransferStatus.IN_TRANSIT, "TRF-TEST-2");
 
-        TransferItem item = TransferItem.builder()
-                .sourceBatchId(testBatch.getId())
-                .productId(testProduct.getId())
-                .productBarcode(testProduct.getBarcode())
-                .productName(testProduct.getName())
-                .productSku(testProduct.getSku())
-                .quantitySent(new BigDecimal("10"))
-                .quantityReceived(BigDecimal.ZERO)
-                .build();
-        transfer.addItem(item);
-        transferRepository.save(transfer);
-        
         // Start validation
         // Switch context to destination warehouse for validation
         WarehouseContext.setWarehouseId(destinationWarehouse.getId());
@@ -224,5 +241,40 @@ class TransferControllerIntegrationTest extends BaseIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.valid").value(true));
+    }
+
+    private Transfer createTransferWithSingleItem(TransferStatus status, String code) {
+        Transfer transfer = Transfer.builder()
+                .code(code)
+                .sourceWarehouseId(sourceWarehouse.getId())
+                .destinationWarehouseId(destinationWarehouse.getId())
+                .status(status)
+                .createdByUserId(UUID.randomUUID())
+                .build();
+        transfer.setTenantId(tenantId);
+
+        TransferItem item = TransferItem.builder()
+                .sourceBatchId(testBatch.getId())
+                .productId(testProduct.getId())
+                .productBarcode(testProduct.getBarcode())
+                .productName(testProduct.getName())
+                .productSku(testProduct.getSku())
+                .quantitySent(new BigDecimal("10"))
+                .quantityReceived(BigDecimal.ZERO)
+                .build();
+        transfer.addItem(item);
+
+        return transferRepository.save(transfer);
+    }
+
+    private void createUser(UUID userTenantId, String email) {
+        User testUser = new User();
+        testUser.setTenantId(userTenantId);
+        testUser.setEmail(email);
+        testUser.setPassword("encoded-password");
+        testUser.setFullName("Tenant User");
+        testUser.setIsActive(true);
+        testUser.setMustChangePassword(false);
+        userRepository.save(testUser);
     }
 }
