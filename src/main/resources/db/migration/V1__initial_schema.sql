@@ -290,3 +290,57 @@ CREATE TABLE inventory_ledger (
 CREATE INDEX idx_inventory_ledger_tenant ON inventory_ledger(tenant_id);
 CREATE INDEX idx_inventory_ledger_product ON inventory_ledger(product_id);
 CREATE INDEX idx_inventory_ledger_reference ON inventory_ledger(reference_type, reference_id);
+
+-- =============================================
+-- BASELINE PERMISSION SEED
+-- =============================================
+-- Seed baseline permissions and backfill ADMIN role assignments.
+-- Idempotent by design to support reset scenarios safely.
+
+WITH
+resources(resource) AS (
+    SELECT (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1]
+    FROM pg_constraint c
+    WHERE c.conrelid = 'permissions'::regclass
+      AND c.conname = 'permissions_resource_check'
+),
+actions(action) AS (
+    SELECT (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1]
+    FROM pg_constraint c
+    WHERE c.conrelid = 'permissions'::regclass
+      AND c.conname = 'permissions_action_check'
+),
+scopes(scope) AS (
+    SELECT (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1]
+    FROM pg_constraint c
+    WHERE c.conrelid = 'permissions'::regclass
+      AND c.conname = 'permissions_scope_check'
+),
+permission_seed AS (
+    SELECT
+        (
+            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 1, 8) || '-' ||
+            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 9, 4) || '-' ||
+            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 13, 4) || '-' ||
+            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 17, 4) || '-' ||
+            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 21, 12)
+        )::uuid AS id,
+        r.resource,
+        a.action,
+        s.scope,
+        (r.resource || ':' || a.action || ':' || s.scope) AS description
+    FROM resources r
+    CROSS JOIN actions a
+    CROSS JOIN scopes s
+)
+INSERT INTO permissions (id, resource, action, scope, description)
+SELECT id, resource, action, scope, description
+FROM permission_seed
+ON CONFLICT (resource, action, scope) DO NOTHING;
+
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT r.id, p.id
+FROM roles r
+CROSS JOIN permissions p
+WHERE r.name = 'ADMIN'
+ON CONFLICT (permission_id, role_id) DO NOTHING;

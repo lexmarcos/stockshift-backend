@@ -25,7 +25,7 @@ public class PermissionController {
     private final PermissionService permissionService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.isAdmin()")
     @Operation(summary = "Get all permissions")
     public ResponseEntity<ApiResponse<List<PermissionResponse>>> findAll() {
         List<PermissionResponse> permissions = permissionService.findAll();

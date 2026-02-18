@@ -27,7 +27,7 @@ public class BrandController {
     private final BrandService brandService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('BRAND_CREATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('BRAND_CREATE')")
     @Operation(summary = "Create a new brand")
     public ResponseEntity<ApiResponse<BrandResponse>> create(@Valid @RequestBody BrandRequest request) {
         BrandResponse response = brandService.create(request);
@@ -36,7 +36,7 @@ public class BrandController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('BRAND_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('BRAND_READ')")
     @Operation(summary = "Get all brands")
     public ResponseEntity<ApiResponse<List<BrandResponse>>> findAll() {
         List<BrandResponse> brands = brandService.findAll();
@@ -44,7 +44,7 @@ public class BrandController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('BRAND_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('BRAND_READ')")
     @Operation(summary = "Get brand by ID")
     public ResponseEntity<ApiResponse<BrandResponse>> findById(@PathVariable UUID id) {
         BrandResponse response = brandService.findById(id);
@@ -52,7 +52,7 @@ public class BrandController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('BRAND_UPDATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('BRAND_UPDATE')")
     @Operation(summary = "Update brand")
     public ResponseEntity<ApiResponse<BrandResponse>> update(
             @PathVariable UUID id,
@@ -62,7 +62,7 @@ public class BrandController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('BRAND_DELETE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('BRAND_DELETE')")
     @Operation(summary = "Delete brand (soft delete)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         brandService.delete(id);

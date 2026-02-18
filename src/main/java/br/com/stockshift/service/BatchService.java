@@ -164,6 +164,17 @@ public class BatchService {
     }
 
     @Transactional(readOnly = true)
+    public List<BatchResponse> findByWarehouseAndProduct(UUID warehouseId, UUID productId) {
+        UUID tenantId = TenantContext.getTenantId();
+
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
+
+        return batchRepository.findByProductIdAndWarehouseIdAndTenantId(productId, warehouseId, tenantId).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<BatchResponse> findExpiringBatches(Integer daysAhead) {
         UUID tenantId = TenantContext.getTenantId();
         LocalDate startDate = LocalDate.now();

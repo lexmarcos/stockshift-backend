@@ -28,7 +28,7 @@ public class TransferController {
     private final TransferValidationService validationService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('TRANSFER_CREATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_CREATE')")
     public ResponseEntity<ApiResponse<TransferResponse>> create(@Valid @RequestBody CreateTransferRequest request) {
         TransferResponse response = transferService.create(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -36,7 +36,7 @@ public class TransferController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('TRANSFER_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_READ')")
     public ResponseEntity<ApiResponse<Page<TransferResponse>>> list(
             @RequestParam(required = false) TransferStatus status,
             @RequestParam(required = false) UUID sourceWarehouseId,
@@ -47,14 +47,14 @@ public class TransferController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_READ')")
     public ResponseEntity<ApiResponse<TransferResponse>> getById(@PathVariable UUID id) {
         TransferResponse response = transferService.getById(id);
         return ResponseEntity.ok(ApiResponse.success("Transfer retrieved successfully", response));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_UPDATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_UPDATE')")
     public ResponseEntity<ApiResponse<TransferResponse>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateTransferRequest request) {
@@ -63,7 +63,7 @@ public class TransferController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_CANCEL', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_CANCEL')")
     public ResponseEntity<ApiResponse<TransferResponse>> cancel(
             @PathVariable UUID id,
             @RequestBody(required = false) CancelTransferRequest request) {
@@ -72,21 +72,21 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/execute")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_EXECUTE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_EXECUTE')")
     public ResponseEntity<ApiResponse<TransferResponse>> execute(@PathVariable UUID id) {
         TransferResponse response = transferService.execute(id);
         return ResponseEntity.ok(ApiResponse.success("Transfer executed successfully", response));
     }
 
     @PostMapping("/{id}/start-validation")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_VALIDATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_VALIDATE')")
     public ResponseEntity<ApiResponse<TransferResponse>> startValidation(@PathVariable UUID id) {
         TransferResponse response = validationService.startValidation(id);
         return ResponseEntity.ok(ApiResponse.success("Validation started successfully", response));
     }
 
     @PostMapping("/{id}/scan")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_VALIDATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_VALIDATE')")
     public ResponseEntity<ApiResponse<ScanBarcodeResponse>> scanBarcode(
             @PathVariable UUID id,
             @Valid @RequestBody ScanBarcodeRequest request) {
@@ -95,21 +95,21 @@ public class TransferController {
     }
 
     @PostMapping("/{id}/complete-validation")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_VALIDATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_VALIDATE')")
     public ResponseEntity<ApiResponse<CompleteValidationResponse>> completeValidation(@PathVariable UUID id) {
         CompleteValidationResponse response = validationService.completeValidation(id);
         return ResponseEntity.ok(ApiResponse.success("Validation completed successfully", response));
     }
 
     @GetMapping("/{id}/discrepancy-report")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_READ')")
     public ResponseEntity<ApiResponse<DiscrepancyReportResponse>> getDiscrepancyReport(@PathVariable UUID id) {
         DiscrepancyReportResponse response = validationService.getDiscrepancyReport(id);
         return ResponseEntity.ok(ApiResponse.success("Discrepancy report retrieved successfully", response));
     }
 
     @GetMapping("/{id}/validation-logs")
-    @PreAuthorize("hasAnyAuthority('TRANSFER_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('TRANSFER_READ')")
     public ResponseEntity<ApiResponse<List<ValidationLogResponse>>> getValidationLogs(@PathVariable UUID id) {
         List<ValidationLogResponse> response = validationService.getValidationLogs(id);
         return ResponseEntity.ok(ApiResponse.success("Validation logs retrieved successfully", response));

@@ -448,6 +448,30 @@ Same format as GET /api/batches (returns array of batches)
 
 ---
 
+## GET /api/batches/warehouses/{warehouseId}/products/{productId}/batches
+**Summary**: Get batches by warehouse and product
+
+### Authorization
+**Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
+
+### Request
+**Method**: `GET`  
+**URL Parameters**:
+- `warehouseId` (UUID) - Warehouse identifier
+- `productId` (UUID) - Product identifier
+
+### Response
+Same format as GET /api/batches (returns array of batches)
+
+### Frontend Implementation Guide
+1. **Product-in-Warehouse View**: Use in warehouse product detail pages
+2. **Precise Stock Query**: Fetch only batches for a specific product in a specific warehouse
+3. **Batch Selection**: Support FEFO/FIFO batch picking in transfer and picking flows
+4. **Scoped Inventory Actions**: Load only relevant batches before stock adjustments
+5. **Performance**: Prefer this endpoint over client-side filtering when both IDs are known
+
+---
+
 ## GET /api/batches/expiring/{daysAhead}
 **Summary**: Get batches expiring in next N days
 

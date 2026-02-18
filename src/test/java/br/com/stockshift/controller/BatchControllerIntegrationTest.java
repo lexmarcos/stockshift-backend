@@ -158,6 +158,37 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
 
         @Test
         @WithMockUser(username = "batch@test.com", authorities = { "ROLE_ADMIN" })
+        void shouldFindBatchesByWarehouseAndProduct() throws Exception {
+                TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                                testProduct, testWarehouse, "BATCH-WP-001", 20);
+                TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                                testProduct, testWarehouse, "BATCH-WP-002", 30);
+
+                Category secondCategory = TestDataFactory.createCategory(
+                                categoryRepository,
+                                testTenant.getId(),
+                                "Other Category");
+                Product secondProduct = TestDataFactory.createProduct(
+                                productRepository,
+                                testTenant.getId(),
+                                secondCategory,
+                                "Other Product",
+                                "SKU-OTHER-001");
+                TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                                secondProduct, testWarehouse, "BATCH-WP-003", 40);
+
+                mockMvc.perform(get(
+                                "/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                                testWarehouse.getId(),
+                                testProduct.getId()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data").isArray())
+                                .andExpect(jsonPath("$.data.length()").value(2));
+        }
+
+        @Test
+        @WithMockUser(username = "batch@test.com", authorities = { "ROLE_ADMIN" })
         void shouldFindExpiringBatches() throws Exception {
                 // Create batch expiring in 15 days
                 Batch expiringBatch = new Batch();

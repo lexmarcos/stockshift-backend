@@ -26,7 +26,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.isAdmin()")
     @Operation(summary = "List users", description = "List all users in the current tenant (Admin only)")
     public ResponseEntity<ApiResponse<java.util.List<UserResponse>>> listUsers() {
         java.util.List<UserResponse> users = userService.listUsers();
@@ -34,7 +34,7 @@ public class UserController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.isAdmin()")
     @Operation(summary = "Create user", description = "Create a new user in the current tenant (Admin only)")
     public ResponseEntity<ApiResponse<CreateUserResponse>> createUser(
             @Valid @RequestBody CreateUserRequest request) {
@@ -44,7 +44,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.isAdmin()")
     @Operation(summary = "Get user by ID", description = "Get user details by ID (Admin only)")
     public ResponseEntity<ApiResponse<UserResponse>> findById(@PathVariable UUID id) {
         UserResponse response = userService.findById(id);
@@ -52,7 +52,7 @@ public class UserController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.isAdmin()")
     @Operation(summary = "Update user", description = "Update user details (Admin only)")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable UUID id,
@@ -62,7 +62,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.isAdmin()")
     @Operation(summary = "Delete user", description = "Delete user (Admin only)")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable UUID id) {
         userService.deleteUser(id);

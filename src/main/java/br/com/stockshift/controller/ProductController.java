@@ -33,7 +33,7 @@ public class ProductController {
     private final OpenAiService openAiService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_CREATE')")
     @Operation(summary = "Create a new product")
     public ResponseEntity<ApiResponse<ProductResponse>> create(
             @RequestPart("product") @Valid ProductRequest request,
@@ -44,7 +44,7 @@ public class ProductController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Get all products")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> findAll() {
         List<ProductResponse> products = productService.findAll();
@@ -52,7 +52,7 @@ public class ProductController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Get product by ID")
     public ResponseEntity<ApiResponse<ProductResponse>> findById(@PathVariable UUID id) {
         ProductResponse response = productService.findById(id);
@@ -60,7 +60,7 @@ public class ProductController {
     }
 
     @GetMapping("/category/{categoryId}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Get products by category")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> findByCategory(@PathVariable UUID categoryId) {
         List<ProductResponse> products = productService.findByCategory(categoryId);
@@ -68,7 +68,7 @@ public class ProductController {
     }
 
     @GetMapping("/active/{active}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Get products by active status")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> findActive(@PathVariable Boolean active) {
         List<ProductResponse> products = productService.findActive(active);
@@ -76,7 +76,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Search products by name, SKU or barcode")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> search(@RequestParam String q) {
         List<ProductResponse> products = productService.search(q);
@@ -84,7 +84,7 @@ public class ProductController {
     }
 
     @GetMapping("/barcode/{barcode}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Get product by barcode")
     public ResponseEntity<ApiResponse<ProductResponse>> findByBarcode(@PathVariable String barcode) {
         ProductResponse response = productService.findByBarcode(barcode);
@@ -92,7 +92,7 @@ public class ProductController {
     }
 
     @GetMapping("/sku/{sku}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_READ', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_READ')")
     @Operation(summary = "Get product by SKU")
     public ResponseEntity<ApiResponse<ProductResponse>> findBySku(@PathVariable String sku) {
         ProductResponse response = productService.findBySku(sku);
@@ -100,7 +100,7 @@ public class ProductController {
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PRODUCT_UPDATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_UPDATE')")
     @Operation(summary = "Update product")
     public ResponseEntity<ApiResponse<ProductResponse>> update(
             @PathVariable UUID id,
@@ -111,7 +111,7 @@ public class ProductController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('PRODUCT_DELETE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_DELETE')")
     @Operation(summary = "Delete product (soft delete)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         productService.delete(id);
@@ -119,7 +119,7 @@ public class ProductController {
     }
 
     @PostMapping(value = "/analyze-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('PRODUCT_CREATE', 'ROLE_ADMIN')")
+    @PreAuthorize("@permissionGuard.hasAny('PRODUCT_CREATE')")
     @Operation(summary = "Analyze product image using AI")
     public ResponseEntity<ApiResponse<ProductClassificationResponse>> analyzeImage(
             @RequestParam("image") MultipartFile image) throws IOException {
