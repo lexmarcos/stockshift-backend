@@ -110,7 +110,16 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public List<WarehouseResponse> findActive(Boolean isActive) {
         UUID tenantId = TenantContext.getTenantId();
-        return warehouseRepository.findByTenantIdAndIsActive(tenantId, isActive).stream()
+        List<Warehouse> warehouses = warehouseRepository.findByTenantIdAndIsActive(tenantId, isActive);
+
+        if (!warehouseAccessService.hasFullAccess()) {
+            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+            warehouses = warehouses.stream()
+                    .filter(w -> userWarehouseIds.contains(w.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        return warehouses.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -118,6 +127,7 @@ public class WarehouseService {
     @Transactional
     public WarehouseResponse update(UUID id, WarehouseRequest request) {
         UUID tenantId = TenantContext.getTenantId();
+        warehouseAccessService.validateWarehouseAccess(id);
 
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
@@ -160,6 +170,7 @@ public class WarehouseService {
     @Transactional
     public void delete(UUID id) {
         UUID tenantId = TenantContext.getTenantId();
+        warehouseAccessService.validateWarehouseAccess(id);
 
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
@@ -218,6 +229,7 @@ public class WarehouseService {
     @Transactional(readOnly = true)
     public Page<ProductWithStockResponse> getProductsWithStock(UUID warehouseId, Pageable pageable) {
         UUID tenantId = TenantContext.getTenantId();
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
 
         // Validate warehouse exists and belongs to tenant
         warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)

@@ -27,7 +27,7 @@ public class CategoryController {
     private final CategoryService categoryService;
 
     @PostMapping
-    @PreAuthorize("@permissionGuard.hasAny('CATEGORY_CREATE')")
+    @PreAuthorize("@permissionGuard.hasAny('categories:create')")
     @Operation(summary = "Create a new category")
     public ResponseEntity<ApiResponse<CategoryResponse>> create(@Valid @RequestBody CategoryRequest request) {
         CategoryResponse response = categoryService.create(request);
@@ -36,7 +36,7 @@ public class CategoryController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.hasAny('CATEGORY_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('categories:read')")
     @Operation(summary = "Get all categories")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> findAll() {
         List<CategoryResponse> categories = categoryService.findAll();
@@ -44,7 +44,7 @@ public class CategoryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasAny('CATEGORY_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('categories:read')")
     @Operation(summary = "Get category by ID")
     public ResponseEntity<ApiResponse<CategoryResponse>> findById(@PathVariable UUID id) {
         CategoryResponse response = categoryService.findById(id);
@@ -52,7 +52,7 @@ public class CategoryController {
     }
 
     @GetMapping("/parent/{parentId}")
-    @PreAuthorize("@permissionGuard.hasAny('CATEGORY_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('categories:read')")
     @Operation(summary = "Get categories by parent ID")
     public ResponseEntity<ApiResponse<List<CategoryResponse>>> findByParentId(@PathVariable UUID parentId) {
         List<CategoryResponse> categories = categoryService.findByParentId(parentId);
@@ -60,7 +60,7 @@ public class CategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasAny('CATEGORY_UPDATE')")
+    @PreAuthorize("@permissionGuard.hasAny('categories:update')")
     @Operation(summary = "Update category")
     public ResponseEntity<ApiResponse<CategoryResponse>> update(
             @PathVariable UUID id,
@@ -70,7 +70,7 @@ public class CategoryController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasAny('CATEGORY_DELETE')")
+    @PreAuthorize("@permissionGuard.hasAny('categories:delete')")
     @Operation(summary = "Delete category (soft delete)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         categoryService.delete(id);

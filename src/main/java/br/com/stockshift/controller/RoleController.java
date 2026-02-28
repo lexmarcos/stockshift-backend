@@ -27,7 +27,7 @@ public class RoleController {
     private final RoleService roleService;
 
     @PostMapping
-    @PreAuthorize("@permissionGuard.isAdmin()")
+    @PreAuthorize("@permissionGuard.has('roles:create')")
     @Operation(summary = "Create a new role")
     public ResponseEntity<ApiResponse<RoleResponse>> create(@Valid @RequestBody RoleRequest request) {
         RoleResponse response = roleService.create(request);
@@ -36,7 +36,7 @@ public class RoleController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.isAdmin()")
+    @PreAuthorize("@permissionGuard.has('roles:read')")
     @Operation(summary = "Get all roles")
     public ResponseEntity<ApiResponse<List<RoleResponse>>> findAll() {
         List<RoleResponse> roles = roleService.findAll();
@@ -44,7 +44,7 @@ public class RoleController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@permissionGuard.isAdmin()")
+    @PreAuthorize("@permissionGuard.has('roles:read')")
     @Operation(summary = "Get role by ID")
     public ResponseEntity<ApiResponse<RoleResponse>> findById(@PathVariable UUID id) {
         RoleResponse response = roleService.findById(id);
@@ -52,7 +52,7 @@ public class RoleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionGuard.isAdmin()")
+    @PreAuthorize("@permissionGuard.has('roles:update')")
     @Operation(summary = "Update role")
     public ResponseEntity<ApiResponse<RoleResponse>> update(
             @PathVariable UUID id,
@@ -62,7 +62,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@permissionGuard.isAdmin()")
+    @PreAuthorize("@permissionGuard.has('roles:delete')")
     @Operation(summary = "Delete role (soft delete)")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         roleService.delete(id);

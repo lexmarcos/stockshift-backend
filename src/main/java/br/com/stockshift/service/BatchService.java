@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -22,12 +21,14 @@ import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.ResourceNotFoundException;
+import br.com.stockshift.exception.UnauthorizedException;
 import br.com.stockshift.model.entity.Batch;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.WarehouseRepository;
+import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class BatchService {
     private final WarehouseRepository warehouseRepository;
     private final ProductService productService;
     private final WarehouseAccessService warehouseAccessService;
+    private final SecurityUtils securityUtils;
 
     /**
      * Generates a unique batch code in the format: BATCH-YYYYMMDD-XXX
@@ -117,15 +119,14 @@ public class BatchService {
     @Transactional(readOnly = true)
     public List<BatchResponse> findAll() {
         UUID tenantId = TenantContext.getTenantId();
-
+        UUID currentWarehouseId = resolveCurrentWarehouseId();
         List<Batch> batches;
-        if (warehouseAccessService.hasFullAccess()) {
+        if (currentWarehouseId != null) {
+            batches = batchRepository.findByWarehouseIdAndTenantId(currentWarehouseId, tenantId);
+        } else if (warehouseAccessService.hasFullAccess()) {
             batches = batchRepository.findAllByTenantId(tenantId);
         } else {
-            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
-            batches = batchRepository.findAllByTenantId(tenantId).stream()
-                    .filter(b -> userWarehouseIds.contains(b.getWarehouse().getId()))
-                    .collect(Collectors.toList());
+            throw new UnauthorizedException("No active warehouse context");
         }
 
         return batches.stream()
@@ -158,7 +159,18 @@ public class BatchService {
     @Transactional(readOnly = true)
     public List<BatchResponse> findByProduct(UUID productId) {
         UUID tenantId = TenantContext.getTenantId();
-        return batchRepository.findByProductIdAndTenantId(productId, tenantId).stream()
+        UUID currentWarehouseId = resolveCurrentWarehouseId();
+
+        List<Batch> batches;
+        if (currentWarehouseId != null) {
+            batches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(productId, currentWarehouseId, tenantId);
+        } else if (warehouseAccessService.hasFullAccess()) {
+            batches = batchRepository.findByProductIdAndTenantId(productId, tenantId);
+        } else {
+            throw new UnauthorizedException("No active warehouse context");
+        }
+
+        return batches.stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -177,16 +189,17 @@ public class BatchService {
     @Transactional(readOnly = true)
     public List<BatchResponse> findExpiringBatches(Integer daysAhead) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = resolveCurrentWarehouseId();
         LocalDate startDate = LocalDate.now();
         LocalDate endDate = startDate.plusDays(daysAhead);
 
         List<Batch> batches = batchRepository.findExpiringBatches(startDate, endDate, tenantId);
-
-        if (!warehouseAccessService.hasFullAccess()) {
-            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+        if (currentWarehouseId != null) {
             batches = batches.stream()
-                    .filter(b -> userWarehouseIds.contains(b.getWarehouse().getId()))
+                    .filter(batch -> currentWarehouseId.equals(batch.getWarehouse().getId()))
                     .collect(Collectors.toList());
+        } else if (!warehouseAccessService.hasFullAccess()) {
+            throw new UnauthorizedException("No active warehouse context");
         }
 
         return batches.stream()
@@ -197,14 +210,15 @@ public class BatchService {
     @Transactional(readOnly = true)
     public List<BatchResponse> findLowStock(Integer threshold) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = resolveCurrentWarehouseId();
 
         List<Batch> batches = batchRepository.findLowStock(threshold, tenantId);
-
-        if (!warehouseAccessService.hasFullAccess()) {
-            Set<UUID> userWarehouseIds = warehouseAccessService.getUserWarehouseIds();
+        if (currentWarehouseId != null) {
             batches = batches.stream()
-                    .filter(b -> userWarehouseIds.contains(b.getWarehouse().getId()))
+                    .filter(batch -> currentWarehouseId.equals(batch.getWarehouse().getId()))
                     .collect(Collectors.toList());
+        } else if (!warehouseAccessService.hasFullAccess()) {
+            throw new UnauthorizedException("No active warehouse context");
         }
 
         return batches.stream()
@@ -218,6 +232,7 @@ public class BatchService {
 
         Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
+        warehouseAccessService.validateWarehouseAccess(batch.getWarehouse().getId());
 
         // Validate unique batch code if changed
         if (!batch.getBatchCode().equals(request.getBatchCode())) {
@@ -236,6 +251,7 @@ public class BatchService {
 
         // Validate warehouse if changed
         if (!batch.getWarehouse().getId().equals(request.getWarehouseId())) {
+            warehouseAccessService.validateWarehouseAccess(request.getWarehouseId());
             Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getWarehouseId())
                     .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
             batch.setWarehouse(warehouse);
@@ -263,6 +279,7 @@ public class BatchService {
 
         Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
+        warehouseAccessService.validateWarehouseAccess(batch.getWarehouse().getId());
 
         batchRepository.delete(batch);
         log.info("Deleted batch {} for tenant {}", id, tenantId);
@@ -274,6 +291,7 @@ public class BatchService {
         UUID productId
     ) {
         UUID tenantId = TenantContext.getTenantId();
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
 
         // Validate warehouse exists and belongs to tenant
         warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
@@ -303,6 +321,7 @@ public class BatchService {
     @Transactional
     public ProductBatchResponse createWithProduct(ProductBatchRequest request, MultipartFile image) {
         UUID tenantId = TenantContext.getTenantId();
+        warehouseAccessService.validateWarehouseAccess(request.getWarehouseId());
 
         // Validate product duplicity - SKU
         if (request.getSku() != null) {
@@ -414,7 +433,15 @@ public class BatchService {
                 .updatedAt(batch.getUpdatedAt())
                 .build();
     }
-    
+
+    private UUID resolveCurrentWarehouseId() {
+        try {
+            return securityUtils.getCurrentWarehouseId();
+        } catch (UnauthorizedException ex) {
+            return null;
+        }
+    }
+
     public BigDecimal getAvailableQuantity(UUID productId, UUID warehouseId, UUID tenantId) {
         List<Batch> batches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
             productId, warehouseId, tenantId);

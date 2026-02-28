@@ -18,11 +18,47 @@ public interface TransferRepository extends JpaRepository<Transfer, UUID> {
     @Query("SELECT t FROM Transfer t WHERE t.tenantId = :tenantId AND t.id = :id")
     Optional<Transfer> findByTenantIdAndId(@Param("tenantId") UUID tenantId, @Param("id") UUID id);
 
+    @Query("""
+            SELECT t
+            FROM Transfer t
+            WHERE t.tenantId = :tenantId
+              AND t.id = :id
+              AND (t.sourceWarehouseId = :warehouseId OR t.destinationWarehouseId = :warehouseId)
+            """)
+    Optional<Transfer> findByTenantIdAndIdAndWarehouseScope(
+            @Param("tenantId") UUID tenantId,
+            @Param("id") UUID id,
+            @Param("warehouseId") UUID warehouseId);
+
     @Query("SELECT t FROM Transfer t WHERE t.tenantId = :tenantId")
     Page<Transfer> findAllByTenantId(@Param("tenantId") UUID tenantId, Pageable pageable);
 
+    @Query("""
+            SELECT t
+            FROM Transfer t
+            WHERE t.tenantId = :tenantId
+              AND (t.sourceWarehouseId = :warehouseId OR t.destinationWarehouseId = :warehouseId)
+            """)
+    Page<Transfer> findAllByTenantIdAndWarehouseScope(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            Pageable pageable);
+
     @Query("SELECT t FROM Transfer t WHERE t.tenantId = :tenantId AND t.status = :status")
     Page<Transfer> findAllByTenantIdAndStatus(@Param("tenantId") UUID tenantId, @Param("status") TransferStatus status, Pageable pageable);
+
+    @Query("""
+            SELECT t
+            FROM Transfer t
+            WHERE t.tenantId = :tenantId
+              AND t.status = :status
+              AND (t.sourceWarehouseId = :warehouseId OR t.destinationWarehouseId = :warehouseId)
+            """)
+    Page<Transfer> findAllByTenantIdAndStatusAndWarehouseScope(
+            @Param("tenantId") UUID tenantId,
+            @Param("status") TransferStatus status,
+            @Param("warehouseId") UUID warehouseId,
+            Pageable pageable);
 
     @Query("SELECT t FROM Transfer t WHERE t.tenantId = :tenantId AND t.sourceWarehouseId = :warehouseId")
     Page<Transfer> findAllByTenantIdAndSourceWarehouseId(@Param("tenantId") UUID tenantId, @Param("warehouseId") UUID warehouseId, Pageable pageable);

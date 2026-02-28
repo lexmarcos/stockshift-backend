@@ -131,8 +131,9 @@ public class TransferService {
     @Transactional(readOnly = true)
     public TransferResponse getById(UUID id) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
 
-        Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, id)
+        Transfer transfer = transferRepository.findByTenantIdAndIdAndWarehouseScope(tenantId, id, currentWarehouseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
 
         String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
@@ -146,16 +147,25 @@ public class TransferService {
     @Transactional(readOnly = true)
     public Page<TransferResponse> list(TransferStatus status, UUID sourceWarehouseId, UUID destinationWarehouseId, Pageable pageable) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+
+        if (sourceWarehouseId != null && !sourceWarehouseId.equals(currentWarehouseId)) {
+            throw new ForbiddenException("Requested source warehouse is outside current token scope");
+        }
+        if (destinationWarehouseId != null && !destinationWarehouseId.equals(currentWarehouseId)) {
+            throw new ForbiddenException("Requested destination warehouse is outside current token scope");
+        }
 
         Page<Transfer> transfers;
         if (status != null) {
-            transfers = transferRepository.findAllByTenantIdAndStatus(tenantId, status, pageable);
+            transfers = transferRepository.findAllByTenantIdAndStatusAndWarehouseScope(
+                    tenantId, status, currentWarehouseId, pageable);
         } else if (sourceWarehouseId != null) {
-            transfers = transferRepository.findAllByTenantIdAndSourceWarehouseId(tenantId, sourceWarehouseId, pageable);
+            transfers = transferRepository.findAllByTenantIdAndSourceWarehouseId(tenantId, currentWarehouseId, pageable);
         } else if (destinationWarehouseId != null) {
-            transfers = transferRepository.findAllByTenantIdAndDestinationWarehouseId(tenantId, destinationWarehouseId, pageable);
+            transfers = transferRepository.findAllByTenantIdAndDestinationWarehouseId(tenantId, currentWarehouseId, pageable);
         } else {
-            transfers = transferRepository.findAllByTenantId(tenantId, pageable);
+            transfers = transferRepository.findAllByTenantIdAndWarehouseScope(tenantId, currentWarehouseId, pageable);
         }
 
         return transfers.map(t -> {

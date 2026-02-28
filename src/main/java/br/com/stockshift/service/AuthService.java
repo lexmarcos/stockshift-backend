@@ -17,23 +17,26 @@ import br.com.stockshift.dto.auth.ChangePasswordRequest;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.LoginResponse;
 import br.com.stockshift.dto.auth.MeResponse;
-import br.com.stockshift.dto.auth.RefreshTokenRequest;
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
 import br.com.stockshift.dto.auth.SwitchWarehouseRequest;
 import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.ForbiddenException;
 import br.com.stockshift.exception.UnauthorizedException;
 import br.com.stockshift.model.entity.RefreshToken;
 import br.com.stockshift.model.entity.User;
+import br.com.stockshift.repository.UserRoleWarehouseRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.WarehouseRepository;
-import br.com.stockshift.model.entity.Permission;
-import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.security.JwtTokenProvider;
+import br.com.stockshift.security.PermissionCodes;
 import br.com.stockshift.security.UserPrincipal;
+import br.com.stockshift.security.WarehouseContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -48,6 +51,9 @@ public class AuthService {
     private final TokenDenylistService tokenDenylistService;
     private final PasswordEncoder passwordEncoder;
     private final WarehouseRepository warehouseRepository;
+    private final UserRoleWarehouseRepository userRoleWarehouseRepository;
+    private final PermissionResolverService permissionResolverService;
+    private final WarehouseAccessService warehouseAccessService;
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -66,19 +72,20 @@ public class AuthService {
                 throw new UnauthorizedException("User account is disabled");
             }
 
-            // Extract roles and permissions from user
-            List<String> roles = extractRoles(user);
-            List<String> permissions = extractPermissions(user);
+            UUID warehouseId = resolveDefaultWarehouseId(user);
+            List<String> roles = extractRoles(user, warehouseId);
+            List<String> permissions = extractPermissions(user, warehouseId);
 
             // Generate tokens
             String accessToken = jwtTokenProvider.generateAccessToken(
                     user.getId(),
                     user.getTenantId(),
+                    warehouseId,
                     user.getEmail(),
                     roles,
                     permissions);
 
-            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user, warehouseId);
 
             // Update last login
             user.setLastLogin(LocalDateTime.now());
@@ -116,14 +123,20 @@ public class AuthService {
             throw new UnauthorizedException("User account is disabled");
         }
 
-        // Preserve warehouseId from old token
         UUID warehouseId = refreshToken.getWarehouseId();
+        if (warehouseId == null) {
+            warehouseId = resolveDefaultWarehouseId(user);
+        }
 
-        // Extract roles and permissions from user
-        List<String> roles = extractRoles(user);
-        List<String> permissions = extractPermissions(user);
+        if (warehouseId != null
+                && !warehouseAccessService.canAccessWarehouse(user.getId(), warehouseId)
+                && !hasAdminRole(user)) {
+            throw new UnauthorizedException("User no longer has access to the selected warehouse");
+        }
 
-        // Generate new access token with warehouseId preserved
+        List<String> roles = extractRoles(user, warehouseId);
+        List<String> permissions = extractPermissions(user, warehouseId);
+
         String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getTenantId(),
@@ -132,7 +145,6 @@ public class AuthService {
                 roles,
                 permissions);
 
-        // Rotate refresh token - create new one with warehouseId preserved
         RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user, warehouseId);
 
         return RefreshTokenResponse.builder()
@@ -198,8 +210,9 @@ public class AuthService {
         User user = userRepository.findById(principal.getId())
                 .orElseThrow(() -> new UnauthorizedException("User not found"));
 
-        List<String> roles = extractRoles(user);
-        List<String> permissions = extractPermissions(user);
+        UUID warehouseId = WarehouseContext.getWarehouseId();
+        List<String> roles = extractRoles(user, warehouseId);
+        List<String> permissions = extractPermissions(user, warehouseId);
 
         return MeResponse.builder()
                 .id(user.getId())
@@ -212,35 +225,47 @@ public class AuthService {
                 .build();
     }
 
-    private List<String> extractRoles(User user) {
-        return user.getRoles().stream()
-                .map(role -> role.getName())
-                .sorted()
-                .toList();
-    }
-
-    private List<String> extractPermissions(User user) {
-        // Check if user has ADMIN role
-        boolean isAdmin = user.getRoles().stream()
-                .anyMatch(role -> "ADMIN".equals(role.getName()));
-
-        if (isAdmin) {
-            return List.of("*");
+    private List<String> extractRoles(User user, UUID warehouseId) {
+        if (warehouseId == null) {
+            return user.getRoles().stream()
+                    .map(role -> role.getName())
+                    .distinct()
+                    .sorted()
+                    .toList();
         }
 
-        return user.getRoles().stream()
-                .flatMap(role -> role.getPermissions().stream())
-                .map(permission -> String.format("%s:%s:%s",
-                        permission.getResource().name(),
-                        permission.getAction().name(),
-                        permission.getScope().name()))
-                .distinct()
+        Set<String> roleNames = permissionResolverService.resolveUserRoleNames(user.getId(), warehouseId);
+        if (roleNames.isEmpty()) {
+            return user.getRoles().stream()
+                    .map(role -> role.getName())
+                    .distinct()
+                    .sorted()
+                    .toList();
+        }
+
+        return roleNames.stream().sorted().toList();
+    }
+
+    private List<String> extractPermissions(User user, UUID warehouseId) {
+        if (warehouseId == null) {
+            if (hasAdminRole(user)) {
+                return PermissionCodes.all();
+            }
+            return new ArrayList<>();
+        }
+
+        Set<String> resolved = permissionResolverService.resolveUserPermissions(user.getId(), warehouseId);
+        if (resolved.isEmpty() && hasAdminRole(user)) {
+            return PermissionCodes.all();
+        }
+
+        return resolved.stream()
                 .sorted()
                 .toList();
     }
 
     @Transactional
-    public String switchWarehouse(SwitchWarehouseRequest request) {
+    public RefreshTokenResponse switchWarehouse(SwitchWarehouseRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal)) {
@@ -256,39 +281,67 @@ public class AuthService {
             throw new UnauthorizedException("User account is disabled");
         }
 
-        // Check if user is admin (has full access)
-        boolean isAdmin = user.getRoles().stream()
-                .anyMatch(role -> "ADMIN".equals(role.getName()));
+        boolean isAdmin = hasAdminRole(user);
+        boolean hasAccess = warehouseAccessService.canAccessWarehouse(user.getId(), request.getWarehouseId());
 
-        boolean hasAccess;
-        if (isAdmin) {
-            // Admin can access any warehouse in their tenant
+        if (!hasAccess && isAdmin) {
             hasAccess = warehouseRepository.findByTenantIdAndId(user.getTenantId(), request.getWarehouseId())
                     .isPresent();
-        } else {
-            // Regular users must have explicit warehouse assignment
-            hasAccess = user.getWarehouses().stream()
-                    .anyMatch(warehouse -> warehouse.getId().equals(request.getWarehouseId()));
         }
 
         if (!hasAccess) {
-            throw new UnauthorizedException("User does not have access to this warehouse");
+            throw new ForbiddenException("User does not have access to this warehouse");
         }
 
-        // Extract roles and permissions
-        List<String> roles = extractRoles(user);
-        List<String> permissions = extractPermissions(user);
+        List<String> roles = extractRoles(user, request.getWarehouseId());
+        List<String> permissions = extractPermissions(user, request.getWarehouseId());
 
-        // Create new refresh token with warehouseId
-        refreshTokenService.createRefreshToken(user, request.getWarehouseId());
+        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user, request.getWarehouseId());
 
-        // Generate new access token with warehouseId
-        return jwtTokenProvider.generateAccessToken(
+        String accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(),
                 user.getTenantId(),
                 request.getWarehouseId(),
                 user.getEmail(),
                 roles,
                 permissions);
+
+        return RefreshTokenResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(newRefreshToken.getToken())
+                .tokenType("Bearer")
+                .expiresIn(jwtProperties.getAccessExpiration())
+                .build();
+    }
+
+    private UUID resolveDefaultWarehouseId(User user) {
+        Set<UUID> warehouseIds = userRoleWarehouseRepository.findWarehouseIdsByUserId(user.getId());
+        if (!warehouseIds.isEmpty()) {
+            return warehouseIds.stream().sorted().findFirst().orElse(null);
+        }
+
+        if (!user.getWarehouses().isEmpty()) {
+            return user.getWarehouses().stream()
+                    .map(warehouse -> warehouse.getId())
+                    .sorted()
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (hasAdminRole(user)) {
+            return warehouseRepository.findAllByTenantId(user.getTenantId()).stream()
+                    .map(warehouse -> warehouse.getId())
+                    .sorted()
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        return null;
+    }
+
+    private boolean hasAdminRole(User user) {
+        return user.getRoles().stream()
+                .map(role -> role.getName())
+                .anyMatch(roleName -> "ADMIN".equalsIgnoreCase(roleName) || "SUPER_ADMIN".equalsIgnoreCase(roleName));
     }
 }

@@ -34,7 +34,7 @@ public class BatchController {
     private final BatchService batchService;
 
     @PostMapping
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_CREATE')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:create')")
     @Operation(summary = "Create a new batch")
     public ResponseEntity<ApiResponse<BatchResponse>> create(@Valid @RequestBody BatchRequest request) {
         BatchResponse response = batchService.create(request);
@@ -43,7 +43,7 @@ public class BatchController {
     }
 
     @PostMapping(value = "/with-product", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_CREATE', 'PRODUCT_CREATE')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:create', 'products:create')")
     @Operation(summary = "Create a new product with initial stock in warehouse")
     public ResponseEntity<ApiResponse<ProductBatchResponse>> createWithProduct(
             @RequestPart("product") @Valid ProductBatchRequest request,
@@ -54,7 +54,7 @@ public class BatchController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:read')")
     @Operation(summary = "Get all batches")
     public ResponseEntity<ApiResponse<List<BatchResponse>>> findAll() {
         List<BatchResponse> batches = batchService.findAll();
@@ -62,7 +62,7 @@ public class BatchController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:read')")
     @Operation(summary = "Get batch by ID")
     public ResponseEntity<ApiResponse<BatchResponse>> findById(@PathVariable UUID id) {
         BatchResponse response = batchService.findById(id);
@@ -70,7 +70,7 @@ public class BatchController {
     }
 
     @GetMapping("/warehouse/{warehouseId}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.has('batches:read') and @warehouseGuard.isCurrent(#warehouseId)")
     @Operation(summary = "Get batches by warehouse")
     public ResponseEntity<ApiResponse<List<BatchResponse>>> findByWarehouse(@PathVariable UUID warehouseId) {
         List<BatchResponse> batches = batchService.findByWarehouse(warehouseId);
@@ -78,7 +78,7 @@ public class BatchController {
     }
 
     @GetMapping("/product/{productId}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:read')")
     @Operation(summary = "Get batches by product")
     public ResponseEntity<ApiResponse<List<BatchResponse>>> findByProduct(@PathVariable UUID productId) {
         List<BatchResponse> batches = batchService.findByProduct(productId);
@@ -86,7 +86,7 @@ public class BatchController {
     }
 
     @GetMapping("/warehouses/{warehouseId}/products/{productId}/batches")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.has('batches:read') and @warehouseGuard.isCurrent(#warehouseId)")
     @Operation(summary = "Get batches by warehouse and product")
     public ResponseEntity<ApiResponse<List<BatchResponse>>> findByWarehouseAndProduct(
         @PathVariable UUID warehouseId,
@@ -97,7 +97,7 @@ public class BatchController {
     }
 
     @GetMapping("/expiring/{daysAhead}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:read')")
     @Operation(summary = "Get batches expiring in next N days")
     public ResponseEntity<ApiResponse<List<BatchResponse>>> findExpiringBatches(@PathVariable Integer daysAhead) {
         List<BatchResponse> batches = batchService.findExpiringBatches(daysAhead);
@@ -105,7 +105,7 @@ public class BatchController {
     }
 
     @GetMapping("/low-stock/{threshold}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:read')")
     @Operation(summary = "Get batches with quantity below threshold")
     public ResponseEntity<ApiResponse<List<BatchResponse>>> findLowStock(@PathVariable Integer threshold) {
         List<BatchResponse> batches = batchService.findLowStock(threshold);
@@ -113,7 +113,7 @@ public class BatchController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_UPDATE')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:update')")
     @Operation(summary = "Update batch")
     public ResponseEntity<ApiResponse<BatchResponse>> update(
             @PathVariable UUID id,
@@ -123,7 +123,7 @@ public class BatchController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_DELETE')")
+    @PreAuthorize("@permissionGuard.hasAny('batches:delete')")
     @Operation(summary = "Delete batch")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
         batchService.delete(id);
@@ -131,7 +131,7 @@ public class BatchController {
     }
 
     @DeleteMapping("/warehouses/{warehouseId}/products/{productId}/batches")
-    @PreAuthorize("@permissionGuard.hasAny('BATCH_DELETE')")
+    @PreAuthorize("@permissionGuard.has('batches:delete') and @warehouseGuard.isCurrent(#warehouseId)")
     public ResponseEntity<BatchDeletionResponse> deleteAllBatchesByProductAndWarehouse(
         @PathVariable UUID warehouseId,
         @PathVariable UUID productId

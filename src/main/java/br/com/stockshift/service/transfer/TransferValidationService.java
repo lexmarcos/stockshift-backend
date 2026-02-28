@@ -235,8 +235,9 @@ public class TransferValidationService {
     @Transactional(readOnly = true)
     public DiscrepancyReportResponse getDiscrepancyReport(UUID transferId) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
 
-        Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, transferId)
+        Transfer transfer = transferRepository.findByTenantIdAndIdAndWarehouseScope(tenantId, transferId, currentWarehouseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
 
         if (transfer.getStatus() != TransferStatus.COMPLETED_WITH_DISCREPANCY) {
@@ -291,8 +292,9 @@ public class TransferValidationService {
     @Transactional(readOnly = true)
     public List<ValidationLogResponse> getValidationLogs(UUID transferId) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
 
-        Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, transferId)
+        Transfer transfer = transferRepository.findByTenantIdAndIdAndWarehouseScope(tenantId, transferId, currentWarehouseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
 
         List<TransferValidationLog> logs = validationLogRepository.findAllByTransferId(transferId);

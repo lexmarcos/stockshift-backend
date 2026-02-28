@@ -12,6 +12,7 @@ import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.JwtTokenProvider;
+import br.com.stockshift.security.PermissionCodes;
 import br.com.stockshift.config.JwtProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -81,9 +82,9 @@ public class TenantService {
     user = userRepository.save(user);
     log.info("Created admin user with ID: {} for tenant: {}", user.getId(), tenant.getId());
 
-    // Admin users get ADMIN role and wildcard permission
+    // Admin users get ADMIN role and full permission set.
     List<String> roles = List.of("ADMIN");
-    List<String> permissions = List.of("*");
+    List<String> permissions = PermissionCodes.all();
 
     // Generate tokens
     String accessToken = jwtTokenProvider.generateAccessToken(

@@ -3,9 +3,6 @@ package br.com.stockshift.security;
 import br.com.stockshift.model.entity.Permission;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.User;
-import br.com.stockshift.model.enums.PermissionAction;
-import br.com.stockshift.model.enums.PermissionResource;
-import br.com.stockshift.model.enums.PermissionScope;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 
@@ -20,9 +17,7 @@ class UserPrincipalTest {
     @Test
     void createShouldIncludeRoleAndPermissionAuthorities() {
         Permission permission = new Permission();
-        permission.setResource(PermissionResource.TRANSFER);
-        permission.setAction(PermissionAction.VALIDATE);
-        permission.setScope(PermissionScope.TENANT);
+        permission.setCode("transfers:validate");
 
         Role role = new Role();
         role.setName("OPERATOR");
@@ -41,7 +36,7 @@ class UserPrincipalTest {
 
         assertThat(principal.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
-                .contains("ROLE_OPERATOR", "TRANSFER_VALIDATE");
+                .contains("ROLE_OPERATOR", "transfers:validate");
         assertThat(principal.isHasFullAccess()).isFalse();
     }
 

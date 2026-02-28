@@ -9,6 +9,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -17,6 +19,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -46,6 +51,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         UUID userId = tokenProvider.getUserIdFromToken(jwt);
                         UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
                         UUID warehouseId = tokenProvider.getWarehouseIdFromToken(jwt);
+                        List<String> tokenAuthorities = tokenProvider.getAuthoritiesFromToken(jwt);
+                        List<String> tokenRoles = tokenProvider.getRolesFromToken(jwt);
+                        if (tokenAuthorities == null) {
+                            tokenAuthorities = List.of();
+                        }
+                        if (tokenRoles == null) {
+                            tokenRoles = List.of();
+                        }
 
                         // Set tenant context
                         TenantContext.setTenantId(tenantId);
@@ -56,10 +69,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         }
 
                         UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+
+                        Collection<GrantedAuthority> authorities = new ArrayList<>();
+                        tokenRoles.stream()
+                                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                                .map(SimpleGrantedAuthority::new)
+                                .forEach(authorities::add);
+                        tokenAuthorities.stream()
+                                .map(SimpleGrantedAuthority::new)
+                                .forEach(authorities::add);
+
+                        if (authorities.isEmpty()) {
+                            authorities = new ArrayList<>(userDetails.getAuthorities());
+                        }
+
                         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,
-                                userDetails.getAuthorities());
+                                authorities);
                         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                         SecurityContextHolder.getContext().setAuthentication(authentication);

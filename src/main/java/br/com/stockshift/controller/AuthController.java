@@ -142,10 +142,10 @@ public class AuthController {
             @Valid @RequestBody SwitchWarehouseRequest request,
             HttpServletResponse response) {
 
-        String accessToken = authService.switchWarehouse(request);
+        RefreshTokenResponse tokens = authService.switchWarehouse(request);
 
-        // Update access token cookie
-        cookieUtil.addAccessTokenCookie(response, accessToken);
+        cookieUtil.addAccessTokenCookie(response, tokens.getAccessToken());
+        cookieUtil.addRefreshTokenCookie(response, tokens.getRefreshToken());
 
         return ResponseEntity.ok(ApiResponse.success("Warehouse switched successfully"));
     }

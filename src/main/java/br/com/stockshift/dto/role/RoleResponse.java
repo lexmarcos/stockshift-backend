@@ -29,9 +29,7 @@ public class RoleResponse {
     @AllArgsConstructor
     public static class PermissionResponse {
         private UUID id;
-        private String resource;
-        private String action;
-        private String scope;
+        private String code;
         private String description;
     }
 }

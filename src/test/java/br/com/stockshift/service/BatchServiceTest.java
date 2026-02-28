@@ -46,6 +46,12 @@ class BatchServiceTest {
     @Mock
     private ProductService productService;
 
+    @Mock
+    private WarehouseAccessService warehouseAccessService;
+
+    @Mock
+    private br.com.stockshift.security.SecurityUtils securityUtils;
+
     @InjectMocks
     private BatchService batchService;
 
@@ -85,6 +91,8 @@ class BatchServiceTest {
         product.setTenantId(tenantId);
         product.setName("Test Product");
         product.setSku("SKU-001");
+
+        doNothing().when(warehouseAccessService).validateWarehouseAccess(any(UUID.class));
     }
 
     @Test

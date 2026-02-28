@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,8 +33,12 @@ public class UserPrincipal implements UserDetails {
         user.getRoles().forEach(role -> {
             authorityNames.add("ROLE_" + role.getName());
             if (role.getPermissions() != null) {
-                role.getPermissions().forEach(permission ->
-                        authorityNames.add(permission.getResource().name() + "_" + permission.getAction().name()));
+                role.getPermissions().forEach(permission -> {
+                    String code = resolvePermissionCode(permission);
+                    if (code != null && !code.isBlank()) {
+                        authorityNames.add(code);
+                    }
+                });
             }
         });
 
@@ -58,6 +63,18 @@ public class UserPrincipal implements UserDetails {
                 warehouseIds,
                 isAdmin
         );
+    }
+
+    private static String resolvePermissionCode(br.com.stockshift.model.entity.Permission permission) {
+        if (permission.getCode() != null && !permission.getCode().isBlank()) {
+            return permission.getCode().toLowerCase(Locale.ROOT);
+        }
+
+        if (permission.getResource() == null || permission.getAction() == null) {
+            return "";
+        }
+
+        return (permission.getResource() + ":" + permission.getAction()).toLowerCase(Locale.ROOT);
     }
 
     @Override

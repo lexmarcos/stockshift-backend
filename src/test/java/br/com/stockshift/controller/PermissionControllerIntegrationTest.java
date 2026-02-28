@@ -1,6 +1,5 @@
 package br.com.stockshift.controller;
 
-import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,8 +21,7 @@ class PermissionControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isNotEmpty())
-                .andExpect(jsonPath("$.data[*].resource", hasItem("PRODUCT")))
-                .andExpect(jsonPath("$.data[*].action", hasItem("READ")))
-                .andExpect(jsonPath("$.data[*].scope", hasItem("ALL")));
+                .andExpect(jsonPath("$.data[*].code").isArray())
+                .andExpect(jsonPath("$.data[*].code").value(org.hamcrest.Matchers.hasItem("products:read")));
     }
 }

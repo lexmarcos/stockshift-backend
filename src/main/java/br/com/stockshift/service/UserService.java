@@ -8,9 +8,12 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.User;
+import br.com.stockshift.model.entity.UserRoleWarehouse;
+import br.com.stockshift.model.entity.UserRoleWarehouseId;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.repository.UserRepository;
+import br.com.stockshift.repository.UserRoleWarehouseRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.UserPrincipal;
 import br.com.stockshift.util.PasswordGeneratorUtil;
@@ -35,6 +38,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final WarehouseRepository warehouseRepository;
+    private final UserRoleWarehouseRepository userRoleWarehouseRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
@@ -68,6 +72,7 @@ public class UserService {
         user.setWarehouses(warehouses);
 
         user = userRepository.save(user);
+        syncRoleWarehouseAssignments(user, roles, warehouses);
         log.info("Created user with ID: {} for tenant: {}", user.getId(), tenantId);
 
         List<String> roleNames = roles.stream()
@@ -193,6 +198,7 @@ public class UserService {
         user.setWarehouses(warehouses);
 
         user = userRepository.save(user);
+        syncRoleWarehouseAssignments(user, roles, warehouses);
         log.info("Updated user: {} for tenant: {}", id, tenantId);
 
         return toUserResponse(user);
@@ -216,5 +222,25 @@ public class UserService {
 
         userRepository.delete(user);
         log.info("Deleted user: {} for tenant: {}", id, tenantId);
+    }
+
+    private void syncRoleWarehouseAssignments(User user, Set<Role> roles, Set<Warehouse> warehouses) {
+        userRoleWarehouseRepository.deleteByUserId(user.getId());
+
+        Set<UserRoleWarehouse> assignments = new HashSet<>();
+        for (Role role : roles) {
+            for (Warehouse warehouse : warehouses) {
+                UserRoleWarehouse assignment = new UserRoleWarehouse();
+                assignment.setId(new UserRoleWarehouseId(user.getId(), role.getId(), warehouse.getId()));
+                assignment.setUser(user);
+                assignment.setRole(role);
+                assignment.setWarehouse(warehouse);
+                assignments.add(assignment);
+            }
+        }
+
+        if (!assignments.isEmpty()) {
+            userRoleWarehouseRepository.saveAll(assignments);
+        }
     }
 }

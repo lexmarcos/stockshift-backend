@@ -150,9 +150,7 @@ public class RoleService {
         Set<RoleResponse.PermissionResponse> permissionResponses = role.getPermissions().stream()
                 .map(p -> RoleResponse.PermissionResponse.builder()
                         .id(p.getId())
-                        .resource(p.getResource().name())
-                        .action(p.getAction().name())
-                        .scope(p.getScope().name())
+                        .code(p.getCode())
                         .description(p.getDescription())
                         .build())
                 .collect(Collectors.toSet());

@@ -24,7 +24,7 @@ public class ReportController {
     private final ReportService reportService;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("@permissionGuard.hasAny('REPORT_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
     @Operation(summary = "Get dashboard summary")
     public ResponseEntity<ApiResponse<DashboardResponse>> getDashboard() {
         DashboardResponse response = reportService.getDashboard();
@@ -32,7 +32,7 @@ public class ReportController {
     }
 
     @GetMapping("/stock")
-    @PreAuthorize("@permissionGuard.hasAny('REPORT_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
     @Operation(summary = "Get complete stock report")
     public ResponseEntity<ApiResponse<List<StockReportResponse>>> getStockReport() {
         List<StockReportResponse> report = reportService.getStockReport();
@@ -40,7 +40,7 @@ public class ReportController {
     }
 
     @GetMapping("/stock/low-stock")
-    @PreAuthorize("@permissionGuard.hasAny('REPORT_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
     @Operation(summary = "Get low stock report")
     public ResponseEntity<ApiResponse<List<StockReportResponse>>> getLowStockReport(
             @RequestParam(defaultValue = "10") Integer threshold,
@@ -50,7 +50,7 @@ public class ReportController {
     }
 
     @GetMapping("/stock/expiring")
-    @PreAuthorize("@permissionGuard.hasAny('REPORT_READ')")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
     @Operation(summary = "Get expiring products report")
     public ResponseEntity<ApiResponse<List<StockReportResponse>>> getExpiringProductsReport(
             @RequestParam(defaultValue = "30") Integer daysAhead,

@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -25,11 +27,11 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateAccessToken(UUID userId, UUID tenantId, String email, List<String> roles, List<String> permissions) {
-        return generateAccessToken(userId, tenantId, null, email, roles, permissions);
+    public String generateAccessToken(UUID userId, UUID tenantId, String email, List<String> roles, List<String> authorities) {
+        return generateAccessToken(userId, tenantId, null, email, roles, authorities);
     }
 
-    public String generateAccessToken(UUID userId, UUID tenantId, UUID warehouseId, String email, List<String> roles, List<String> permissions) {
+    public String generateAccessToken(UUID userId, UUID tenantId, UUID warehouseId, String email, List<String> roles, List<String> authorities) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getAccessExpiration());
         String jti = UUID.randomUUID().toString();
@@ -40,7 +42,8 @@ public class JwtTokenProvider {
                 .claim("tenantId", tenantId.toString())
                 .claim("email", email)
                 .claim("roles", roles)
-                .claim("permissions", permissions)
+                .claim("authorities", authorities)
+                .claim("permissions", authorities) // Backward compatibility for legacy consumers.
                 .issuedAt(now)
                 .expiration(expiryDate);
 
@@ -80,6 +83,52 @@ public class JwtTokenProvider {
 
         String warehouseId = claims.get("warehouseId", String.class);
         return warehouseId != null ? UUID.fromString(warehouseId) : null;
+    }
+
+    public List<String> getAuthoritiesFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        Object rawAuthorities = claims.get("authorities");
+        if (rawAuthorities == null) {
+            rawAuthorities = claims.get("permissions");
+        }
+
+        if (!(rawAuthorities instanceof List<?> list)) {
+            return Collections.emptyList();
+        }
+
+        List<String> authorities = new ArrayList<>();
+        for (Object value : list) {
+            if (value != null) {
+                authorities.add(value.toString());
+            }
+        }
+        return authorities;
+    }
+
+    public List<String> getRolesFromToken(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+
+        Object rawRoles = claims.get("roles");
+        if (!(rawRoles instanceof List<?> list)) {
+            return Collections.emptyList();
+        }
+
+        List<String> roles = new ArrayList<>();
+        for (Object value : list) {
+            if (value != null) {
+                roles.add(value.toString());
+            }
+        }
+        return roles;
     }
 
     public boolean validateToken(String token) {

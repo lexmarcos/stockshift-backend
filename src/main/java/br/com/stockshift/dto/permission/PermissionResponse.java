@@ -13,11 +13,6 @@ import java.util.UUID;
 @AllArgsConstructor
 public class PermissionResponse {
     private UUID id;
-    private String resource;
-    private String resourceDisplayName;
-    private String action;
-    private String actionDisplayName;
-    private String scope;
-    private String scopeDisplayName;
+    private String code;
     private String description;
 }

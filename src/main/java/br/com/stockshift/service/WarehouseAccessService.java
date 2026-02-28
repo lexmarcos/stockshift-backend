@@ -3,6 +3,8 @@ package br.com.stockshift.service;
 import br.com.stockshift.exception.ForbiddenException;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.security.UserPrincipal;
+import br.com.stockshift.security.WarehouseContext;
+import br.com.stockshift.repository.UserRoleWarehouseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -17,27 +19,32 @@ import java.util.UUID;
 @Slf4j
 public class WarehouseAccessService {
 
+    private final UserRoleWarehouseRepository userRoleWarehouseRepository;
+
+    public boolean canAccessWarehouse(UUID userId, UUID warehouseId) {
+        if (userId == null || warehouseId == null) {
+            return false;
+        }
+        return userRoleWarehouseRepository.existsByUserIdAndWarehouseId(userId, warehouseId);
+    }
+
     public Set<UUID> getUserWarehouseIds() {
-        UserPrincipal principal = getCurrentPrincipalIfAvailable();
-        if (principal == null || principal.getWarehouseIds() == null) {
+        UUID userId = getCurrentUserId();
+        if (userId == null) {
             return Set.of();
         }
-        return principal.getWarehouseIds();
+        return userRoleWarehouseRepository.findWarehouseIdsByUserId(userId);
     }
 
     public boolean hasFullAccess() {
-        UserPrincipal principal = getCurrentPrincipalIfAvailable();
-        if (principal != null) {
-            return principal.isHasFullAccess();
-        }
-
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getAuthorities() == null) {
             return false;
         }
 
         return authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority) || "ROLE_SUPER_ADMIN".equals(authority));
     }
 
     public UUID getTenantId() {
@@ -49,12 +56,21 @@ public class WarehouseAccessService {
     }
 
     public void validateWarehouseAccess(UUID warehouseId) {
+        if (warehouseId == null) {
+            throw new ForbiddenException("Warehouse is required");
+        }
+
+        UUID currentWarehouseId = WarehouseContext.getWarehouseId();
+        if (currentWarehouseId != null && !currentWarehouseId.equals(warehouseId)) {
+            throw new ForbiddenException("Requested warehouse is outside current token scope");
+        }
+
         if (hasFullAccess()) {
             return;
         }
 
-        Set<UUID> userWarehouseIds = getUserWarehouseIds();
-        if (!userWarehouseIds.contains(warehouseId)) {
+        UUID userId = getCurrentUserId();
+        if (!canAccessWarehouse(userId, warehouseId)) {
             log.warn("User {} attempted to access warehouse {} without permission",
                     getCurrentUserIdentifier(), warehouseId);
             throw new ForbiddenException("You don't have access to this warehouse");
@@ -66,8 +82,7 @@ public class WarehouseAccessService {
             return;
         }
 
-        Set<UUID> userWarehouseIds = getUserWarehouseIds();
-        if (userWarehouseIds == null || userWarehouseIds.isEmpty()) {
+        if (getUserWarehouseIds().isEmpty()) {
             log.warn("User {} has no warehouse access", getCurrentUserIdentifier());
             throw new ForbiddenException("No warehouse access. Contact your administrator.");
         }
@@ -87,10 +102,18 @@ public class WarehouseAccessService {
         return null;
     }
 
-    private String getCurrentUserIdentifier() {
+    private UUID getCurrentUserId() {
         UserPrincipal principal = getCurrentPrincipalIfAvailable();
-        if (principal != null && principal.getId() != null) {
-            return principal.getId().toString();
+        if (principal != null) {
+            return principal.getId();
+        }
+        return null;
+    }
+
+    private String getCurrentUserIdentifier() {
+        UUID userId = getCurrentUserId();
+        if (userId != null) {
+            return userId.toString();
         }
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
