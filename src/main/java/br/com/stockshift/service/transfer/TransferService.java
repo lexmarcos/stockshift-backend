@@ -11,6 +11,9 @@ import br.com.stockshift.model.enums.LedgerEntryType;
 import br.com.stockshift.model.enums.TransferStatus;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
+import br.com.stockshift.service.stockmovement.StockMovementService;
+import br.com.stockshift.model.entity.StockMovementItem;
+import br.com.stockshift.model.enums.StockMovementType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,7 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +46,7 @@ public class TransferService {
     private final TransferMapper transferMapper;
     private final TransferStateMachine stateMachine;
     private final SecurityUtils securityUtils;
+    private final StockMovementService stockMovementService;
 
     @Transactional
     public TransferResponse create(CreateTransferRequest request) {
@@ -51,7 +59,8 @@ public class TransferService {
             throw new BadRequestException("Source and destination warehouses must be different");
         }
 
-        Warehouse destinationWarehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getDestinationWarehouseId())
+        Warehouse destinationWarehouse = warehouseRepository
+                .findByTenantIdAndId(tenantId, request.getDestinationWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Destination warehouse not found"));
 
         Warehouse sourceWarehouse = warehouseRepository.findByTenantIdAndId(tenantId, sourceWarehouseId)
@@ -145,7 +154,8 @@ public class TransferService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TransferResponse> list(TransferStatus status, UUID sourceWarehouseId, UUID destinationWarehouseId, Pageable pageable) {
+    public Page<TransferResponse> list(TransferStatus status, UUID sourceWarehouseId, UUID destinationWarehouseId,
+            Pageable pageable) {
         UUID tenantId = TenantContext.getTenantId();
         UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
 
@@ -161,9 +171,11 @@ public class TransferService {
             transfers = transferRepository.findAllByTenantIdAndStatusAndWarehouseScope(
                     tenantId, status, currentWarehouseId, pageable);
         } else if (sourceWarehouseId != null) {
-            transfers = transferRepository.findAllByTenantIdAndSourceWarehouseId(tenantId, currentWarehouseId, pageable);
+            transfers = transferRepository.findAllByTenantIdAndSourceWarehouseId(tenantId, currentWarehouseId,
+                    pageable);
         } else if (destinationWarehouseId != null) {
-            transfers = transferRepository.findAllByTenantIdAndDestinationWarehouseId(tenantId, currentWarehouseId, pageable);
+            transfers = transferRepository.findAllByTenantIdAndDestinationWarehouseId(tenantId, currentWarehouseId,
+                    pageable);
         } else {
             transfers = transferRepository.findAllByTenantIdAndWarehouseScope(tenantId, currentWarehouseId, pageable);
         }
@@ -228,7 +240,8 @@ public class TransferService {
         Warehouse destinationWarehouse = warehouseRepository.findById(transfer.getDestinationWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Destination warehouse not found"));
 
-        // Process each item: validate stock, update batch quantities, create ledger entries
+        // Process each item: validate stock, update batch quantities, create ledger
+        // entries
         for (TransferItem item : transfer.getItems()) {
             Batch batch = batchRepository.findByIdForUpdate(item.getSourceBatchId())
                     .orElseThrow(() -> new ResourceNotFoundException("Batch not found: " + item.getSourceBatchId()));
@@ -269,6 +282,24 @@ public class TransferService {
 
         String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");
+
+        // Create TRANSFER_OUT stock movement
+        List<StockMovementItem> movementItems = transfer.getItems().stream()
+                .map(ti -> StockMovementItem.builder()
+                        .productId(ti.getProductId())
+                        .productName(ti.getProductName())
+                        .productSku(ti.getProductSku())
+                        .batchId(ti.getSourceBatchId())
+                        .batchCode(batchRepository.findById(ti.getSourceBatchId())
+                                .map(Batch::getBatchCode).orElse("Unknown"))
+                        .quantity(ti.getQuantitySent())
+                        .build())
+                .collect(Collectors.toList());
+
+        stockMovementService.createForTransfer(
+                tenantId, transfer.getSourceWarehouseId(), userId,
+                StockMovementType.TRANSFER_OUT, transfer.getId(),
+                movementItems, "Transfer " + saved.getCode() + " to " + destinationWarehouse.getName());
 
         return transferMapper.toResponse(saved, sourceWarehouseName, destinationWarehouse.getName());
     }

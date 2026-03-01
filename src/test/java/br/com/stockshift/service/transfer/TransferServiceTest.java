@@ -37,96 +37,100 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TransferServiceTest {
 
-    @Mock
-    private TransferRepository transferRepository;
-    @Mock
-    private TransferItemRepository transferItemRepository;
-    @Mock
-    private TransferValidationLogRepository validationLogRepository;
-    @Mock
-    private BatchRepository batchRepository;
-    @Mock
-    private WarehouseRepository warehouseRepository;
-    @Mock
-    private InventoryLedgerRepository ledgerRepository;
-    @Mock
-    private TransferMapper transferMapper;
-    @Mock
-    private TransferStateMachine stateMachine;
-    @Mock
-    private SecurityUtils securityUtils;
+        @Mock
+        private TransferRepository transferRepository;
+        @Mock
+        private TransferItemRepository transferItemRepository;
+        @Mock
+        private TransferValidationLogRepository validationLogRepository;
+        @Mock
+        private BatchRepository batchRepository;
+        @Mock
+        private WarehouseRepository warehouseRepository;
+        @Mock
+        private InventoryLedgerRepository ledgerRepository;
+        @Mock
+        private TransferMapper transferMapper;
+        @Mock
+        private TransferStateMachine stateMachine;
+        @Mock
+        private SecurityUtils securityUtils;
+        @Mock
+        private br.com.stockshift.service.stockmovement.StockMovementService stockMovementService;
 
-    @InjectMocks
-    private TransferService transferService;
+        @InjectMocks
+        private TransferService transferService;
 
-    @AfterEach
-    void tearDown() {
-        TenantContext.clear();
-    }
+        @AfterEach
+        void tearDown() {
+                TenantContext.clear();
+        }
 
-    @Test
-    void executeShouldPersistLedgerEntryWithTenantAndCreatedBy() {
-        UUID tenantId = UUID.randomUUID();
-        UUID transferId = UUID.randomUUID();
-        UUID sourceWarehouseId = UUID.randomUUID();
-        UUID destinationWarehouseId = UUID.randomUUID();
-        UUID sourceBatchId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
+        @Test
+        void executeShouldPersistLedgerEntryWithTenantAndCreatedBy() {
+                UUID tenantId = UUID.randomUUID();
+                UUID transferId = UUID.randomUUID();
+                UUID sourceWarehouseId = UUID.randomUUID();
+                UUID destinationWarehouseId = UUID.randomUUID();
+                UUID sourceBatchId = UUID.randomUUID();
+                UUID userId = UUID.randomUUID();
 
-        TenantContext.setTenantId(tenantId);
+                TenantContext.setTenantId(tenantId);
 
-        Transfer transfer = Transfer.builder()
-                .code("TRF-2026-0001")
-                .sourceWarehouseId(sourceWarehouseId)
-                .destinationWarehouseId(destinationWarehouseId)
-                .status(TransferStatus.DRAFT)
-                .createdByUserId(userId)
-                .build();
-        transfer.setId(transferId);
-        transfer.setTenantId(tenantId);
+                Transfer transfer = Transfer.builder()
+                                .code("TRF-2026-0001")
+                                .sourceWarehouseId(sourceWarehouseId)
+                                .destinationWarehouseId(destinationWarehouseId)
+                                .status(TransferStatus.DRAFT)
+                                .createdByUserId(userId)
+                                .build();
+                transfer.setId(transferId);
+                transfer.setTenantId(tenantId);
 
-        TransferItem item = TransferItem.builder()
-                .sourceBatchId(sourceBatchId)
-                .productId(UUID.randomUUID())
-                .productName("Produto")
-                .quantitySent(new BigDecimal("5"))
-                .quantityReceived(BigDecimal.ZERO)
-                .build();
-        transfer.addItem(item);
+                TransferItem item = TransferItem.builder()
+                                .sourceBatchId(sourceBatchId)
+                                .productId(UUID.randomUUID())
+                                .productName("Produto")
+                                .quantitySent(new BigDecimal("5"))
+                                .quantityReceived(BigDecimal.ZERO)
+                                .build();
+                transfer.addItem(item);
 
-        Warehouse destinationWarehouse = new Warehouse();
-        destinationWarehouse.setId(destinationWarehouseId);
-        destinationWarehouse.setName("Natal");
+                Warehouse destinationWarehouse = new Warehouse();
+                destinationWarehouse.setId(destinationWarehouseId);
+                destinationWarehouse.setName("Natal");
 
-        Warehouse sourceWarehouse = new Warehouse();
-        sourceWarehouse.setId(sourceWarehouseId);
-        sourceWarehouse.setName("Recife");
+                Warehouse sourceWarehouse = new Warehouse();
+                sourceWarehouse.setId(sourceWarehouseId);
+                sourceWarehouse.setName("Recife");
 
-        Batch batch = Batch.builder()
-                .batchCode("BATCH-001")
-                .quantity(new BigDecimal("10"))
-                .transitQuantity(BigDecimal.ZERO)
-                .build();
-        batch.setId(sourceBatchId);
+                Batch batch = Batch.builder()
+                                .batchCode("BATCH-001")
+                                .quantity(new BigDecimal("10"))
+                                .transitQuantity(BigDecimal.ZERO)
+                                .build();
+                batch.setId(sourceBatchId);
 
-        when(securityUtils.getCurrentWarehouseId()).thenReturn(sourceWarehouseId);
-        when(securityUtils.getCurrentUserId()).thenReturn(userId);
-        when(transferRepository.findByTenantIdAndId(tenantId, transferId)).thenReturn(Optional.of(transfer));
-        when(warehouseRepository.findById(destinationWarehouseId)).thenReturn(Optional.of(destinationWarehouse));
-        when(warehouseRepository.findById(sourceWarehouseId)).thenReturn(Optional.of(sourceWarehouse));
-        when(batchRepository.findByIdForUpdate(sourceBatchId)).thenReturn(Optional.of(batch));
-        when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(transferRepository.save(transfer)).thenReturn(transfer);
-        when(transferMapper.toResponse(eq(transfer), eq("Recife"), eq("Natal")))
-                .thenReturn(TransferResponse.builder().id(transferId).status(TransferStatus.IN_TRANSIT).build());
+                when(securityUtils.getCurrentWarehouseId()).thenReturn(sourceWarehouseId);
+                when(securityUtils.getCurrentUserId()).thenReturn(userId);
+                when(transferRepository.findByTenantIdAndId(tenantId, transferId)).thenReturn(Optional.of(transfer));
+                when(warehouseRepository.findById(destinationWarehouseId))
+                                .thenReturn(Optional.of(destinationWarehouse));
+                when(warehouseRepository.findById(sourceWarehouseId)).thenReturn(Optional.of(sourceWarehouse));
+                when(batchRepository.findByIdForUpdate(sourceBatchId)).thenReturn(Optional.of(batch));
+                when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                when(transferRepository.save(transfer)).thenReturn(transfer);
+                when(transferMapper.toResponse(eq(transfer), eq("Recife"), eq("Natal")))
+                                .thenReturn(TransferResponse.builder().id(transferId).status(TransferStatus.IN_TRANSIT)
+                                                .build());
 
-        transferService.execute(transferId);
+                transferService.execute(transferId);
 
-        ArgumentCaptor<InventoryLedger> ledgerCaptor = ArgumentCaptor.forClass(InventoryLedger.class);
-        verify(ledgerRepository).save(ledgerCaptor.capture());
-        InventoryLedger savedLedger = ledgerCaptor.getValue();
+                ArgumentCaptor<InventoryLedger> ledgerCaptor = ArgumentCaptor.forClass(InventoryLedger.class);
+                verify(ledgerRepository).save(ledgerCaptor.capture());
+                InventoryLedger savedLedger = ledgerCaptor.getValue();
 
-        assertThat(savedLedger.getTenantId()).isEqualTo(tenantId);
-        assertThat(savedLedger.getCreatedBy()).isEqualTo(userId);
-    }
+                assertThat(savedLedger.getTenantId()).isEqualTo(tenantId);
+                assertThat(savedLedger.getCreatedBy()).isEqualTo(userId);
+        }
 }
