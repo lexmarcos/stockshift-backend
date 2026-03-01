@@ -7,7 +7,13 @@ public enum LedgerEntryType {
     TRANSFER_OUT(true),
     TRANSFER_CANCELLED(false),
     TRANSFER_IN(false),
-    TRANSFER_IN_DISCREPANCY(true);
+    TRANSFER_IN_DISCREPANCY(true),
+    USAGE_OUT(true),
+    GIFT_OUT(true),
+    LOSS_OUT(true),
+    DAMAGE_OUT(true),
+    STOCK_MOVEMENT_IN(false),
+    STOCK_MOVEMENT_OUT(true);
 
     private final boolean debit;
 
