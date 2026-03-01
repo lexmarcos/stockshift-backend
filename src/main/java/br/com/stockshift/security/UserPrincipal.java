@@ -1,7 +1,6 @@
 package br.com.stockshift.security;
 
 import br.com.stockshift.model.entity.User;
-import br.com.stockshift.model.entity.Warehouse;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
@@ -61,8 +60,7 @@ public class UserPrincipal implements UserDetails {
                 user.getIsActive(),
                 authorities,
                 warehouseIds,
-                isAdmin
-        );
+                isAdmin);
     }
 
     private static String resolvePermissionCode(br.com.stockshift.model.entity.Permission permission) {

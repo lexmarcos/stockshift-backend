@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class OpenAiService {
@@ -33,10 +32,10 @@ public class OpenAiService {
     private final ObjectMapper objectMapper;
 
     public OpenAiService(RestClient restClient,
-                         @Value("${openai.api-key}") String apiKey,
-                         @Value("${openai.model}") String model,
-                         BrandRepository brandRepository,
-                         CategoryRepository categoryRepository) {
+            @Value("${openai.api-key}") String apiKey,
+            @Value("${openai.model}") String model,
+            BrandRepository brandRepository,
+            CategoryRepository categoryRepository) {
         this.restClient = restClient;
         this.apiKey = apiKey;
         this.model = model;
@@ -73,46 +72,45 @@ public class OpenAiService {
 
     private String buildPrompt(List<String> brands, List<String> categories) {
         return String.format("""
-            Analyze this product image. Identify the product name, brand, category, and volume (if applicable).
-            
-            Known Brands: %s
-            Known Categories: %s
-            
-            Return ONLY a JSON object with this structure (no markdown formatting):
-            {
-              "name": "Product Name",
-              "brand": "Brand Name" (try to match known brands exactly if possible),
-              "category": "Category Name" (try to match known categories exactly if possible),
-              "volume": {
-                "value": number,
-                "unit": "ml/g/kg/l"
-              }
-            }
-            """, String.join(", ", brands), String.join(", ", categories));
+                Analyze this product image. Identify the product name, brand, category, and volume (if applicable).
+
+                Known Brands: %s
+                Known Categories: %s
+
+                Return ONLY a JSON object with this structure (no markdown formatting):
+                {
+                  "name": "Product Name",
+                  "brand": "Brand Name" (try to match known brands exactly if possible),
+                  "category": "Category Name" (try to match known categories exactly if possible),
+                  "volume": {
+                    "value": number,
+                    "unit": "ml/g/kg/l"
+                  }
+                }
+                """, String.join(", ", brands), String.join(", ", categories));
     }
 
     private Map<String, Object> buildRequestBody(String base64Image, String prompt) {
         return Map.of(
-            "model", model,
-            "messages", List.of(
-                Map.of(
-                    "role", "user",
-                    "content", List.of(
-                        Map.of("type", "text", "text", prompt),
-                        Map.of("type", "image_url", "image_url", Map.of("url", "data:image/jpeg;base64," + base64Image))
-                    )
-                )
-            ),
-            "max_completion_tokens", 500
-        );
+                "model", model,
+                "messages", List.of(
+                        Map.of(
+                                "role", "user",
+                                "content", List.of(
+                                        Map.of("type", "text", "text", prompt),
+                                        Map.of("type", "image_url", "image_url",
+                                                Map.of("url", "data:image/jpeg;base64," + base64Image))))),
+                "max_completion_tokens", 500);
     }
 
-    private ProductClassificationResponse parseResponse(String responseBody, UUID tenantId) throws JsonProcessingException {
+    private ProductClassificationResponse parseResponse(String responseBody, UUID tenantId)
+            throws JsonProcessingException {
         JsonNode root = objectMapper.readTree(responseBody);
         JsonNode choice = root.path("choices").get(0);
         String content = choice.path("message").path("content").asText();
 
-        // Clean up markdown code blocks if present (OpenAI sometimes adds them even if told not to)
+        // Clean up markdown code blocks if present (OpenAI sometimes adds them even if
+        // told not to)
         if (content.startsWith("```json")) {
             content = content.substring(7);
         }
@@ -125,7 +123,8 @@ public class OpenAiService {
 
         JsonNode result = objectMapper.readTree(content);
 
-        ProductClassificationResponse.ProductClassificationResponseBuilder responseBuilder = ProductClassificationResponse.builder()
+        ProductClassificationResponse.ProductClassificationResponseBuilder responseBuilder = ProductClassificationResponse
+                .builder()
                 .name(result.path("name").asText())
                 .detectedBrand(result.path("brand").asText())
                 .detectedCategory(result.path("category").asText());

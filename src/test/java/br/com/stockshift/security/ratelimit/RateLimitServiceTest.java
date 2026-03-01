@@ -4,7 +4,6 @@ import br.com.stockshift.config.RateLimitProperties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -15,7 +14,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(classes = {RateLimitService.class, RateLimitProperties.class})
+@SpringBootTest(classes = { RateLimitService.class, RateLimitProperties.class })
 @Testcontainers
 class RateLimitServiceTest {
 

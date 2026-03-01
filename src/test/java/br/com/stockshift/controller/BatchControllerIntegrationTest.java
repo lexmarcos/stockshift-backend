@@ -56,7 +56,6 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
         private PasswordEncoder passwordEncoder;
 
         private Tenant testTenant;
-        private User testUser;
         private Category testCategory;
         private Product testProduct;
         private Warehouse testWarehouse;
@@ -71,7 +70,7 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 tenantRepository.deleteAll();
 
                 testTenant = TestDataFactory.createTenant(tenantRepository, "Batch Test Tenant", "44444444000104");
-                testUser = TestDataFactory.createUser(userRepository, passwordEncoder,
+                TestDataFactory.createUser(userRepository, passwordEncoder,
                                 testTenant.getId(), "batch@test.com");
 
                 TenantContext.setTenantId(testTenant.getId());
@@ -91,8 +90,8 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .warehouseId(testWarehouse.getId())
                                 .batchCode("BATCH-20251228-001")
                                 .quantity(new BigDecimal("100"))
-                                .costPrice(1550L)  // R$15.50 in cents
-                                .sellingPrice(2500L)  // R$25.00 in cents
+                                .costPrice(1550L) // R$15.50 in cents
+                                .sellingPrice(2500L) // R$25.00 in cents
                                 .expirationDate(LocalDate.now().plusMonths(12))
                                 .build();
 
@@ -112,8 +111,8 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .productId(testProduct.getId())
                                 .warehouseId(testWarehouse.getId())
                                 .quantity(new BigDecimal("50"))
-                                .costPrice(1000L)  // R$10.00 in cents
-                                .sellingPrice(1800L)  // R$18.00 in cents
+                                .costPrice(1000L) // R$10.00 in cents
+                                .sellingPrice(1800L) // R$18.00 in cents
                                 .expirationDate(LocalDate.now().plusMonths(6))
                                 .build();
 
@@ -197,8 +196,8 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                 expiringBatch.setWarehouse(testWarehouse);
                 expiringBatch.setBatchCode("BATCH-EXP-001");
                 expiringBatch.setQuantity(new BigDecimal("25"));
-                expiringBatch.setCostPrice(1000L);  // R$10.00 in cents
-                expiringBatch.setSellingPrice(1500L);  // R$15.00 in cents
+                expiringBatch.setCostPrice(1000L); // R$10.00 in cents
+                expiringBatch.setSellingPrice(1500L); // R$15.00 in cents
                 expiringBatch.setExpirationDate(LocalDate.now().plusDays(15));
                 batchRepository.save(expiringBatch);
 
@@ -219,8 +218,8 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .warehouseId(testWarehouse.getId())
                                 .batchCode("BATCH-NEW-001")
                                 .quantity(new BigDecimal("50"))
-                                .costPrice(1200L)  // R$12.00 in cents
-                                .sellingPrice(2200L)  // R$22.00 in cents
+                                .costPrice(1200L) // R$12.00 in cents
+                                .sellingPrice(2200L) // R$22.00 in cents
                                 .build();
 
                 MockMultipartFile productPart = new MockMultipartFile(

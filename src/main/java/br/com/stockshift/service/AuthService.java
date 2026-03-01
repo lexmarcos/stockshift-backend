@@ -28,7 +28,6 @@ import br.com.stockshift.repository.UserRoleWarehouseRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.JwtTokenProvider;
-import br.com.stockshift.security.PermissionCodes;
 import br.com.stockshift.security.UserPrincipal;
 import br.com.stockshift.security.WarehouseContext;
 import lombok.RequiredArgsConstructor;
@@ -247,17 +246,15 @@ public class AuthService {
     }
 
     private List<String> extractPermissions(User user, UUID warehouseId) {
+        if (hasAdminRole(user)) {
+            return List.of("*");
+        }
+
         if (warehouseId == null) {
-            if (hasAdminRole(user)) {
-                return PermissionCodes.all();
-            }
             return new ArrayList<>();
         }
 
         Set<String> resolved = permissionResolverService.resolveUserPermissions(user.getId(), warehouseId);
-        if (resolved.isEmpty() && hasAdminRole(user)) {
-            return PermissionCodes.all();
-        }
 
         return resolved.stream()
                 .sorted()

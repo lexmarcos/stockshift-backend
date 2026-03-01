@@ -5,7 +5,7 @@ import br.com.stockshift.dto.auth.ChangePasswordRequest;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.LoginResponse;
 import br.com.stockshift.dto.auth.MeResponse;
-import br.com.stockshift.dto.auth.RefreshTokenRequest;
+
 import br.com.stockshift.dto.auth.RefreshTokenResponse;
 import br.com.stockshift.dto.auth.RegisterRequest;
 import br.com.stockshift.dto.auth.RegisterResponse;
@@ -18,7 +18,7 @@ import br.com.stockshift.util.CookieUtil;
 import br.com.stockshift.util.IpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.Cookie;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;

@@ -103,7 +103,8 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                 operatorRole = roleRepository.save(operatorRole);
 
                 UserRoleWarehouse assignment = new UserRoleWarehouse();
-                assignment.setId(new UserRoleWarehouseId(testUser.getId(), operatorRole.getId(), primaryWarehouse.getId()));
+                assignment.setId(new UserRoleWarehouseId(testUser.getId(), operatorRole.getId(),
+                                primaryWarehouse.getId()));
                 assignment.setUser(testUser);
                 assignment.setRole(operatorRole);
                 assignment.setWarehouse(primaryWarehouse);
@@ -147,6 +148,7 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                 Cookie accessTokenCookie = loginResult.getResponse().getCookie("accessToken");
                 Cookie refreshTokenCookie = loginResult.getResponse().getCookie("refreshToken");
 
+                assertNotNull(accessTokenCookie);
                 assertNotNull(refreshTokenCookie);
 
                 // Now test refresh using cookies
@@ -210,7 +212,8 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
 
                 UUID warehouseId = jwtTokenProvider.getWarehouseIdFromToken(accessTokenCookie.getValue());
                 assertEquals(primaryWarehouse.getId(), warehouseId);
-                assertTrue(jwtTokenProvider.getAuthoritiesFromToken(accessTokenCookie.getValue()).contains("users:read"));
+                assertTrue(jwtTokenProvider.getAuthoritiesFromToken(accessTokenCookie.getValue())
+                                .contains("users:read"));
         }
 
         @Test
@@ -221,7 +224,8 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 "Secondary");
 
                 UserRoleWarehouse assignment = new UserRoleWarehouse();
-                assignment.setId(new UserRoleWarehouseId(testUser.getId(), operatorRole.getId(), secondaryWarehouse.getId()));
+                assignment.setId(new UserRoleWarehouseId(testUser.getId(), operatorRole.getId(),
+                                secondaryWarehouse.getId()));
                 assignment.setUser(testUser);
                 assignment.setRole(operatorRole);
                 assignment.setWarehouse(secondaryWarehouse);

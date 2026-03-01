@@ -22,7 +22,6 @@ import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.Tenant;
-import br.com.stockshift.model.entity.User;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.ProductRepository;
@@ -54,7 +53,6 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     private Tenant testTenant;
-    private User testUser;
 
     @BeforeEach
     void setUpTestData() {
@@ -65,14 +63,14 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
         tenantRepository.deleteAll();
 
         testTenant = TestDataFactory.createTenant(tenantRepository, "Brand Test Tenant", "33333333000103");
-        testUser = TestDataFactory.createUser(userRepository, passwordEncoder,
+        TestDataFactory.createUser(userRepository, passwordEncoder,
                 testTenant.getId(), "brand@test.com");
 
         TenantContext.setTenantId(testTenant.getId());
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldCreateBrand() throws Exception {
         BrandRequest request = new BrandRequest();
         request.setName("Nike");
@@ -88,7 +86,7 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldNotCreateBrandWithDuplicateName() throws Exception {
         TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Adidas");
 
@@ -104,7 +102,7 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldListAllBrands() throws Exception {
         TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand 1");
         TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand 2");
@@ -117,7 +115,7 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldGetBrandById() throws Exception {
         Brand brand = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Puma");
 
@@ -129,7 +127,7 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldReturnNotFoundForNonExistentBrand() throws Exception {
         mockMvc.perform(get("/api/brands/{id}", "00000000-0000-0000-0000-000000000000"))
                 .andExpect(status().isNotFound())
@@ -138,7 +136,7 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldUpdateBrand() throws Exception {
         Brand brand = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Old Brand");
 
@@ -156,9 +154,9 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldNotUpdateBrandWithDuplicateName() throws Exception {
-        Brand brand1 = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand One");
+        TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand One");
         Brand brand2 = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand Two");
 
         BrandRequest request = new BrandRequest();
@@ -173,7 +171,7 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldDeleteBrandWithoutProducts() throws Exception {
         Brand brand = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand to Delete");
 
@@ -184,12 +182,13 @@ class BrandControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "brand@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "brand@test.com", authorities = { "ROLE_ADMIN" })
     void shouldNotDeleteBrandWithProducts() throws Exception {
         Brand brand = TestDataFactory.createBrand(brandRepository, testTenant.getId(), "Brand with Products");
         Category category = TestDataFactory.createCategory(categoryRepository, testTenant.getId(), "Test Category");
 
-        Product product = TestDataFactory.createProduct(productRepository, testTenant.getId(), category, "Test Product", "SKU-001");
+        Product product = TestDataFactory.createProduct(productRepository, testTenant.getId(), category, "Test Product",
+                "SKU-001");
         product.setBrand(brand);
         productRepository.save(product);
 

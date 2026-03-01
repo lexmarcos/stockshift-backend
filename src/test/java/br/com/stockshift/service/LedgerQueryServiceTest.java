@@ -1,7 +1,7 @@
 package br.com.stockshift.service;
 
 import br.com.stockshift.model.entity.InventoryLedger;
-import br.com.stockshift.model.enums.LedgerEntryType;
+
 import br.com.stockshift.repository.InventoryLedgerRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,7 +33,7 @@ class LedgerQueryServiceTest {
         UUID batchId = UUID.randomUUID();
 
         when(ledgerRepository.findByBatchIdOrderByCreatedAtDesc(batchId))
-            .thenReturn(List.of());
+                .thenReturn(List.of());
 
         List<InventoryLedger> result = ledgerQueryService.findByBatchId(batchId);
 

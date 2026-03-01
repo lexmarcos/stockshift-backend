@@ -3,7 +3,6 @@ package br.com.stockshift.service;
 import br.com.stockshift.model.entity.Permission;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.repository.UserRoleWarehouseRepository;
-import br.com.stockshift.security.PermissionCodes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +31,7 @@ public class PermissionResolverService {
 
         boolean isAdmin = roles.stream().anyMatch(this::isAdminRole);
         if (isAdmin) {
-            return Set.copyOf(PermissionCodes.all());
+            return Set.of("*");
         }
 
         return roles.stream()
@@ -85,7 +84,7 @@ public class PermissionResolverService {
             case "report" -> "reports:" + action;
             case "stock" -> "batches:" + action;
             case "transfer" -> switch (action) {
-                case "cancel" -> PermissionCodes.TRANSFERS_DELETE;
+                case "cancel" -> "transfers:delete";
                 default -> "transfers:" + action;
             };
             default -> resource + ":" + action;

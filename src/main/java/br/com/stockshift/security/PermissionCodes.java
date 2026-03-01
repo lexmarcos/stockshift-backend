@@ -50,6 +50,9 @@ public final class PermissionCodes {
     public static final String REPORTS_READ = "reports:read";
     public static final String PERMISSIONS_READ = "permissions:read";
 
+    public static final String STOCK_MOVEMENTS_READ = "stock_movements:read";
+    public static final String STOCK_MOVEMENTS_CREATE = "stock_movements:create";
+
     private static final List<String> ALL = List.of(
             USERS_READ,
             USERS_CREATE,
@@ -87,7 +90,9 @@ public final class PermissionCodes {
             TRANSFERS_EXECUTE,
             TRANSFERS_VALIDATE,
             REPORTS_READ,
-            PERMISSIONS_READ);
+            PERMISSIONS_READ,
+            STOCK_MOVEMENTS_READ,
+            STOCK_MOVEMENTS_CREATE);
 
     private PermissionCodes() {
     }

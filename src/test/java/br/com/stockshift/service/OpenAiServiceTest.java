@@ -5,7 +5,7 @@ import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
-import br.com.stockshift.security.TenantContext;
+
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;
@@ -25,78 +25,78 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
+
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class OpenAiServiceTest {
 
-    private OpenAiService openAiService;
-    private MockWebServer mockWebServer;
+  private OpenAiService openAiService;
+  private MockWebServer mockWebServer;
 
-    @Mock
-    private BrandRepository brandRepository;
-    @Mock
-    private CategoryRepository categoryRepository;
+  @Mock
+  private BrandRepository brandRepository;
+  @Mock
+  private CategoryRepository categoryRepository;
 
-    @BeforeEach
-    void setUp() throws IOException {
-        mockWebServer = new MockWebServer();
-        mockWebServer.start();
+  @BeforeEach
+  void setUp() throws IOException {
+    mockWebServer = new MockWebServer();
+    mockWebServer.start();
 
-        RestClient restClient = RestClient.builder()
-                .baseUrl(mockWebServer.url("/").toString())
-                .build();
+    RestClient restClient = RestClient.builder()
+        .baseUrl(mockWebServer.url("/").toString())
+        .build();
 
-        // Inject dependencies manually
-        openAiService = new OpenAiService(
-                restClient,
-                "test-api-key",
-                "gpt-5-nano",
-                brandRepository,
-                categoryRepository
-        );
-    }
+    // Inject dependencies manually
+    openAiService = new OpenAiService(
+        restClient,
+        "test-api-key",
+        "gpt-5-nano",
+        brandRepository,
+        categoryRepository);
+  }
 
-    @AfterEach
-    void tearDown() throws IOException {
-        mockWebServer.shutdown();
-    }
+  @AfterEach
+  void tearDown() throws IOException {
+    mockWebServer.shutdown();
+  }
 
-    @Test
-    void shouldAnalyzeImageAndReturnClassification() throws IOException {
-        // Arrange
-        MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
-        UUID tenantId = UUID.randomUUID();
+  @Test
+  void shouldAnalyzeImageAndReturnClassification() throws IOException {
+    // Arrange
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    UUID tenantId = UUID.randomUUID();
+    br.com.stockshift.security.TenantContext.setTenantId(tenantId);
 
-        // Mock objects
-        Brand mahogany = new Brand();
-        mahogany.setName("Mahogany");
-        
-        Brand mahoganyWithId = new Brand();
-        mahoganyWithId.setId(UUID.randomUUID());
-        mahoganyWithId.setName("Mahogany");
+    // Mock objects
+    Brand mahogany = new Brand();
+    mahogany.setName("Mahogany");
 
-        Category perfumes = new Category();
-        perfumes.setName("Perfumes");
-        
-        Category perfumesWithId = new Category();
-        perfumesWithId.setId(UUID.randomUUID());
-        perfumesWithId.setName("Perfumes");
+    Brand mahoganyWithId = new Brand();
+    mahoganyWithId.setId(UUID.randomUUID());
+    mahoganyWithId.setName("Mahogany");
 
-        // Mock repositories
-        when(brandRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of(mahogany));
-        when(categoryRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of(perfumes));
+    Category perfumes = new Category();
+    perfumes.setName("Perfumes");
 
-        // Mock DB match logic
-        when(brandRepository.findByNameIgnoreCaseAndTenantId(eq("Mahogany"), any()))
-            .thenReturn(Optional.of(mahoganyWithId));
-            
-        when(categoryRepository.findByNameIgnoreCaseAndTenantId(eq("Perfumes"), any()))
-            .thenReturn(Optional.of(perfumesWithId));
+    Category perfumesWithId = new Category();
+    perfumesWithId.setId(UUID.randomUUID());
+    perfumesWithId.setName("Perfumes");
 
-        // Mock OpenAI Response
-        String jsonResponse = """
+    // Mock repositories
+    when(brandRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of(mahogany));
+    when(categoryRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of(perfumes));
+
+    // Mock DB match logic
+    when(brandRepository.findByNameIgnoreCaseAndTenantId(eq("Mahogany"), any()))
+        .thenReturn(Optional.of(mahoganyWithId));
+
+    when(categoryRepository.findByNameIgnoreCaseAndTenantId(eq("Perfumes"), any()))
+        .thenReturn(Optional.of(perfumesWithId));
+
+    // Mock OpenAI Response
+    String jsonResponse = """
             {
               "choices": [
                 {
@@ -107,18 +107,18 @@ class OpenAiServiceTest {
               ]
             }
         """;
-        mockWebServer.enqueue(new MockResponse()
-                .setBody(jsonResponse)
-                .addHeader("Content-Type", "application/json"));
+    mockWebServer.enqueue(new MockResponse()
+        .setBody(jsonResponse)
+        .addHeader("Content-Type", "application/json"));
 
-        // Act
-        ProductClassificationResponse response = openAiService.analyzeImage(image);
+    // Act
+    ProductClassificationResponse response = openAiService.analyzeImage(image);
 
-        // Assert
-        assertThat(response.getName()).isEqualTo("Make Me Fever Gold");
-        assertThat(response.getBrandName()).isEqualTo("Mahogany");
-        assertThat(response.getBrandId()).isNotNull();
-        assertThat(response.getCategoryName()).isEqualTo("Perfumes");
-        assertThat(response.getCategoryId()).isNotNull();
-    }
+    // Assert
+    assertThat(response.getName()).isEqualTo("Make Me Fever Gold");
+    assertThat(response.getBrandName()).isEqualTo("Mahogany");
+    assertThat(response.getBrandId()).isNotNull();
+    assertThat(response.getCategoryName()).isEqualTo("Perfumes");
+    assertThat(response.getCategoryId()).isNotNull();
+  }
 }

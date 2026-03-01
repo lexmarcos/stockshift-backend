@@ -328,7 +328,7 @@ public class TransferValidationService {
                 UUID tenantId = TenantContext.getTenantId();
                 UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
 
-                Transfer transfer = transferRepository
+                transferRepository
                                 .findByTenantIdAndIdAndWarehouseScope(tenantId, transferId, currentWarehouseId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
 

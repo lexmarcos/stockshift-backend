@@ -29,7 +29,6 @@ import br.com.stockshift.model.entity.Batch;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.Tenant;
-import br.com.stockshift.model.entity.User;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.CategoryRepository;
@@ -84,44 +83,39 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
 
         // Create test tenant and user
         Tenant testTenant = TestDataFactory.createTenant(
-            tenantRepository,
-            "Batch Deletion Test Tenant",
-            "55555555000105"
-        );
+                tenantRepository,
+                "Batch Deletion Test Tenant",
+                "55555555000105");
         tenantId = testTenant.getId();
 
-        User testUser = TestDataFactory.createUser(
-            userRepository,
-            passwordEncoder,
-            tenantId,
-            "batchdeletion@test.com"
-        );
+        TestDataFactory.createUser(
+                userRepository,
+                passwordEncoder,
+                tenantId,
+                "batchdeletion@test.com");
 
         TenantContext.setTenantId(tenantId);
 
         // Create test category
         Category testCategory = TestDataFactory.createCategory(
-            categoryRepository,
-            tenantId,
-            "Deletion Test Category"
-        );
+                categoryRepository,
+                tenantId,
+                "Deletion Test Category");
 
         // Create test warehouse
         testWarehouse = TestDataFactory.createWarehouse(
-            warehouseRepository,
-            tenantId,
-            "Test Warehouse"
-        );
+                warehouseRepository,
+                tenantId,
+                "Test Warehouse");
         warehouseId = testWarehouse.getId();
 
         // Create test product
         testProduct = TestDataFactory.createProduct(
-            productRepository,
-            tenantId,
-            testCategory,
-            "Test Product",
-            "SKU-DELETE-001"
-        );
+                productRepository,
+                tenantId,
+                testCategory,
+                "Test Product",
+                "SKU-DELETE-001");
         productId = testProduct.getId();
     }
 
@@ -129,60 +123,54 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
     @WithMockUser(username = "batchdeletion@test.com", authorities = { "ROLE_ADMIN" })
     void shouldDeleteAllBatchesSuccessfully() throws Exception {
         // Create 3 batches for the same product and warehouse
-        Batch batch1 = TestDataFactory.createBatch(
-            batchRepository,
-            tenantId,
-            testProduct,
-            testWarehouse,
-            "BATCH-001",
-            100
-        );
-        Batch batch2 = TestDataFactory.createBatch(
-            batchRepository,
-            tenantId,
-            testProduct,
-            testWarehouse,
-            "BATCH-002",
-            200
-        );
-        Batch batch3 = TestDataFactory.createBatch(
-            batchRepository,
-            tenantId,
-            testProduct,
-            testWarehouse,
-            "BATCH-003",
-            300
-        );
+        TestDataFactory.createBatch(
+                batchRepository,
+                tenantId,
+                testProduct,
+                testWarehouse,
+                "BATCH-001",
+                100);
+        TestDataFactory.createBatch(
+                batchRepository,
+                tenantId,
+                testProduct,
+                testWarehouse,
+                "BATCH-002",
+                200);
+        TestDataFactory.createBatch(
+                batchRepository,
+                tenantId,
+                testProduct,
+                testWarehouse,
+                "BATCH-003",
+                300);
 
         // Call DELETE endpoint
         mockMvc.perform(delete(
-            "/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
-            warehouseId,
-            productId
-        ))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.deletedCount").value(3))
-            .andExpect(jsonPath("$.productId").value(productId.toString()))
-            .andExpect(jsonPath("$.warehouseId").value(warehouseId.toString()))
-            .andExpect(jsonPath("$.message").value("Successfully deleted 3 batches"));
+                "/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
+                warehouseId,
+                productId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deletedCount").value(3))
+                .andExpect(jsonPath("$.productId").value(productId.toString()))
+                .andExpect(jsonPath("$.warehouseId").value(warehouseId.toString()))
+                .andExpect(jsonPath("$.message").value("Successfully deleted 3 batches"));
 
         // Verify batches are filtered by @SQLRestriction annotation
         List<Batch> remainingBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
-            productId,
-            warehouseId,
-            tenantId
-        );
+                productId,
+                warehouseId,
+                tenantId);
         assertThat(remainingBatches).isEmpty();
 
         // Verify GET endpoint returns empty list
         mockMvc.perform(get(
-            "/api/batches/warehouse/{warehouseId}",
-            warehouseId
-        ))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data").isArray())
-            .andExpect(jsonPath("$.data").isEmpty());
+                "/api/batches/warehouse/{warehouseId}",
+                warehouseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test
@@ -192,8 +180,8 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(
                 delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
-                    nonExistentWarehouseId, productId))
-            .andExpect(status().isNotFound());
+                        nonExistentWarehouseId, productId))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -203,8 +191,8 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(
                 delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
-                    warehouseId, nonExistentProductId))
-            .andExpect(status().isNotFound());
+                        warehouseId, nonExistentProductId))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -214,9 +202,9 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
 
         String responseContent = mockMvc.perform(
                 delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
-                    warehouseId, productId))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+                        warehouseId, productId))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
 
         BatchDeletionResponse response = objectMapper.readValue(responseContent, BatchDeletionResponse.class);
 
@@ -225,26 +213,26 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(authorities = {"BATCH_READ"}) // Wrong permission
+    @WithMockUser(authorities = { "BATCH_READ" }) // Wrong permission
     void shouldReturn403WhenUnauthorized() throws Exception {
         mockMvc.perform(
                 delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
-                    warehouseId, productId))
-            .andExpect(status().isForbidden());
+                        warehouseId, productId))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(username = "batchdeletion@test.com", authorities = {"ROLE_ADMIN", "BATCH_CREATE", "BATCH_DELETE", "BATCH_READ"})
+    @WithMockUser(username = "batchdeletion@test.com", authorities = { "ROLE_ADMIN", "BATCH_CREATE", "BATCH_DELETE",
+            "BATCH_READ" })
     void shouldRespectTenantIsolation() throws Exception {
         // Create batch for current tenant
         BatchRequest batchRequest = new BatchRequest(
-            productId, warehouseId, "BATCH-TENANT-1", java.math.BigDecimal.TEN,
-            null, null, null, null
-        );
+                productId, warehouseId, "BATCH-TENANT-1", java.math.BigDecimal.TEN,
+                null, null, null, null);
         mockMvc.perform(post("/api/batches")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(batchRequest)))
-            .andExpect(status().isCreated());
+                .andExpect(status().isCreated());
 
         // Switch to different tenant
         UUID differentTenantId = UUID.randomUUID();
@@ -253,17 +241,17 @@ class BatchDeletionIntegrationTest extends BaseIntegrationTest {
         // Try to delete batches as different tenant
         mockMvc.perform(
                 delete("/api/batches/warehouses/{warehouseId}/products/{productId}/batches",
-                    warehouseId, productId))
-            .andExpect(status().isNotFound()); // Warehouse doesn't exist for this tenant
+                        warehouseId, productId))
+                .andExpect(status().isNotFound()); // Warehouse doesn't exist for this tenant
 
         // Switch back to original tenant
         TenantContext.setTenantId(tenantId);
 
         // Verify batch still exists for original tenant
         mockMvc.perform(get("/api/batches/warehouse/{warehouseId}", warehouseId))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data").isArray())
-            .andExpect(jsonPath("$.data.length()").value(1));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data.length()").value(1));
     }
 }

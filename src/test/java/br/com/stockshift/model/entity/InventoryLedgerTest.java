@@ -1,6 +1,5 @@
 package br.com.stockshift.model.entity;
 
-import br.com.stockshift.model.enums.LedgerEntryType;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;

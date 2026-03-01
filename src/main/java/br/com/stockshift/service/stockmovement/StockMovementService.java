@@ -12,7 +12,7 @@ import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
-import br.com.stockshift.service.WarehouseAccessService;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,14 +36,12 @@ public class StockMovementService {
       StockMovementType.TRANSFER_IN, StockMovementType.TRANSFER_OUT);
 
   private final StockMovementRepository movementRepository;
-  private final StockMovementItemRepository movementItemRepository;
   private final BatchRepository batchRepository;
   private final ProductRepository productRepository;
   private final WarehouseRepository warehouseRepository;
   private final InventoryLedgerRepository ledgerRepository;
   private final StockMovementMapper mapper;
   private final SecurityUtils securityUtils;
-  private final WarehouseAccessService warehouseAccessService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
@@ -286,9 +284,6 @@ public class StockMovementService {
     // Group by warehouse
     Map<UUID, List<StockMovement>> byWarehouse = movements.stream()
         .collect(Collectors.groupingBy(StockMovement::getWarehouseId));
-
-    Map<UUID, String> warehouseNames = warehouses.stream()
-        .collect(Collectors.toMap(Warehouse::getId, Warehouse::getName));
 
     List<WarehouseMovementSummaryResponse.WarehouseSummary> summaries = new ArrayList<>();
 

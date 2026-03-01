@@ -24,7 +24,8 @@ public class PermissionGuard {
     public boolean hasAny(String... requiredAuthorities) {
         Set<String> rawAuthorities = currentAuthorities();
 
-        if (rawAuthorities.contains("ROLE_ADMIN") || rawAuthorities.contains("ROLE_SUPER_ADMIN")) {
+        if (rawAuthorities.contains("ROLE_ADMIN") || rawAuthorities.contains("ROLE_SUPER_ADMIN")
+                || rawAuthorities.contains("*")) {
             return true;
         }
 

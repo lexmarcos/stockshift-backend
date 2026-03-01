@@ -40,7 +40,6 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
     private PasswordEncoder passwordEncoder;
 
     private Tenant testTenant;
-    private User testUser;
 
     @BeforeEach
     void setUpTestData() {
@@ -52,7 +51,7 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
         tenantRepository.deleteAll();
 
         testTenant = TestDataFactory.createTenant(tenantRepository, "Report Test Tenant", "66666666000106");
-        testUser = TestDataFactory.createUser(userRepository, passwordEncoder,
+        TestDataFactory.createUser(userRepository, passwordEncoder,
                 testTenant.getId(), "report@test.com");
 
         TenantContext.setTenantId(testTenant.getId());
@@ -61,12 +60,13 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
         Category category = TestDataFactory.createCategory(categoryRepository, testTenant.getId(), "Report Category");
         Product product = TestDataFactory.createProduct(productRepository, testTenant.getId(),
                 category, "Report Product", "SKU-RPT-001");
-        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository, testTenant.getId(), "Report Warehouse");
+        Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository, testTenant.getId(),
+                "Report Warehouse");
         TestDataFactory.createBatch(batchRepository, testTenant.getId(), product, warehouse, 75);
     }
 
     @Test
-    @WithMockUser(username = "report@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
     void shouldGetDashboard() throws Exception {
         mockMvc.perform(get("/api/reports/dashboard"))
                 .andExpect(status().isOk())
@@ -77,7 +77,7 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @WithMockUser(username = "report@test.com", authorities = {"ROLE_ADMIN"})
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
     void shouldGetStockReport() throws Exception {
         mockMvc.perform(get("/api/reports/stock"))
                 .andExpect(status().isOk())

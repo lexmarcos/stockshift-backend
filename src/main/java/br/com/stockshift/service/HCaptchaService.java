@@ -50,11 +50,11 @@ public class HCaptchaService {
 
             HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
 
-            ResponseEntity<Map> response = restTemplate.postForEntity(
+            @SuppressWarnings("unchecked")
+            ResponseEntity<Map<String, Object>> response = restTemplate.postForEntity(
                     HCAPTCHA_VERIFY_URL,
                     request,
-                    Map.class
-            );
+                    (Class<Map<String, Object>>) (Class<?>) Map.class);
 
             if (response.getBody() != null) {
                 Boolean success = (Boolean) response.getBody().get("success");

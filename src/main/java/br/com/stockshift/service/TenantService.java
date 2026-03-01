@@ -7,12 +7,10 @@ import br.com.stockshift.model.entity.RefreshToken;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
-import br.com.stockshift.repository.PermissionRepository;
 import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.JwtTokenProvider;
-import br.com.stockshift.security.PermissionCodes;
 import br.com.stockshift.config.JwtProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +29,6 @@ public class TenantService {
   private final TenantRepository tenantRepository;
   private final UserRepository userRepository;
   private final RoleRepository roleRepository;
-  private final PermissionRepository permissionRepository;
   private final PasswordEncoder passwordEncoder;
   private final JwtTokenProvider jwtTokenProvider;
   private final RefreshTokenService refreshTokenService;
@@ -65,10 +62,10 @@ public class TenantService {
     adminRole.setName("ADMIN");
     adminRole.setDescription("Administrator role with full access");
     adminRole.setIsSystemRole(true);
-    adminRole.setPermissions(new HashSet<>(permissionRepository.findAll()));
+    adminRole.setPermissions(new HashSet<>());
     adminRole = roleRepository.save(adminRole);
-    log.info("Created ADMIN role with ID: {} for tenant: {} with {} permissions",
-        adminRole.getId(), tenant.getId(), adminRole.getPermissions().size());
+    log.info("Created ADMIN role with ID: {} for tenant: {}",
+        adminRole.getId(), tenant.getId());
 
     // Create first admin user
     User user = new User();
@@ -82,9 +79,9 @@ public class TenantService {
     user = userRepository.save(user);
     log.info("Created admin user with ID: {} for tenant: {}", user.getId(), tenant.getId());
 
-    // Admin users get ADMIN role and full permission set.
+    // Admin users get ADMIN role and wildcard permission.
     List<String> roles = List.of("ADMIN");
-    List<String> permissions = PermissionCodes.all();
+    List<String> permissions = List.of("*");
 
     // Generate tokens
     String accessToken = jwtTokenProvider.generateAccessToken(

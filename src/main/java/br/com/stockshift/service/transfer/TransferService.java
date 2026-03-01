@@ -24,8 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
+
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,8 +37,7 @@ public class TransferService {
     private static final int TRANSFER_CODE_SEQUENCE_PADDING = 4;
 
     private final TransferRepository transferRepository;
-    private final TransferItemRepository transferItemRepository;
-    private final TransferValidationLogRepository validationLogRepository;
+
     private final BatchRepository batchRepository;
     private final WarehouseRepository warehouseRepository;
     private final InventoryLedgerRepository ledgerRepository;
