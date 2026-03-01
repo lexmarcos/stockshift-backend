@@ -369,6 +369,7 @@ public class StockMovementService {
       case ADJUSTMENT_OUT -> LedgerEntryType.ADJUSTMENT_OUT;
       case TRANSFER_IN -> LedgerEntryType.TRANSFER_IN;
       case TRANSFER_OUT -> LedgerEntryType.TRANSFER_OUT;
+      default -> throw new IllegalArgumentException("Unknown movement type: " + type);
     };
   }
 }
