@@ -12,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -114,4 +115,36 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
       @Param("productId") UUID productId,
       @Param("warehouseId") UUID warehouseId,
       @Param("tenantId") UUID tenantId);
+
+  @Query("SELECT COALESCE(SUM(CAST(b.costPrice AS bigdecimal) * b.quantity), 0) FROM Batch b " +
+        "WHERE b.tenantId = :tenantId AND b.deletedAt IS NULL " +
+        "AND (:warehouseId IS NULL OR b.warehouse.id = :warehouseId)")
+  BigDecimal sumStockValue(
+        @Param("tenantId") UUID tenantId,
+        @Param("warehouseId") UUID warehouseId);
+
+  @Query("SELECT COALESCE(SUM(b.transitQuantity), 0) FROM Batch b " +
+        "WHERE b.tenantId = :tenantId AND b.deletedAt IS NULL " +
+        "AND (:warehouseId IS NULL OR b.warehouse.id = :warehouseId)")
+  BigDecimal sumTransitQuantity(
+        @Param("tenantId") UUID tenantId,
+        @Param("warehouseId") UUID warehouseId);
+
+  @Query("SELECT COUNT(b) FROM Batch b " +
+        "WHERE b.tenantId = :tenantId AND b.deletedAt IS NULL " +
+        "AND (:warehouseId IS NULL OR b.warehouse.id = :warehouseId)")
+  long countActiveBatches(
+        @Param("tenantId") UUID tenantId,
+        @Param("warehouseId") UUID warehouseId);
+
+  @Query("SELECT COUNT(DISTINCT b.product.id) FROM Batch b " +
+        "WHERE b.tenantId = :tenantId AND b.deletedAt IS NULL " +
+        "AND (:warehouseId IS NULL OR b.warehouse.id = :warehouseId) " +
+        "AND (b.quantity <= :threshold " +
+        "OR (b.expirationDate IS NOT NULL AND b.expirationDate BETWEEN CURRENT_DATE AND :expirationLimit))")
+  long countCriticalAlerts(
+        @Param("tenantId") UUID tenantId,
+        @Param("warehouseId") UUID warehouseId,
+        @Param("threshold") BigDecimal threshold,
+        @Param("expirationLimit") LocalDate expirationLimit);
 }

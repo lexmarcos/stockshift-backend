@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -71,4 +72,15 @@ public interface TransferRepository extends JpaRepository<Transfer, UUID> {
 
     @Query("SELECT COUNT(t) FROM Transfer t WHERE t.tenantId = :tenantId AND t.code LIKE CONCAT(:prefix, '%')")
     long countByTenantIdAndCodePrefix(@Param("tenantId") UUID tenantId, @Param("prefix") String prefix);
+
+    @Query("SELECT COUNT(t) FROM Transfer t " +
+            "WHERE t.tenantId = :tenantId " +
+            "AND t.status IN :pendingStatuses " +
+            "AND (:warehouseId IS NULL " +
+            "OR t.sourceWarehouseId = :warehouseId " +
+            "OR t.destinationWarehouseId = :warehouseId)")
+    long countPendingTransfers(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("pendingStatuses") List<TransferStatus> pendingStatuses);
 }

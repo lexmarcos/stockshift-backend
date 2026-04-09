@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -70,4 +71,63 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
             Pageable pageable);
+
+    @Query("SELECT sm.type, sm.direction, COALESCE(SUM(smi.quantity), 0) " +
+            "FROM StockMovement sm JOIN sm.items smi " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate " +
+            "GROUP BY sm.type, sm.direction")
+    List<Object[]> sumMovementsByTypeAndPeriod(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT COUNT(sm) FROM StockMovement sm " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.createdAt >= :startOfDay AND sm.createdAt < :endOfDay")
+    long countTodayMovements(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("startOfDay") LocalDateTime startOfDay,
+            @Param("endOfDay") LocalDateTime endOfDay);
+
+    @Query("SELECT CAST(sm.createdAt AS LocalDate), sm.direction, COALESCE(SUM(smi.quantity), 0), COUNT(DISTINCT sm) " +
+            "FROM StockMovement sm JOIN sm.items smi " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate " +
+            "GROUP BY CAST(sm.createdAt AS LocalDate), sm.direction " +
+            "ORDER BY CAST(sm.createdAt AS LocalDate)")
+    List<Object[]> getDailyMovementTrend(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT sm.type, smi.productName, smi.quantity, sm.createdAt, smi.batchId " +
+            "FROM StockMovement sm JOIN sm.items smi " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.type IN :lossTypes " +
+            "AND sm.createdAt >= :since " +
+            "ORDER BY sm.createdAt DESC")
+    List<Object[]> findRecentLosses(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("lossTypes") List<StockMovementType> lossTypes,
+            @Param("since") LocalDateTime since);
+
+    @Query("SELECT COALESCE(SUM(smi.quantity), 0) FROM StockMovement sm JOIN sm.items smi " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.direction = br.com.stockshift.model.enums.MovementDirection.OUT " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate")
+    BigDecimal sumOutQuantityForPeriod(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
 }
