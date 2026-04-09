@@ -12,6 +12,9 @@ import org.springframework.security.test.context.support.WithMockUser;
 
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.model.entity.*;
+import br.com.stockshift.model.enums.MovementDirection;
+import br.com.stockshift.model.enums.StockMovementType;
+import br.com.stockshift.model.enums.TransferStatus;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.util.TestDataFactory;
@@ -39,6 +42,15 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private StockMovementRepository stockMovementRepository;
+
+    @Autowired
+    private StockMovementItemRepository stockMovementItemRepository;
+
+    @Autowired
+    private TransferRepository transferRepository;
+
     private Tenant testTenant;
 
     @BeforeEach
@@ -48,6 +60,9 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
         categoryRepository.deleteAll();
         warehouseRepository.deleteAll();
         userRepository.deleteAll();
+        stockMovementItemRepository.deleteAll();
+        stockMovementRepository.deleteAll();
+        transferRepository.deleteAll();
         tenantRepository.deleteAll();
 
         testTenant = TestDataFactory.createTenant(tenantRepository, "Report Test Tenant", "66666666000106");
@@ -85,5 +100,61 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data[0].productName").value("Report Product"))
                 .andExpect(jsonPath("$.data[0].totalQuantity").value(75));
+    }
+
+    @Test
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldGetDashboardSummary() throws Exception {
+        mockMvc.perform(get("/api/reports/dashboard/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.totalProducts").exists())
+                .andExpect(jsonPath("$.data.totalWarehouses").exists())
+                .andExpect(jsonPath("$.data.totalActiveBatches").exists())
+                .andExpect(jsonPath("$.data.totalStockQuantity").exists())
+                .andExpect(jsonPath("$.data.totalStockValue").exists())
+                .andExpect(jsonPath("$.data.totalTransitQuantity").exists())
+                .andExpect(jsonPath("$.data.pendingTransfers").exists())
+                .andExpect(jsonPath("$.data.todayMovements").exists())
+                .andExpect(jsonPath("$.data.criticalAlerts").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldGetDashboardKpis() throws Exception {
+        mockMvc.perform(get("/api/reports/dashboard/kpis"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.currentMonth").exists())
+                .andExpect(jsonPath("$.data.currentMonth.totalStockValue").exists())
+                .andExpect(jsonPath("$.data.currentMonth.stockTurnoverRate").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldGetDashboardAlerts() throws Exception {
+        mockMvc.perform(get("/api/reports/dashboard/alerts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.lowStockProducts").isArray())
+                .andExpect(jsonPath("$.data.expiringProducts").isArray())
+                .andExpect(jsonPath("$.data.recentLosses").isArray())
+                .andExpect(jsonPath("$.data.pendingTransfers").exists())
+                .andExpect(jsonPath("$.data.highTransitValue").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldGetMovementTrend() throws Exception {
+        mockMvc.perform(get("/api/reports/dashboard/movement-trend")
+                        .param("days", "30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.startDate").exists())
+                .andExpect(jsonPath("$.data.endDate").exists())
+                .andExpect(jsonPath("$.data.days").isArray())
+                .andExpect(jsonPath("$.data.totals").exists())
+                .andExpect(jsonPath("$.data.totals.totalInQuantity").exists())
+                .andExpect(jsonPath("$.data.totals.totalOutQuantity").exists());
     }
 }

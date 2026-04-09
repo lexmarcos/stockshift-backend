@@ -2,6 +2,9 @@ package br.com.stockshift.util;
 
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.BarcodeType;
+import br.com.stockshift.model.enums.MovementDirection;
+import br.com.stockshift.model.enums.StockMovementType;
+import br.com.stockshift.model.enums.TransferStatus;
 import br.com.stockshift.repository.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -115,5 +118,45 @@ public class TestDataFactory {
         batch.setSellingPrice(1500L);  // R$15.00 in cents
         batch.setExpirationDate(LocalDate.now().plusMonths(6));
         return repo.save(batch);
+    }
+
+    public static StockMovement createStockMovement(StockMovementRepository repo, UUID tenantId,
+                                                     UUID warehouseId, StockMovementType type,
+                                                     MovementDirection direction, UUID createdByUserId) {
+        StockMovement sm = new StockMovement();
+        sm.setTenantId(tenantId);
+        sm.setCode("SM-" + UUID.randomUUID().toString().substring(0, 8));
+        sm.setWarehouseId(warehouseId);
+        sm.setType(type);
+        sm.setDirection(direction);
+        sm.setCreatedByUserId(createdByUserId);
+        return repo.save(sm);
+    }
+
+    public static StockMovementItem createStockMovementItem(StockMovementItemRepository repo,
+                                                             StockMovement movement, Product product,
+                                                             Batch batch, BigDecimal quantity) {
+        StockMovementItem item = new StockMovementItem();
+        item.setStockMovement(movement);
+        item.setProductId(product.getId());
+        item.setProductName(product.getName());
+        item.setProductSku(product.getSku());
+        item.setBatchId(batch.getId());
+        item.setBatchCode(batch.getBatchCode());
+        item.setQuantity(quantity);
+        return repo.save(item);
+    }
+
+    public static Transfer createTransfer(TransferRepository repo, UUID tenantId,
+                                           UUID sourceWarehouseId, UUID destinationWarehouseId,
+                                           TransferStatus status, UUID createdByUserId) {
+        Transfer transfer = new Transfer();
+        transfer.setTenantId(tenantId);
+        transfer.setCode("TR-" + UUID.randomUUID().toString().substring(0, 8));
+        transfer.setSourceWarehouseId(sourceWarehouseId);
+        transfer.setDestinationWarehouseId(destinationWarehouseId);
+        transfer.setStatus(status);
+        transfer.setCreatedByUserId(createdByUserId);
+        return repo.save(transfer);
     }
 }
