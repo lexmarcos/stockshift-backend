@@ -1,7 +1,11 @@
 package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.dto.report.DashboardAlertsResponse;
+import br.com.stockshift.dto.report.DashboardKpisResponse;
 import br.com.stockshift.dto.report.DashboardResponse;
+import br.com.stockshift.dto.report.DashboardSummaryResponse;
+import br.com.stockshift.dto.report.MovementTrendResponse;
 import br.com.stockshift.dto.report.StockReportResponse;
 import br.com.stockshift.service.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,5 +61,38 @@ public class ReportController {
             @RequestParam(required = false) Integer limit) {
         List<StockReportResponse> report = reportService.getExpiringProductsReport(daysAhead, limit);
         return ResponseEntity.ok(ApiResponse.success(report));
+    }
+
+    @GetMapping("/dashboard/summary")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
+    @Operation(summary = "Get dashboard quick summary")
+    public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getDashboardSummary() {
+        DashboardSummaryResponse response = reportService.getSummary();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/dashboard/kpis")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
+    @Operation(summary = "Get dashboard financial KPIs with month comparison")
+    public ResponseEntity<ApiResponse<DashboardKpisResponse>> getDashboardKpis() {
+        DashboardKpisResponse response = reportService.getKpis();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/dashboard/alerts")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
+    @Operation(summary = "Get dashboard operational alerts")
+    public ResponseEntity<ApiResponse<DashboardAlertsResponse>> getDashboardAlerts() {
+        DashboardAlertsResponse response = reportService.getAlerts();
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/dashboard/movement-trend")
+    @PreAuthorize("@permissionGuard.hasAny('reports:read')")
+    @Operation(summary = "Get movement trend for chart")
+    public ResponseEntity<ApiResponse<MovementTrendResponse>> getMovementTrend(
+            @RequestParam(defaultValue = "30") Integer days) {
+        MovementTrendResponse response = reportService.getMovementTrend(days);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }
