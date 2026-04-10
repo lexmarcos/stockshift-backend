@@ -2,6 +2,8 @@ package br.com.stockshift.service;
 
 import br.com.stockshift.dto.warehouse.WarehouseRequest;
 import br.com.stockshift.dto.warehouse.WarehouseResponse;
+import br.com.stockshift.dto.warehouse.WarehouseStockSummaryProjection;
+import br.com.stockshift.dto.warehouse.WarehouseStockSummaryResponse;
 import br.com.stockshift.exception.BusinessException;
 import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Warehouse;
@@ -93,6 +95,20 @@ public class WarehouseService {
 
         return warehouses.stream()
                 .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<WarehouseStockSummaryResponse> getStockSummaries() {
+        UUID tenantId = TenantContext.getTenantId();
+        Set<UUID> accessibleWarehouseIds = resolveAccessibleWarehouseIds(tenantId);
+
+        if (accessibleWarehouseIds.isEmpty()) {
+            return List.of();
+        }
+
+        return batchRepository.findStockSummaryByWarehouseIds(tenantId, accessibleWarehouseIds).stream()
+                .map(this::mapToStockSummaryResponse)
                 .collect(Collectors.toList());
     }
 
@@ -224,6 +240,25 @@ public class WarehouseService {
                 .createdAt(warehouse.getCreatedAt())
                 .updatedAt(warehouse.getUpdatedAt())
                 .build();
+    }
+
+    private WarehouseStockSummaryResponse mapToStockSummaryResponse(WarehouseStockSummaryProjection projection) {
+        return WarehouseStockSummaryResponse.builder()
+                .warehouseId(projection.getWarehouseId())
+                .productCount(projection.getProductCount())
+                .batchCount(projection.getBatchCount())
+                .totalQuantity(projection.getTotalQuantity())
+                .build();
+    }
+
+    private Set<UUID> resolveAccessibleWarehouseIds(UUID tenantId) {
+        if (warehouseAccessService.hasFullAccess()) {
+            return warehouseRepository.findAllByTenantId(tenantId).stream()
+                    .map(Warehouse::getId)
+                    .collect(Collectors.toSet());
+        }
+
+        return warehouseAccessService.getUserWarehouseIds();
     }
 
     @Transactional(readOnly = true)

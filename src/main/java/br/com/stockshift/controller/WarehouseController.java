@@ -4,6 +4,7 @@ import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.warehouse.ProductWithStockResponse;
 import br.com.stockshift.dto.warehouse.WarehouseRequest;
 import br.com.stockshift.dto.warehouse.WarehouseResponse;
+import br.com.stockshift.dto.warehouse.WarehouseStockSummaryResponse;
 import br.com.stockshift.service.WarehouseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -46,6 +47,14 @@ public class WarehouseController {
     public ResponseEntity<ApiResponse<List<WarehouseResponse>>> findAll() {
         List<WarehouseResponse> warehouses = warehouseService.findAll();
         return ResponseEntity.ok(ApiResponse.success(warehouses));
+    }
+
+    @GetMapping("/stock-summary")
+    @PreAuthorize("@permissionGuard.hasAny('warehouses:read')")
+    @Operation(summary = "Get stock summary for accessible warehouses")
+    public ResponseEntity<ApiResponse<List<WarehouseStockSummaryResponse>>> getStockSummaries() {
+        List<WarehouseStockSummaryResponse> summaries = warehouseService.getStockSummaries();
+        return ResponseEntity.ok(ApiResponse.success(summaries));
     }
 
     @GetMapping("/{id}")

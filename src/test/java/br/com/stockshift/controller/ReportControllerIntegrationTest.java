@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 
+import java.util.UUID;
+
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.MovementDirection;
@@ -17,6 +19,7 @@ import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.model.enums.TransferStatus;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.security.WarehouseContext;
 import br.com.stockshift.util.TestDataFactory;
 
 class ReportControllerIntegrationTest extends BaseIntegrationTest {
@@ -89,6 +92,138 @@ class ReportControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data").exists())
                 .andExpect(jsonPath("$.data.totalProducts").exists())
                 .andExpect(jsonPath("$.data.totalWarehouses").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldGetDashboardAcrossAllWarehousesEvenWithWarehouseContext() throws Exception {
+        Category secondCategory = TestDataFactory.createCategory(
+                categoryRepository,
+                testTenant.getId(),
+                "Secondary Report Category"
+        );
+        Product secondProduct = TestDataFactory.createProduct(
+                productRepository,
+                testTenant.getId(),
+                secondCategory,
+                "Second Report Product",
+                "SKU-RPT-002"
+        );
+        Warehouse secondWarehouse = TestDataFactory.createWarehouse(
+                warehouseRepository,
+                testTenant.getId(),
+                "Overflow Warehouse"
+        );
+        TestDataFactory.createBatch(batchRepository, testTenant.getId(), secondProduct, secondWarehouse, 20);
+
+        Warehouse primaryWarehouse = warehouseRepository.findAllByTenantId(testTenant.getId()).stream()
+                .filter(warehouse -> "Report Warehouse".equals(warehouse.getName()))
+                .findFirst()
+                .orElseThrow();
+
+        WarehouseContext.setWarehouseId(primaryWarehouse.getId());
+
+        try {
+            mockMvc.perform(get("/api/reports/dashboard"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.totalWarehouses").value(2))
+                    .andExpect(jsonPath("$.data.stockByWarehouse.length()").value(2));
+        } finally {
+            WarehouseContext.clear();
+        }
+    }
+
+    @Test
+    @WithMockUser(username = "report@test.com", authorities = { "ROLE_ADMIN" })
+    void shouldDeduplicateTransferLegsInDashboardRecentMovements() throws Exception {
+        Warehouse sourceWarehouse = warehouseRepository.findAllByTenantId(testTenant.getId()).stream()
+                .filter(warehouse -> "Report Warehouse".equals(warehouse.getName()))
+                .findFirst()
+                .orElseThrow();
+        User reportUser = userRepository.findByTenantIdAndEmail(testTenant.getId(), "report@test.com")
+                .orElseThrow();
+
+        Category transferCategory = TestDataFactory.createCategory(
+                categoryRepository,
+                testTenant.getId(),
+                "Transfer Category"
+        );
+        Product transferProduct = TestDataFactory.createProduct(
+                productRepository,
+                testTenant.getId(),
+                transferCategory,
+                "Transfer Product",
+                "SKU-RPT-TRF"
+        );
+        Warehouse destinationWarehouse = TestDataFactory.createWarehouse(
+                warehouseRepository,
+                testTenant.getId(),
+                "Filial Sul"
+        );
+        Batch destinationBatch = TestDataFactory.createBatch(
+                batchRepository,
+                testTenant.getId(),
+                transferProduct,
+                destinationWarehouse,
+                10
+        );
+
+        UUID transferReferenceId = UUID.randomUUID();
+
+        StockMovement transferOut = TestDataFactory.createStockMovement(
+                stockMovementRepository,
+                testTenant.getId(),
+                sourceWarehouse.getId(),
+                StockMovementType.TRANSFER_OUT,
+                MovementDirection.OUT,
+                reportUser.getId()
+        );
+        transferOut.setReferenceType("TRANSFER");
+        transferOut.setReferenceId(transferReferenceId);
+        transferOut.setNotes("Transfer TRF-2026-0002 to Filial Sul");
+        stockMovementRepository.save(transferOut);
+        TestDataFactory.createStockMovementItem(
+                stockMovementItemRepository,
+                transferOut,
+                transferProduct,
+                destinationBatch,
+                java.math.BigDecimal.ONE
+        );
+
+        StockMovement transferIn = TestDataFactory.createStockMovement(
+                stockMovementRepository,
+                testTenant.getId(),
+                destinationWarehouse.getId(),
+                StockMovementType.TRANSFER_IN,
+                MovementDirection.IN,
+                reportUser.getId()
+        );
+        transferIn.setReferenceType("TRANSFER");
+        transferIn.setReferenceId(transferReferenceId);
+        transferIn.setNotes("Transfer TRF-2026-0002 from Report Warehouse");
+        stockMovementRepository.save(transferIn);
+        TestDataFactory.createStockMovementItem(
+                stockMovementItemRepository,
+                transferIn,
+                transferProduct,
+                destinationBatch,
+                java.math.BigDecimal.ONE
+        );
+
+        WarehouseContext.setWarehouseId(sourceWarehouse.getId());
+
+        try {
+            mockMvc.perform(get("/api/reports/dashboard"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true))
+                    .andExpect(jsonPath("$.data.recentMovements.length()").value(1))
+                    .andExpect(jsonPath("$.data.recentMovements[0].notes")
+                            .value("Transfer TRF-2026-0002 to Filial Sul"))
+                    .andExpect(jsonPath("$.data.movementStats.today.transfers").value(1));
+        } finally {
+            WarehouseContext.clear();
+        }
     }
 
     @Test

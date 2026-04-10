@@ -13,6 +13,8 @@ import br.com.stockshift.dto.report.RecentMovementAlert;
 import br.com.stockshift.dto.report.StockReportResponse;
 import br.com.stockshift.exception.UnauthorizedException;
 import br.com.stockshift.model.entity.Batch;
+import br.com.stockshift.model.entity.StockMovement;
+import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.model.enums.MovementDirection;
 import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.model.enums.TransferStatus;
@@ -20,19 +22,27 @@ import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.StockMovementRepository;
 import br.com.stockshift.repository.TransferRepository;
 import br.com.stockshift.repository.WarehouseRepository;
+import br.com.stockshift.security.PermissionCodes;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -41,52 +51,68 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ReportService {
 
+    private static final int DASHBOARD_RECENT_MOVEMENTS_LIMIT = 5;
+    private static final int DASHBOARD_RECENT_MOVEMENTS_FETCH_SIZE = 20;
+    private static final Set<StockMovementType> TRANSFER_MOVEMENT_TYPES = Set.of(
+            StockMovementType.TRANSFER_IN,
+            StockMovementType.TRANSFER_OUT
+    );
+
     private final BatchRepository batchRepository;
     private final StockMovementRepository stockMovementRepository;
     private final TransferRepository transferRepository;
     private final WarehouseRepository warehouseRepository;
     private final SecurityUtils securityUtils;
     private final WarehouseAccessService warehouseAccessService;
+    private final PermissionResolverService permissionResolverService;
 
     @Transactional(readOnly = true)
     public DashboardResponse getDashboard() {
         UUID tenantId = TenantContext.getTenantId();
-        UUID currentWarehouseId = resolveCurrentWarehouseId();
-
-        List<Batch> allBatches;
-        if (currentWarehouseId != null) {
-            allBatches = batchRepository.findByWarehouseIdAndTenantId(currentWarehouseId, tenantId);
-        } else if (warehouseAccessService.hasFullAccess()) {
-            allBatches = batchRepository.findAllByTenantId(tenantId);
-        } else {
-            throw new UnauthorizedException("No active warehouse context");
-        }
+        DashboardWarehouseScope dashboardScope = resolveDashboardWarehouseScope(tenantId);
+        List<Batch> allBatches = resolveBatchesForDashboard(tenantId, dashboardScope);
+        List<Warehouse> warehouses = dashboardScope.warehouses();
 
         long totalProducts = allBatches.stream()
                 .map(batch -> batch.getProduct().getId())
                 .distinct()
                 .count();
-        long totalWarehouses = 1;
+        long activeProducts = allBatches.stream()
+                .map(Batch::getProduct)
+                .filter(product -> Boolean.TRUE.equals(product.getActive()))
+                .map(br.com.stockshift.model.entity.Product::getId)
+                .distinct()
+                .count();
+        long totalWarehouses = warehouses.size();
+        long activeWarehouses = warehouses.stream()
+                .filter(warehouse -> Boolean.TRUE.equals(warehouse.getIsActive()))
+                .count();
+        long totalBatches = allBatches.size();
 
-        BigDecimal totalStockQuantity = allBatches.stream()
-                .map(Batch::getQuantity)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalStockValue = toCurrencyValue(sumStockValue(allBatches));
 
-        BigDecimal totalStockValue = allBatches.stream()
-                .filter(b -> b.getCostPrice() != null)
-                .map(b -> BigDecimal.valueOf(b.getCostPrice()).multiply(b.getQuantity()))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        List<StockReportResponse> lowStockProducts = getLowStockReport(10, 10);
-        List<StockReportResponse> expiringProducts = getExpiringProductsReport(30, 10);
+        long lowStockCount = filterLowStockBatches(allBatches, BigDecimal.TEN).stream()
+                .map(batch -> batch.getProduct().getId())
+                .distinct()
+                .count();
+        long expiringCount = filterExpiringBatches(allBatches, 30).stream()
+                .map(batch -> batch.getProduct().getId())
+                .distinct()
+                .count();
 
         return DashboardResponse.builder()
                 .totalProducts(totalProducts)
+                .activeProducts(activeProducts)
                 .totalWarehouses(totalWarehouses)
-                .totalStockQuantity(totalStockQuantity)
+                .activeWarehouses(activeWarehouses)
+                .totalBatches(totalBatches)
                 .totalStockValue(totalStockValue)
-                .lowStockProducts(lowStockProducts)
-                .expiringProducts(expiringProducts)
+                .lowStockCount(lowStockCount)
+                .expiringCount(expiringCount)
+                .recentMovements(buildRecentMovements(tenantId, dashboardScope))
+                .stockByWarehouse(buildStockByWarehouse(allBatches))
+                .stockByCategory(buildStockByCategory(allBatches))
+                .movementStats(buildMovementStats(tenantId, dashboardScope))
                 .build();
     }
 
@@ -485,6 +511,299 @@ public class ReportService {
         if (warehouseId == null && !warehouseAccessService.hasFullAccess()) {
             throw new UnauthorizedException("No active warehouse context");
         }
+    }
+
+    private record DashboardWarehouseScope(
+            List<Warehouse> warehouses,
+            List<UUID> warehouseIds,
+            boolean fullTenantAccess
+    ) {}
+
+    private DashboardWarehouseScope resolveDashboardWarehouseScope(UUID tenantId) {
+        List<Warehouse> tenantWarehouses = warehouseRepository.findAllByTenantId(tenantId);
+        if (warehouseAccessService.hasFullAccess()) {
+            return new DashboardWarehouseScope(
+                    tenantWarehouses,
+                    tenantWarehouses.stream().map(Warehouse::getId).toList(),
+                    true
+            );
+        }
+
+        UUID userId = securityUtils.getCurrentUserId();
+        List<Warehouse> accessibleWarehouses = tenantWarehouses.stream()
+                .filter(warehouse -> hasDashboardWarehouseAccess(userId, warehouse.getId()))
+                .toList();
+
+        if (accessibleWarehouses.isEmpty()) {
+            throw new UnauthorizedException("No active warehouse context");
+        }
+
+        return new DashboardWarehouseScope(
+                accessibleWarehouses,
+                accessibleWarehouses.stream().map(Warehouse::getId).toList(),
+                false
+        );
+    }
+
+    private boolean hasDashboardWarehouseAccess(UUID userId, UUID warehouseId) {
+        return permissionResolverService.resolveUserPermissions(userId, warehouseId).stream()
+                .anyMatch(permission -> "*".equals(permission) || PermissionCodes.REPORTS_READ.equals(permission));
+    }
+
+    private List<Batch> resolveBatchesForDashboard(UUID tenantId, DashboardWarehouseScope dashboardScope) {
+        if (dashboardScope.fullTenantAccess()) {
+            return batchRepository.findAllByTenantId(tenantId);
+        }
+        return batchRepository.findByTenantIdAndWarehouseIdIn(tenantId, dashboardScope.warehouseIds());
+    }
+
+    private BigDecimal sumStockValue(List<Batch> batches) {
+        return batches.stream()
+                .filter(batch -> batch.getCostPrice() != null)
+                .map(batch -> BigDecimal.valueOf(batch.getCostPrice()).multiply(batch.getQuantity()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal toCurrencyValue(BigDecimal centsValue) {
+        return centsValue.divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    private List<Batch> filterLowStockBatches(List<Batch> batches, BigDecimal threshold) {
+        return batches.stream()
+                .filter(batch -> batch.getQuantity() != null && batch.getQuantity().compareTo(threshold) <= 0)
+                .collect(Collectors.toList());
+    }
+
+    private List<Batch> filterExpiringBatches(List<Batch> batches, int daysAhead) {
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(daysAhead);
+
+        return batches.stream()
+                .filter(batch -> batch.getExpirationDate() != null)
+                .filter(batch -> !batch.getExpirationDate().isBefore(today) && !batch.getExpirationDate().isAfter(endDate))
+                .collect(Collectors.toList());
+    }
+
+    private List<DashboardResponse.RecentMovement> buildRecentMovements(
+            UUID tenantId,
+            DashboardWarehouseScope dashboardScope
+    ) {
+        var recentMovements = dashboardScope.fullTenantAccess()
+                ? stockMovementRepository.findWithFilters(
+                        tenantId,
+                        null,
+                        null,
+                        null,
+                        null,
+                        PageRequest.of(0, DASHBOARD_RECENT_MOVEMENTS_FETCH_SIZE)
+                )
+                : stockMovementRepository.findWithFiltersByWarehouseIds(
+                        tenantId,
+                        dashboardScope.warehouseIds(),
+                        null,
+                        null,
+                        null,
+                        PageRequest.of(0, DASHBOARD_RECENT_MOVEMENTS_FETCH_SIZE)
+                );
+
+        Map<UUID, List<StockMovement>> groupedTransferMovements = new LinkedHashMap<>();
+        List<DashboardResponse.RecentMovement> mappedMovements = new ArrayList<>();
+
+        for (StockMovement movement : recentMovements) {
+            if (isTransferMovement(movement)) {
+                groupedTransferMovements
+                        .computeIfAbsent(movement.getReferenceId(), ignored -> new ArrayList<>())
+                        .add(movement);
+                continue;
+            }
+
+            mappedMovements.add(toRecentMovement(movement, movement.getCreatedAt()));
+        }
+
+        groupedTransferMovements.values().stream()
+                .map(this::toTransferRecentMovement)
+                .forEach(mappedMovements::add);
+
+        return mappedMovements
+                .stream()
+                .sorted(Comparator.comparing(DashboardResponse.RecentMovement::getCreatedAt).reversed())
+                .limit(DASHBOARD_RECENT_MOVEMENTS_LIMIT)
+                .toList();
+    }
+
+    private List<DashboardResponse.StockByWarehouse> buildStockByWarehouse(List<Batch> batches) {
+        return batches.stream()
+                .collect(Collectors.groupingBy(Batch::getWarehouse))
+                .entrySet()
+                .stream()
+                .map(entry -> DashboardResponse.StockByWarehouse.builder()
+                        .warehouseId(entry.getKey().getId())
+                        .warehouseName(entry.getKey().getName())
+                        .batchCount((long) entry.getValue().size())
+                        .stockValue(toCurrencyValue(sumStockValue(entry.getValue())))
+                        .productCount(entry.getValue().stream()
+                                .map(batch -> batch.getProduct().getId())
+                                .distinct()
+                                .count())
+                        .build())
+                .sorted(Comparator.comparing(DashboardResponse.StockByWarehouse::getStockValue).reversed())
+                .collect(Collectors.toList());
+    }
+
+    private List<DashboardResponse.StockByCategory> buildStockByCategory(List<Batch> batches) {
+        record CategoryKey(String id, String name) {}
+
+        return batches.stream()
+                .collect(Collectors.groupingBy(batch -> {
+                    if (batch.getProduct().getCategory() == null) {
+                        return new CategoryKey("uncategorized", "Sem categoria");
+                    }
+                    return new CategoryKey(
+                            batch.getProduct().getCategory().getId().toString(),
+                            batch.getProduct().getCategory().getName()
+                    );
+                }))
+                .entrySet()
+                .stream()
+                .map(entry -> DashboardResponse.StockByCategory.builder()
+                        .categoryId(entry.getKey().id())
+                        .categoryName(entry.getKey().name())
+                        .batchCount((long) entry.getValue().size())
+                        .stockValue(toCurrencyValue(sumStockValue(entry.getValue())))
+                        .productCount(entry.getValue().stream()
+                                .map(batch -> batch.getProduct().getId())
+                                .distinct()
+                                .count())
+                        .build())
+                .sorted(Comparator.comparing(DashboardResponse.StockByCategory::getStockValue).reversed())
+                .collect(Collectors.toList());
+    }
+
+    private DashboardResponse.MovementStats buildMovementStats(
+            UUID tenantId,
+            DashboardWarehouseScope dashboardScope
+    ) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfToday = today.atStartOfDay();
+        LocalDateTime startOfTomorrow = today.plusDays(1).atStartOfDay();
+        LocalDateTime startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).atStartOfDay();
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+
+        return DashboardResponse.MovementStats.builder()
+                .today(buildMovementStatsPeriod(tenantId, dashboardScope, startOfToday, startOfTomorrow))
+                .thisWeek(buildMovementStatsPeriod(tenantId, dashboardScope, startOfWeek, startOfTomorrow))
+                .thisMonth(buildMovementStatsPeriod(tenantId, dashboardScope, startOfMonth, startOfTomorrow))
+                .build();
+    }
+
+    private DashboardResponse.MovementStatsPeriod buildMovementStatsPeriod(
+            UUID tenantId,
+            DashboardWarehouseScope dashboardScope,
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    ) {
+        long entries = 0L;
+        long exits = 0L;
+        long adjustments = 0L;
+        long transfers = countTransferEvents(tenantId, dashboardScope, startDate, endDate);
+
+        List<Object[]> rows = dashboardScope.fullTenantAccess()
+                ? stockMovementRepository.countMovementsByTypeAndPeriod(tenantId, null, startDate, endDate)
+                : stockMovementRepository.countMovementsByTypeAndPeriodByWarehouseIds(
+                        tenantId,
+                        dashboardScope.warehouseIds(),
+                        startDate,
+                        endDate
+                );
+
+        for (Object[] row : rows) {
+            StockMovementType type = (StockMovementType) row[0];
+            long count = ((Number) row[1]).longValue();
+
+            switch (type) {
+                case PURCHASE_IN -> entries += count;
+                case ADJUSTMENT_IN, ADJUSTMENT_OUT -> adjustments += count;
+                case USAGE, GIFT, LOSS, DAMAGE -> exits += count;
+                case TRANSFER_IN, TRANSFER_OUT -> {
+                    // Transfer stats are counted by distinct transfer reference to avoid double-counting IN/OUT legs.
+                }
+            }
+        }
+
+        return DashboardResponse.MovementStatsPeriod.builder()
+                .entries(entries)
+                .exits(exits)
+                .transfers(transfers)
+                .adjustments(adjustments)
+                .build();
+    }
+
+    private long countTransferEvents(
+            UUID tenantId,
+            DashboardWarehouseScope dashboardScope,
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    ) {
+        return dashboardScope.fullTenantAccess()
+                ? stockMovementRepository.countDistinctTransferReferencesByPeriod(
+                        tenantId,
+                        null,
+                        startDate,
+                        endDate,
+                        TRANSFER_MOVEMENT_TYPES
+                )
+                : stockMovementRepository.countDistinctTransferReferencesByPeriodByWarehouseIds(
+                        tenantId,
+                        dashboardScope.warehouseIds(),
+                        startDate,
+                        endDate,
+                        TRANSFER_MOVEMENT_TYPES
+                );
+    }
+
+    private boolean isTransferMovement(StockMovement movement) {
+        return movement.getReferenceId() != null
+                && "TRANSFER".equals(movement.getReferenceType())
+                && TRANSFER_MOVEMENT_TYPES.contains(movement.getType());
+    }
+
+    private DashboardResponse.RecentMovement toTransferRecentMovement(List<StockMovement> transferMovements) {
+        StockMovement representativeMovement = transferMovements.stream()
+                .filter(movement -> movement.getType() == StockMovementType.TRANSFER_OUT)
+                .findFirst()
+                .orElseGet(() -> transferMovements.stream()
+                        .max(Comparator.comparing(StockMovement::getCreatedAt))
+                        .orElseThrow());
+
+        LocalDateTime latestTransferTimestamp = transferMovements.stream()
+                .map(StockMovement::getCreatedAt)
+                .max(LocalDateTime::compareTo)
+                .orElse(representativeMovement.getCreatedAt());
+
+        return toRecentMovement(representativeMovement, latestTransferTimestamp);
+    }
+
+    private DashboardResponse.RecentMovement toRecentMovement(
+            StockMovement movement,
+            LocalDateTime createdAt
+    ) {
+        return DashboardResponse.RecentMovement.builder()
+                .id(movement.getId())
+                .movementType(mapMovementType(movement.getType()))
+                .status("COMPLETED")
+                .createdAt(createdAt)
+                .productCount(movement.getItems() != null ? movement.getItems().size() : 0)
+                .notes(movement.getNotes())
+                .build();
+    }
+
+    private String mapMovementType(StockMovementType type) {
+        return switch (type) {
+            case PURCHASE_IN -> "ENTRY";
+            case TRANSFER_IN, TRANSFER_OUT -> "TRANSFER";
+            case ADJUSTMENT_IN, ADJUSTMENT_OUT -> "ADJUSTMENT";
+            case USAGE, GIFT, LOSS, DAMAGE -> "EXIT";
+        };
     }
 
     private UUID resolveCurrentWarehouseId() {

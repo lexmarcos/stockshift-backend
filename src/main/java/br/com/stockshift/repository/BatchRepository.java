@@ -1,6 +1,7 @@
 package br.com.stockshift.repository;
 
 import br.com.stockshift.dto.warehouse.ProductWithStockProjection;
+import br.com.stockshift.dto.warehouse.WarehouseStockSummaryProjection;
 import br.com.stockshift.model.entity.Batch;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -42,6 +44,11 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
 
   @Query("SELECT b FROM Batch b WHERE b.warehouse.id = :warehouseId AND b.tenantId = :tenantId")
   List<Batch> findByWarehouseIdAndTenantId(UUID warehouseId, UUID tenantId);
+
+  @Query("SELECT b FROM Batch b WHERE b.tenantId = :tenantId AND b.warehouse.id IN :warehouseIds")
+  List<Batch> findByTenantIdAndWarehouseIdIn(
+      @Param("tenantId") UUID tenantId,
+      @Param("warehouseIds") Collection<UUID> warehouseIds);
 
   @Query("SELECT b FROM Batch b WHERE b.product.id = :productId AND b.tenantId = :tenantId")
   List<Batch> findByProductIdAndTenantId(UUID productId, UUID tenantId);
@@ -122,6 +129,20 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
   BigDecimal sumStockValue(
         @Param("tenantId") UUID tenantId,
         @Param("warehouseId") UUID warehouseId);
+
+  @Query("""
+        SELECT b.warehouse.id as warehouseId,
+               COUNT(DISTINCT b.product.id) as productCount,
+               COUNT(b.id) as batchCount,
+               COALESCE(SUM(b.quantity), 0) as totalQuantity
+        FROM Batch b
+        WHERE b.tenantId = :tenantId
+          AND b.warehouse.id IN :warehouseIds
+        GROUP BY b.warehouse.id
+        """)
+  List<WarehouseStockSummaryProjection> findStockSummaryByWarehouseIds(
+        @Param("tenantId") UUID tenantId,
+        @Param("warehouseIds") java.util.Collection<UUID> warehouseIds);
 
   @Query("SELECT COALESCE(SUM(b.transitQuantity), 0) FROM Batch b " +
         "WHERE b.tenantId = :tenantId AND b.deletedAt IS NULL " +

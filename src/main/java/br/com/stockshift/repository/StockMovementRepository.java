@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,6 +36,20 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
     Page<StockMovement> findWithFilters(
             @Param("tenantId") UUID tenantId,
             @Param("warehouseId") UUID warehouseId,
+            @Param("type") StockMovementType type,
+            @Param("dateFrom") LocalDateTime dateFrom,
+            @Param("dateTo") LocalDateTime dateTo,
+            Pageable pageable);
+
+    @Query("SELECT sm FROM StockMovement sm WHERE sm.tenantId = :tenantId " +
+            "AND sm.warehouseId IN :warehouseIds " +
+            "AND (CAST(:type AS string) IS NULL OR sm.type = :type) " +
+            "AND (CAST(:dateFrom AS string) IS NULL OR sm.createdAt >= :dateFrom) " +
+            "AND (CAST(:dateTo AS string) IS NULL OR sm.createdAt <= :dateTo) " +
+            "ORDER BY sm.createdAt DESC")
+    Page<StockMovement> findWithFiltersByWarehouseIds(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseIds") Collection<UUID> warehouseIds,
             @Param("type") StockMovementType type,
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
@@ -130,4 +145,54 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, UU
             @Param("warehouseId") UUID warehouseId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT sm.type, COUNT(sm) FROM StockMovement sm " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate " +
+            "GROUP BY sm.type")
+    List<Object[]> countMovementsByTypeAndPeriod(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT sm.type, COUNT(sm) FROM StockMovement sm " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND sm.warehouseId IN :warehouseIds " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate " +
+            "GROUP BY sm.type")
+    List<Object[]> countMovementsByTypeAndPeriodByWarehouseIds(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseIds") Collection<UUID> warehouseIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT COUNT(DISTINCT sm.referenceId) FROM StockMovement sm " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND sm.referenceType = 'TRANSFER' " +
+            "AND sm.referenceId IS NOT NULL " +
+            "AND sm.type IN :transferTypes " +
+            "AND (:warehouseId IS NULL OR sm.warehouseId = :warehouseId) " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate")
+    long countDistinctTransferReferencesByPeriod(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("transferTypes") Collection<StockMovementType> transferTypes);
+
+    @Query("SELECT COUNT(DISTINCT sm.referenceId) FROM StockMovement sm " +
+            "WHERE sm.tenantId = :tenantId " +
+            "AND sm.referenceType = 'TRANSFER' " +
+            "AND sm.referenceId IS NOT NULL " +
+            "AND sm.type IN :transferTypes " +
+            "AND sm.warehouseId IN :warehouseIds " +
+            "AND sm.createdAt >= :startDate AND sm.createdAt < :endDate")
+    long countDistinctTransferReferencesByPeriodByWarehouseIds(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseIds") Collection<UUID> warehouseIds,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            @Param("transferTypes") Collection<StockMovementType> transferTypes);
 }

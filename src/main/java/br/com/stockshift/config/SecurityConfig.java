@@ -54,7 +54,7 @@ public class SecurityConfig {
             // Health check
             .requestMatchers("/actuator/health/**").permitAll()
             // Auth endpoints
-            .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/register").permitAll()
             // All other requests require authentication
             .anyRequest().authenticated())
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
