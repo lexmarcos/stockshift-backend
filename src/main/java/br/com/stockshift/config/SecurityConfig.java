@@ -55,6 +55,8 @@ public class SecurityConfig {
             .requestMatchers("/actuator/health/**").permitAll()
             // Auth endpoints
             .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/register").permitAll()
+            // InfinitePay callback (public - called by InfinitePay app)
+            .requestMatchers(HttpMethod.GET, "/api/sales/infinitepay/callback").permitAll()
             // All other requests require authentication
             .anyRequest().authenticated())
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
