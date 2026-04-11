@@ -30,6 +30,9 @@ public class SaleMapper {
                 .createdByUserId(sale.getCreatedByUserId())
                 .createdAt(sale.getCreatedAt() != null ? sale.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant() : null)
                 .items(toItemResponseList(sale.getItems()))
+                .infinitepayNsu(sale.getInfinitepayNsu())
+                .infinitepayAut(sale.getInfinitepayAut())
+                .infinitepayCardBrand(sale.getInfinitepayCardBrand())
                 .build();
     }
 

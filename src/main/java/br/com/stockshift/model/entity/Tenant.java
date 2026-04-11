@@ -28,4 +28,10 @@ public class Tenant extends BaseEntity {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+
+    @Column(name = "infinitepay_handle")
+    private String infinitepayHandle;
+
+    @Column(name = "infinitepay_doc_number")
+    private String infinitepayDocNumber;
 }

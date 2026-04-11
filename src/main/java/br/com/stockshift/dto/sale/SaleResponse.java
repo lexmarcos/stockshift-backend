@@ -31,4 +31,7 @@ public class SaleResponse {
     private UUID createdByUserId;
     private Instant createdAt;
     private List<SaleItemResponse> items;
+    private String infinitepayNsu;
+    private String infinitepayAut;
+    private String infinitepayCardBrand;
 }

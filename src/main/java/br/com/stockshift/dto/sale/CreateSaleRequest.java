@@ -28,4 +28,6 @@ public class CreateSaleRequest {
     @NotEmpty(message = "At least one item is required")
     @Valid
     private List<CreateSaleItemRequest> items;
+
+    private Boolean useInfinitePay;
 }

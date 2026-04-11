@@ -65,6 +65,15 @@ public class Sale extends TenantAwareEntity {
     @Column(name = "created_by_user_id", nullable = false)
     private UUID createdByUserId;
 
+    @Column(name = "infinitepay_nsu")
+    private String infinitepayNsu;
+
+    @Column(name = "infinitepay_aut")
+    private String infinitepayAut;
+
+    @Column(name = "infinitepay_card_brand")
+    private String infinitepayCardBrand;
+
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<SaleItem> items = new ArrayList<>();
