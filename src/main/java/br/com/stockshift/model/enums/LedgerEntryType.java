@@ -13,7 +13,9 @@ public enum LedgerEntryType {
     LOSS_OUT(true),
     DAMAGE_OUT(true),
     STOCK_MOVEMENT_IN(false),
-    STOCK_MOVEMENT_OUT(true);
+    STOCK_MOVEMENT_OUT(true),
+    SALE_OUT(true),
+    SALE_CANCEL_IN(false);
 
     private final boolean debit;
 
