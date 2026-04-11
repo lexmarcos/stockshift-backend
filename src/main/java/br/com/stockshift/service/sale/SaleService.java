@@ -71,7 +71,7 @@ public class SaleService {
                 .subtotal(0L)
                 .discountAmount(0L)
                 .total(0L)
-                .status(SaleStatus.COMPLETED)
+                .status(Boolean.TRUE.equals(request.getUseInfinitePay()) ? SaleStatus.PENDING : SaleStatus.COMPLETED)
                 .createdByUserId(userId)
                 .build();
         sale.setTenantId(tenantId);
@@ -281,6 +281,27 @@ public class SaleService {
         String warehouseName = warehouseRepository.findById(saved.getWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");
         return mapper.toResponse(saved, warehouseName);
+    }
+
+    // ── Confirm InfinitePay payment ──────────────────────────────────────
+
+    @Transactional
+    public void confirmInfinitePayPayment(UUID saleId, String nsu, String aut, String cardBrand) {
+        Sale sale = saleRepository.findById(saleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
+
+        if (sale.getStatus() != SaleStatus.PENDING) {
+            log.warn("Sale {} is not PENDING (status: {}), ignoring InfinitePay callback", saleId, sale.getStatus());
+            return;
+        }
+
+        sale.setStatus(SaleStatus.COMPLETED);
+        sale.setInfinitepayNsu(nsu);
+        sale.setInfinitepayAut(aut);
+        sale.setInfinitepayCardBrand(cardBrand);
+
+        saleRepository.save(sale);
+        log.info("Sale {} confirmed via InfinitePay (nsu: {}, card_brand: {})", sale.getCode(), nsu, cardBrand);
     }
 
     // ── Next code ───────────────────────────────────────────────────────────
