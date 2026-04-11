@@ -21,7 +21,9 @@ class LedgerEntryTypeTest {
                 LedgerEntryType.LOSS_OUT,
                 LedgerEntryType.DAMAGE_OUT,
                 LedgerEntryType.STOCK_MOVEMENT_IN,
-                LedgerEntryType.STOCK_MOVEMENT_OUT);
+                LedgerEntryType.STOCK_MOVEMENT_OUT,
+                LedgerEntryType.SALE_OUT,
+                LedgerEntryType.SALE_CANCEL_IN);
     }
 
     @Test
