@@ -96,10 +96,10 @@ public class WarehouseController {
     @Operation(summary = "Get products with stock for warehouse")
     public ResponseEntity<ApiResponse<Page<ProductWithStockResponse>>> getProductsWithStock(
             @PathVariable UUID id,
+            @RequestParam(required = false) String search,
             Pageable pageable) {
-        // Filter out invalid sorts - only allow sorting by entity fields
         Pageable sanitizedPageable = sanitizePageable(pageable);
-        Page<ProductWithStockResponse> products = warehouseService.getProductsWithStock(id, sanitizedPageable);
+        Page<ProductWithStockResponse> products = warehouseService.getProductsWithStock(id, search, sanitizedPageable);
         return ResponseEntity.ok(ApiResponse.success(products));
     }
 

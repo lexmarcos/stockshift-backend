@@ -86,6 +86,9 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
         AND b.tenantId = :tenantId
         AND p.tenantId = :tenantId
         AND p.deletedAt IS NULL
+        AND (:search = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+             OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :search, '%'))
+             OR LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%')))
       GROUP BY p.id, p.name, p.sku, p.barcode, p.barcodeType,
                p.description, p.category, p.brand, p.isKit,
                p.attributes, p.hasExpiration, p.active,
@@ -98,10 +101,14 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
         AND b.tenantId = :tenantId
         AND p.tenantId = :tenantId
         AND p.deletedAt IS NULL
+        AND (:search = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
+             OR LOWER(p.sku) LIKE LOWER(CONCAT('%', :search, '%'))
+             OR LOWER(p.barcode) LIKE LOWER(CONCAT('%', :search, '%')))
       """)
   Page<ProductWithStockProjection> findProductsWithStockByWarehouse(
       @Param("warehouseId") UUID warehouseId,
       @Param("tenantId") UUID tenantId,
+      @Param("search") String search,
       Pageable pageable);
 
   @Modifying

@@ -262,7 +262,7 @@ public class WarehouseService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ProductWithStockResponse> getProductsWithStock(UUID warehouseId, Pageable pageable) {
+    public Page<ProductWithStockResponse> getProductsWithStock(UUID warehouseId, String search, Pageable pageable) {
         UUID tenantId = TenantContext.getTenantId();
         warehouseAccessService.validateWarehouseAccess(warehouseId);
 
@@ -270,9 +270,13 @@ public class WarehouseService {
         warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", warehouseId));
 
+        String sanitizedSearch = (search != null && !search.isBlank())
+                ? SanitizationUtil.sanitizeForHtml(search.trim())
+                : "";
+
         // Fetch products with aggregated stock
         Page<ProductWithStockProjection> projections = batchRepository.findProductsWithStockByWarehouse(warehouseId,
-                tenantId, pageable);
+                tenantId, sanitizedSearch, pageable);
 
         // Map to response DTO
         return projections.map(this::mapToProductWithStockResponse);

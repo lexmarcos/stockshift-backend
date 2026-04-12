@@ -22,10 +22,10 @@ public interface SaleRepository extends JpaRepository<Sale, UUID> {
 
     @Query("SELECT s FROM Sale s WHERE s.tenantId = :tenantId " +
             "AND (:warehouseId IS NULL OR s.warehouseId = :warehouseId) " +
-            "AND (:paymentMethod IS NULL OR s.paymentMethod = :paymentMethod) " +
-            "AND (:status IS NULL OR s.status = :status) " +
-            "AND (:dateFrom IS NULL OR s.createdAt >= :dateFrom) " +
-            "AND (:dateTo IS NULL OR s.createdAt <= :dateTo) " +
+            "AND (CAST(:paymentMethod AS string) IS NULL OR s.paymentMethod = :paymentMethod) " +
+            "AND (CAST(:status AS string) IS NULL OR s.status = :status) " +
+            "AND (CAST(:dateFrom AS string) IS NULL OR s.createdAt >= :dateFrom) " +
+            "AND (CAST(:dateTo AS string) IS NULL OR s.createdAt <= :dateTo) " +
             "ORDER BY s.createdAt DESC")
     Page<Sale> findWithFilters(
             @Param("tenantId") UUID tenantId,

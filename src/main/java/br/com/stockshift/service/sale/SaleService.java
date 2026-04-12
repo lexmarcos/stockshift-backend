@@ -76,6 +76,9 @@ public class SaleService {
                 .build();
         sale.setTenantId(tenantId);
 
+        // Save sale immediately to get ID
+        Sale savedSale = saleRepository.save(sale);
+
         // Generate stock movement code
         String movementCode = generateMovementCode(tenantId);
 
@@ -85,7 +88,7 @@ public class SaleService {
                 .type(StockMovementType.USAGE)
                 .direction(MovementDirection.OUT)
                 .referenceType("SALE")
-                .referenceId(sale.getId())
+                .referenceId(savedSale.getId())
                 .createdByUserId(userId)
                 .build();
         stockMovement.setTenantId(tenantId);
@@ -116,7 +119,7 @@ public class SaleService {
                                     + ", Required: " + itemReq.getQuantity());
                 }
 
-                subtotal += processBatchAllocation(sale, stockMovement, batch, product,
+                subtotal += processBatchAllocation(savedSale, stockMovement, batch, product,
                         itemReq.getQuantity(), tenantId, warehouseId, userId, code);
 
             } else {
@@ -157,11 +160,11 @@ public class SaleService {
                 : 0L;
         long total = subtotal - discountAmount;
 
-        sale.setSubtotal(subtotal);
-        sale.setDiscountAmount(discountAmount);
-        sale.setTotal(total);
+        savedSale.setSubtotal(subtotal);
+        savedSale.setDiscountAmount(discountAmount);
+        savedSale.setTotal(total);
 
-        Sale saved = saleRepository.save(sale);
+        Sale saved = saleRepository.save(savedSale);
         movementRepository.save(stockMovement);
 
         log.info("Sale {} created by user {} in warehouse {} - total: {}",

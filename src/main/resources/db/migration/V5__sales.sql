@@ -11,11 +11,6 @@ ALTER TABLE inventory_ledger ADD CONSTRAINT inventory_ledger_entry_type_check
         'STOCK_MOVEMENT_OUT', 'SALE_OUT', 'SALE_CANCEL_IN'
     ));
 
--- Extend permissions resource check
-ALTER TABLE permissions DROP CONSTRAINT permissions_resource_check;
-ALTER TABLE permissions ADD CONSTRAINT permissions_resource_check
-    CHECK (resource IN ('PRODUCT', 'STOCK', 'USER', 'REPORT', 'WAREHOUSE', 'TRANSFER', 'SALES'));
-
 CREATE TABLE sales (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
@@ -68,47 +63,23 @@ CREATE INDEX idx_sale_items_sale ON sale_items(sale_id);
 CREATE INDEX idx_sale_items_product ON sale_items(product_id);
 
 -- Seed SALES permissions
-WITH
-resources(resource) AS (
-    SELECT (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1]
-    FROM pg_constraint c
-    WHERE c.conrelid = 'permissions'::regclass
-      AND c.conname = 'permissions_resource_check'
-),
-actions(action) AS (
-    SELECT (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1]
-    FROM pg_constraint c
-    WHERE c.conrelid = 'permissions'::regclass
-      AND c.conname = 'permissions_action_check'
-),
-scopes(scope) AS (
-    SELECT (regexp_matches(pg_get_constraintdef(c.oid), '''([^'']+)''', 'g'))[1]
-    FROM pg_constraint c
-    WHERE c.conrelid = 'permissions'::regclass
-      AND c.conname = 'permissions_scope_check'
-),
-permission_seed AS (
-    SELECT
-        (
-            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 1, 8) || '-' ||
-            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 9, 4) || '-' ||
-            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 13, 4) || '-' ||
-            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 17, 4) || '-' ||
-            substr(md5(r.resource || ':' || a.action || ':' || s.scope), 21, 12)
-        )::uuid AS id,
-        r.resource,
-        a.action,
-        s.scope,
-        (r.resource || ':' || a.action || ':' || s.scope) AS description
-    FROM resources r
-    CROSS JOIN actions a
-    CROSS JOIN scopes s
-)
-INSERT INTO permissions (id, resource, action, scope, description)
-SELECT id, resource, action, scope, description
-FROM permission_seed
-WHERE resource = 'SALES'
-ON CONFLICT (resource, action, scope) DO NOTHING;
+INSERT INTO permissions (id, resource, action, scope, code, description)
+SELECT
+    (substr(md5('SALES:CREATE:ALL'), 1, 8) || '-' || substr(md5('SALES:CREATE:ALL'), 9, 4) || '-' || substr(md5('SALES:CREATE:ALL'), 13, 4) || '-' || substr(md5('SALES:CREATE:ALL'), 17, 4) || '-' || substr(md5('SALES:CREATE:ALL'), 21, 12))::uuid,
+    'SALES', 'CREATE', 'ALL', 'sales:create', 'SALES:CREATE:ALL'
+UNION ALL SELECT
+    (substr(md5('SALES:READ:ALL'), 1, 8) || '-' || substr(md5('SALES:READ:ALL'), 9, 4) || '-' || substr(md5('SALES:READ:ALL'), 13, 4) || '-' || substr(md5('SALES:READ:ALL'), 17, 4) || '-' || substr(md5('SALES:READ:ALL'), 21, 12))::uuid,
+    'SALES', 'READ', 'ALL', 'sales:read', 'SALES:READ:ALL'
+UNION ALL SELECT
+    (substr(md5('SALES:READ:OWN_WAREHOUSE'), 1, 8) || '-' || substr(md5('SALES:READ:OWN_WAREHOUSE'), 9, 4) || '-' || substr(md5('SALES:READ:OWN_WAREHOUSE'), 13, 4) || '-' || substr(md5('SALES:READ:OWN_WAREHOUSE'), 17, 4) || '-' || substr(md5('SALES:READ:OWN_WAREHOUSE'), 21, 12))::uuid,
+    'SALES', 'READ', 'OWN_WAREHOUSE', 'sales:read:own_warehouse', 'SALES:READ:OWN_WAREHOUSE'
+UNION ALL SELECT
+    (substr(md5('SALES:CANCEL:ALL'), 1, 8) || '-' || substr(md5('SALES:CANCEL:ALL'), 9, 4) || '-' || substr(md5('SALES:CANCEL:ALL'), 13, 4) || '-' || substr(md5('SALES:CANCEL:ALL'), 17, 4) || '-' || substr(md5('SALES:CANCEL:ALL'), 21, 12))::uuid,
+    'SALES', 'CANCEL', 'ALL', 'sales:cancel', 'SALES:CANCEL:ALL'
+UNION ALL SELECT
+    (substr(md5('SALES:CANCEL:OWN_WAREHOUSE'), 1, 8) || '-' || substr(md5('SALES:CANCEL:OWN_WAREHOUSE'), 9, 4) || '-' || substr(md5('SALES:CANCEL:OWN_WAREHOUSE'), 13, 4) || '-' || substr(md5('SALES:CANCEL:OWN_WAREHOUSE'), 17, 4) || '-' || substr(md5('SALES:CANCEL:OWN_WAREHOUSE'), 21, 12))::uuid,
+    'SALES', 'CANCEL', 'OWN_WAREHOUSE', 'sales:cancel:own_warehouse', 'SALES:CANCEL:OWN_WAREHOUSE'
+ON CONFLICT (code) DO NOTHING;
 
 -- Grant SALES permissions to ADMIN role
 INSERT INTO role_permissions (role_id, permission_id)
