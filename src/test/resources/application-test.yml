@@ -1,3 +1,5 @@
+# Test profile - datasource configured dynamically by BaseIntegrationTest via @DynamicPropertySource
+
 spring:
   jpa:
     hibernate:
@@ -20,6 +22,9 @@ jwt:
     path: /
     http-only: true
 
+cors:
+  allowed-origins: http://localhost:3000
+
 storage:
   endpoint: http://localhost:54321
   access-key: test-access-key
@@ -28,11 +33,20 @@ storage:
   region: us-east-1
   public-url: http://localhost:54321/test-bucket
 
-logging:
-  level:
-    br.com.stockshift: DEBUG
-    org.springframework.security: DEBUG
+hcaptcha:
+  secret-key: test-hcaptcha-key
 
 openai:
   api-key: test-api-key
   model: gpt-4o-mini
+
+logging:
+  level:
+    root: WARN
+    br.com.stockshift: DEBUG
+    org.springframework.security: DEBUG
+
+management:
+  endpoint:
+    health:
+      show-details: always

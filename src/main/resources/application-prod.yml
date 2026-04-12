@@ -1,0 +1,44 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+jwt:
+  secret: ${JWT_SECRET}
+  cookie:
+    secure: true
+    same-site: Strict
+
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS}
+
+logging:
+  level:
+    root: WARN
+    br.com.stockshift: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+storage:
+  endpoint: ${STORAGE_ENDPOINT}
+  access-key: ${STORAGE_ACCESS_KEY}
+  secret-key: ${STORAGE_SECRET_KEY}
+  bucket-name: ${STORAGE_BUCKET:stockshift}
+  region: ${STORAGE_REGION:auto}
+  public-url: ${STORAGE_PUBLIC_URL}
+
+hcaptcha:
+  secret-key: ${HCAPTCHA_SECRET_KEY}
+
+openai:
+  api-key: ${OPENAI_API_KEY}
+  model: ${OPENAI_MODEL:gpt-4.1-nano}

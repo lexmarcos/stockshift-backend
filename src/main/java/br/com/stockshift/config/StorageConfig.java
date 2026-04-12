@@ -1,7 +1,7 @@
 package br.com.stockshift.config;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -15,7 +15,7 @@ import java.time.Duration;
 
 @Configuration
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "storage", name = "endpoint")
+@ConditionalOnExpression("!'${storage.endpoint:}'.isEmpty()")
 public class StorageConfig {
     private final StorageProperties properties;
 

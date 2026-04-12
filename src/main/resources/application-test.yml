@@ -1,11 +1,2 @@
-spring:
-  datasource:
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
-    url: jdbc:tc:postgresql:16:///testdb
-  jpa:
-    hibernate:
-      ddl-auto: validate
-  data:
-    redis:
-      host: localhost
-      port: 6379
+# Minimal marker - actual test config lives in src/test/resources/application-test.yml
+# This file exists only to prevent Spring from merging dev defaults into test runs

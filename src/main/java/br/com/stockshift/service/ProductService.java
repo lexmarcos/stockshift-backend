@@ -15,6 +15,8 @@ import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -32,7 +34,9 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
-    private final StorageService storageService;
+    @Autowired(required = false)
+    @Nullable
+    private StorageService storageService;
 
     /**
      * Generates a unique SKU for a product
@@ -62,7 +66,7 @@ public class ProductService {
     @Transactional
     public ProductResponse create(ProductRequest request, MultipartFile image) {
         // Upload image if provided
-        if (image != null && !image.isEmpty()) {
+        if (image != null && !image.isEmpty() && storageService != null) {
             String imageUrl = storageService.uploadImage(image);
             request.setImageUrl(imageUrl);
         }
@@ -196,9 +200,9 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
 
         // Upload new image if provided
-        if (image != null && !image.isEmpty()) {
+        if (image != null && !image.isEmpty() && storageService != null) {
             // Delete old image if exists
-            if (product.getImageUrl() != null) {
+            if (product.getImageUrl() != null && storageService != null) {
                 storageService.deleteImage(product.getImageUrl());
             }
             String imageUrl = storageService.uploadImage(image);
