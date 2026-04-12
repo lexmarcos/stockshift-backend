@@ -1,6 +1,7 @@
 package br.com.stockshift.service;
 
 import br.com.stockshift.dto.permission.PermissionResponse;
+import br.com.stockshift.model.entity.Permission;
 import br.com.stockshift.repository.PermissionRepository;
 import br.com.stockshift.security.PermissionCodes;
 import lombok.RequiredArgsConstructor;
@@ -20,13 +21,34 @@ public class PermissionService {
     public List<PermissionResponse> findAll() {
         return PermissionCodes.all().stream()
                 .sorted()
-                .map(code -> PermissionResponse.builder()
-                        .id(permissionRepository.findByCodeIgnoreCase(code)
-                                .map(permission -> permission.getId())
-                                .orElse(stableIdFor(code)))
-                        .code(code)
-                        .description(code)
-                        .build())
+                .map(code -> {
+                    Permission dbPermission = permissionRepository.findByCodeIgnoreCase(code).orElse(null);
+
+                    String resource = null;
+                    String action = null;
+                    String scope = null;
+                    String[] parts = code.split(":");
+                    if (parts.length >= 1) resource = parts[0];
+                    if (parts.length >= 2) action = parts[1];
+                    if (parts.length >= 3) scope = parts[2];
+
+                    // Use DB values if available, otherwise fall back to parsed values
+                    if (dbPermission != null) {
+                        if (dbPermission.getResource() != null) resource = dbPermission.getResource();
+                        if (dbPermission.getAction() != null) action = dbPermission.getAction();
+                        if (dbPermission.getScope() != null) scope = dbPermission.getScope();
+                    }
+
+                    return PermissionResponse.builder()
+                            .id(dbPermission != null ? dbPermission.getId() : stableIdFor(code))
+                            .code(code)
+                            .description(dbPermission != null && dbPermission.getDescription() != null
+                                    ? dbPermission.getDescription() : code)
+                            .resource(resource)
+                            .action(action)
+                            .scope(scope)
+                            .build();
+                })
                 .toList();
     }
 

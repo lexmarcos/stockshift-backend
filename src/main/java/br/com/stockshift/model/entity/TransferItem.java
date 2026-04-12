@@ -28,6 +28,9 @@ public class TransferItem {
     @Column(name = "source_batch_id", nullable = false)
     private UUID sourceBatchId;
 
+    @Column(name = "batch_code")
+    private String batchCode;
+
     @Column(name = "product_id", nullable = false)
     private UUID productId;
 

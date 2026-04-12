@@ -106,6 +106,7 @@ public class TransferService {
 
         return TransferItem.builder()
                 .sourceBatchId(batch.getId())
+                .batchCode(batch.getBatchCode())
                 .productId(product.getId())
                 .productBarcode(product.getBarcode())
                 .productName(product.getName())

@@ -16,6 +16,7 @@ public class TransferItemResponse {
 
     private UUID id;
     private UUID sourceBatchId;
+    private String batchCode;
     private UUID productId;
     private String productBarcode;
     private String productName;

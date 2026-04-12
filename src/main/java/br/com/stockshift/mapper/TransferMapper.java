@@ -40,6 +40,7 @@ public class TransferMapper {
         return TransferItemResponse.builder()
                 .id(item.getId())
                 .sourceBatchId(item.getSourceBatchId())
+                .batchCode(item.getBatchCode())
                 .productId(item.getProductId())
                 .productBarcode(item.getProductBarcode())
                 .productName(item.getProductName())

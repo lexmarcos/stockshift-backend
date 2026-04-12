@@ -15,4 +15,7 @@ public class PermissionResponse {
     private UUID id;
     private String code;
     private String description;
+    private String resource;
+    private String action;
+    private String scope;
 }
