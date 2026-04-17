@@ -5,6 +5,7 @@ import br.com.stockshift.dto.sale.*;
 import br.com.stockshift.model.enums.PaymentMethod;
 import br.com.stockshift.model.enums.SaleStatus;
 import br.com.stockshift.service.sale.SaleService;
+import br.com.stockshift.service.sale.SalesDashboardService;
 
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ import java.util.UUID;
 public class SaleController {
 
     private final SaleService saleService;
+    private final SalesDashboardService salesDashboardService;
 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
@@ -64,6 +66,14 @@ public class SaleController {
     public ResponseEntity<ApiResponse<NextSaleCodeResponse>> getNextCode() {
         NextSaleCodeResponse response = saleService.getNextCode();
         return ResponseEntity.ok(ApiResponse.success("Next code retrieved successfully", response));
+    }
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("@permissionGuard.hasAny('sales:read')")
+    public ResponseEntity<ApiResponse<SalesDashboardResponse>> dashboard(
+            @RequestParam(required = false) UUID warehouseId) {
+        SalesDashboardResponse response = salesDashboardService.getDashboard(warehouseId);
+        return ResponseEntity.ok(ApiResponse.success("Dashboard retrieved successfully", response));
     }
 
     @GetMapping("/{id}")
