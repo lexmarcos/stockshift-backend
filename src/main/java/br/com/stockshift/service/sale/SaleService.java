@@ -7,7 +7,9 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.mapper.SaleMapper;
 import br.com.stockshift.model.entity.*;
 import br.com.stockshift.model.enums.*;
+import br.com.stockshift.model.entity.User;
 import br.com.stockshift.repository.*;
+import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 
@@ -39,6 +41,7 @@ public class SaleService {
     private final WarehouseRepository warehouseRepository;
     private final InventoryLedgerRepository ledgerRepository;
     private final StockMovementRepository movementRepository;
+    private final UserRepository userRepository;
     private final SaleMapper mapper;
     private final SecurityUtils securityUtils;
 
@@ -202,7 +205,9 @@ public class SaleService {
         return sales.map(sale -> {
             String warehouseName = warehouseRepository.findById(sale.getWarehouseId())
                     .map(Warehouse::getName).orElse("Unknown");
-            return mapper.toSummaryResponse(sale, warehouseName);
+            String userName = userRepository.findById(sale.getCreatedByUserId())
+                    .map(User::getFullName).orElse("Desconhecido");
+            return mapper.toSummaryResponse(sale, warehouseName, userName);
         });
     }
 

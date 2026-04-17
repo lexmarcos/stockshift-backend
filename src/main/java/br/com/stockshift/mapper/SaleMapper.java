@@ -54,7 +54,7 @@ public class SaleMapper {
         return items.stream().map(this::toItemResponse).collect(Collectors.toList());
     }
 
-    public SaleSummaryResponse toSummaryResponse(Sale sale, String warehouseName) {
+    public SaleSummaryResponse toSummaryResponse(Sale sale, String warehouseName, String createdByUserName) {
         return SaleSummaryResponse.builder()
                 .id(sale.getId())
                 .code(sale.getCode())
@@ -64,6 +64,7 @@ public class SaleMapper {
                 .total(sale.getTotal())
                 .status(sale.getStatus())
                 .createdAt(sale.getCreatedAt() != null ? sale.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant() : null)
+                .createdByUserName(createdByUserName)
                 .build();
     }
 }

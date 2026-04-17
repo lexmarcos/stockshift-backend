@@ -20,4 +20,5 @@ public class SaleSummaryResponse {
     private Long total;
     private SaleStatus status;
     private Instant createdAt;
+    private String createdByUserName;
 }
