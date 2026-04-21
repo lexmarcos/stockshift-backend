@@ -1,5 +1,6 @@
 package br.com.stockshift.service.sale;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,8 +58,11 @@ public class InfinitePayCheckoutService {
     public static class CheckoutRequest {
         private String handle;
         private List<CheckoutItem> items;
+        @JsonProperty("order_nsu")
         private String orderNsu;
+        @JsonProperty("redirect_url")
         private String redirectUrl;
+        @JsonProperty("webhook_url")
         private String webhookUrl;
     }
 
