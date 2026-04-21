@@ -44,6 +44,8 @@ public class SaleService {
     private final UserRepository userRepository;
     private final SaleMapper mapper;
     private final SecurityUtils securityUtils;
+    private final InfinitePayCheckoutService infinitePayCheckoutService;
+    private final TenantRepository tenantRepository;
 
     // ── Create sale ─────────────────────────────────────────────────────────
 
@@ -74,7 +76,8 @@ public class SaleService {
                 .subtotal(0L)
                 .discountAmount(0L)
                 .total(0L)
-                .status(Boolean.TRUE.equals(request.getUseInfinitePay()) ? SaleStatus.PENDING : SaleStatus.COMPLETED)
+                .status(determineSaleStatus(request))
+                .paymentMode(resolvePaymentMode(request))
                 .createdByUserId(userId)
                 .build();
         sale.setTenantId(tenantId);
@@ -173,7 +176,46 @@ public class SaleService {
         log.info("Sale {} created by user {} in warehouse {} - total: {}",
                 saved.getCode(), userId, warehouseId, total);
 
-        return mapper.toResponse(saved, warehouse.getName());
+        SaleResponse response = mapper.toResponse(saved, warehouse.getName());
+
+        // Generate payment link for LINK mode
+        if (resolvePaymentMode(request) == PaymentMode.LINK) {
+            Tenant tenant = tenantRepository.findById(tenantId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Tenant", "id", tenantId));
+
+            if (tenant.getInfinitepayHandle() == null || tenant.getInfinitepayHandle().isBlank()) {
+                throw new BadRequestException("Configure o InfinitePay nas configurações da empresa antes de gerar link de pagamento");
+            }
+
+            // Aggregate items by product name
+            Map<String, InfinitePayCheckoutService.CheckoutItem> aggregated = new HashMap<>();
+            for (SaleItem item : saved.getItems()) {
+                aggregated.merge(item.getProductName(),
+                        new InfinitePayCheckoutService.CheckoutItem(
+                                item.getQuantity().intValue(),
+                                item.getTotalPrice(),
+                                item.getProductName()),
+                        (existing, newItem) -> {
+                            existing.setQuantity(existing.getQuantity() + newItem.getQuantity());
+                            existing.setPrice(existing.getPrice() + newItem.getPrice());
+                            return existing;
+                        });
+            }
+
+            InfinitePayCheckoutService.CheckoutLinkResponse linkResponse =
+                    infinitePayCheckoutService.generatePaymentLink(
+                            tenant.getInfinitepayHandle(),
+                            aggregated.values().stream().toList(),
+                            saved.getId().toString());
+
+            saved.setPaymentLink(linkResponse.getUrl());
+            saved.setInfinitepayInvoiceSlug(linkResponse.getSlug());
+            saleRepository.save(saved);
+
+            response.setPaymentLink(linkResponse.getUrl());
+        }
+
+        return response;
     }
 
     // ── Get sale by ID ──────────────────────────────────────────────────────
@@ -188,6 +230,26 @@ public class SaleService {
         String warehouseName = warehouseRepository.findById(sale.getWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");
         return mapper.toResponse(sale, warehouseName);
+    }
+
+    // ── Payment mode helpers ──────────────────────────────────────────────────
+
+    private SaleStatus determineSaleStatus(CreateSaleRequest request) {
+        PaymentMode mode = resolvePaymentMode(request);
+        if (mode == PaymentMode.LINK || mode == PaymentMode.TAP) {
+            return SaleStatus.PENDING;
+        }
+        return SaleStatus.COMPLETED;
+    }
+
+    private PaymentMode resolvePaymentMode(CreateSaleRequest request) {
+        if (request.getPaymentMode() != null) {
+            return request.getPaymentMode();
+        }
+        if (Boolean.TRUE.equals(request.getUseInfinitePay())) {
+            return PaymentMode.TAP;
+        }
+        return PaymentMode.DIRECT;
     }
 
     // ── List sales ──────────────────────────────────────────────────────────
