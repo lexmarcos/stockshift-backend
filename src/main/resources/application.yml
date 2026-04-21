@@ -62,3 +62,7 @@ rate-limit:
     capacity: 10
     refill-tokens: 10
     refill-duration-minutes: 15
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  api-base-url: ${API_BASE_URL:http://localhost:8080/stockshift}
