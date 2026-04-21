@@ -74,7 +74,9 @@ public class TenantController {
         UUID tenantId = TenantContext.getTenantId();
         Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
 
-        boolean configured = tenant.getInfinitepayDocNumber() != null
+        boolean configured = tenant.getInfinitepayHandle() != null
+                && !tenant.getInfinitepayHandle().isBlank()
+                && tenant.getInfinitepayDocNumber() != null
                 && !tenant.getInfinitepayDocNumber().isBlank();
 
         return ResponseEntity.ok(ApiResponse.success("InfinitePay config retrieved",
@@ -95,7 +97,8 @@ public class TenantController {
         tenant.setInfinitepayDocNumber(request.getDocNumber());
         tenantRepository.save(tenant);
 
-        boolean configured = request.getDocNumber() != null && !request.getDocNumber().isBlank();
+        boolean configured = request.getHandle() != null && !request.getHandle().isBlank()
+                && request.getDocNumber() != null && !request.getDocNumber().isBlank();
 
         return ResponseEntity.ok(ApiResponse.success("InfinitePay config updated",
                 InfinitePayConfigResponse.builder()
