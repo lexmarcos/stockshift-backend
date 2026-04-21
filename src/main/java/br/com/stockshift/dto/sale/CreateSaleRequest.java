@@ -1,6 +1,7 @@
 package br.com.stockshift.dto.sale;
 
 import br.com.stockshift.model.enums.PaymentMethod;
+import br.com.stockshift.model.enums.PaymentMode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -30,4 +31,6 @@ public class CreateSaleRequest {
     private List<CreateSaleItemRequest> items;
 
     private Boolean useInfinitePay;
+
+    private PaymentMode paymentMode;
 }

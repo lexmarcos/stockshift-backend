@@ -1,6 +1,7 @@
 package br.com.stockshift.dto.sale;
 
 import br.com.stockshift.model.enums.PaymentMethod;
+import br.com.stockshift.model.enums.PaymentMode;
 import br.com.stockshift.model.enums.SaleStatus;
 import lombok.*;
 
@@ -21,4 +22,5 @@ public class SaleSummaryResponse {
     private SaleStatus status;
     private Instant createdAt;
     private String createdByUserName;
+    private PaymentMode paymentMode;
 }

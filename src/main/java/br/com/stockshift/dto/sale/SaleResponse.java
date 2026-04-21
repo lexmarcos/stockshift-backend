@@ -1,6 +1,7 @@
 package br.com.stockshift.dto.sale;
 
 import br.com.stockshift.model.enums.PaymentMethod;
+import br.com.stockshift.model.enums.PaymentMode;
 import br.com.stockshift.model.enums.SaleStatus;
 import lombok.*;
 
@@ -34,4 +35,6 @@ public class SaleResponse {
     private String infinitepayNsu;
     private String infinitepayAut;
     private String infinitepayCardBrand;
+    private PaymentMode paymentMode;
+    private String paymentLink;
 }

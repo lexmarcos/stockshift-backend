@@ -1,6 +1,7 @@
 package br.com.stockshift.model.entity;
 
 import br.com.stockshift.model.enums.PaymentMethod;
+import br.com.stockshift.model.enums.PaymentMode;
 import br.com.stockshift.model.enums.SaleStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -73,6 +74,17 @@ public class Sale extends TenantAwareEntity {
 
     @Column(name = "infinitepay_card_brand")
     private String infinitepayCardBrand;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_mode", nullable = false, length = 10)
+    @Builder.Default
+    private PaymentMode paymentMode = PaymentMode.DIRECT;
+
+    @Column(name = "payment_link")
+    private String paymentLink;
+
+    @Column(name = "infinitepay_invoice_slug")
+    private String infinitepayInvoiceSlug;
 
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default

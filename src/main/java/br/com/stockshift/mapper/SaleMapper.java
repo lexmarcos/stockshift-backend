@@ -33,6 +33,8 @@ public class SaleMapper {
                 .infinitepayNsu(sale.getInfinitepayNsu())
                 .infinitepayAut(sale.getInfinitepayAut())
                 .infinitepayCardBrand(sale.getInfinitepayCardBrand())
+                .paymentMode(sale.getPaymentMode())
+                .paymentLink(sale.getPaymentLink())
                 .build();
     }
 
@@ -65,6 +67,7 @@ public class SaleMapper {
                 .status(sale.getStatus())
                 .createdAt(sale.getCreatedAt() != null ? sale.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant() : null)
                 .createdByUserName(createdByUserName)
+                .paymentMode(sale.getPaymentMode())
                 .build();
     }
 }
