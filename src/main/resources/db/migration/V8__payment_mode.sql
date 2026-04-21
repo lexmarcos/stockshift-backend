@@ -1,0 +1,3 @@
+ALTER TABLE sales ADD COLUMN payment_mode VARCHAR(10) NOT NULL DEFAULT 'DIRECT';
+ALTER TABLE sales ADD COLUMN payment_link VARCHAR(500);
+ALTER TABLE sales ADD COLUMN infinitepay_invoice_slug VARCHAR(100);
