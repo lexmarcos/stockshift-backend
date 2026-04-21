@@ -374,6 +374,30 @@ public class SaleService {
         log.info("Sale {} confirmed via InfinitePay (nsu: {}, card_brand: {})", sale.getCode(), nsu, cardBrand);
     }
 
+    // ── Confirm InfinitePay webhook (payment link) ──────────────────────────
+
+    @Transactional
+    public void confirmInfinitePayWebhook(UUID saleId, String transactionNsu,
+                                           String captureMethod, String invoiceSlug,
+                                           String receiptUrl) {
+        Sale sale = saleRepository.findById(saleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
+
+        if (sale.getStatus() != SaleStatus.PENDING) {
+            log.warn("Sale {} is not PENDING (status: {}), ignoring webhook", saleId, sale.getStatus());
+            return;
+        }
+
+        sale.setStatus(SaleStatus.COMPLETED);
+        sale.setInfinitepayNsu(transactionNsu);
+        sale.setInfinitepayCardBrand(captureMethod);
+        sale.setInfinitepayInvoiceSlug(invoiceSlug);
+
+        saleRepository.save(sale);
+        log.info("Sale {} confirmed via InfinitePay webhook (transaction_nsu: {}, capture_method: {})",
+                sale.getCode(), transactionNsu, captureMethod);
+    }
+
     // ── Next code ───────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)

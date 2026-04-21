@@ -2,6 +2,7 @@ package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.sale.*;
+import br.com.stockshift.dto.sale.InfinitePayWebhookRequest;
 import br.com.stockshift.model.enums.PaymentMethod;
 import br.com.stockshift.model.enums.SaleStatus;
 import br.com.stockshift.service.sale.SaleService;
@@ -124,6 +125,30 @@ public class SaleController {
             return ResponseEntity.status(302)
                     .header("Location", frontendUrl + "/sales/pdv?infinitepay=error&sale_id=" + order_id)
                     .build();
+        }
+    }
+
+    @PostMapping("/infinitepay/webhook")
+    public ResponseEntity<Void> infinitepayWebhook(
+            @RequestBody InfinitePayWebhookRequest request) {
+        try {
+            UUID saleId = UUID.fromString(request.getOrder_nsu());
+            log.info("InfinitePay webhook received for sale {} - capture_method: {}",
+                    saleId, request.getCapture_method());
+            saleService.confirmInfinitePayWebhook(
+                    saleId,
+                    request.getTransaction_nsu(),
+                    request.getCapture_method(),
+                    request.getInvoice_slug(),
+                    request.getReceipt_url());
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid order_nsu from InfinitePay webhook: {}", request.getOrder_nsu());
+            return ResponseEntity.badRequest().build();
+        } catch (Exception e) {
+            log.error("Error processing InfinitePay webhook for order {}: {}",
+                    request.getOrder_nsu(), e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 }
