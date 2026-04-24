@@ -2,6 +2,7 @@ package br.com.stockshift.model.enums;
 
 public enum StockMovementType {
   USAGE(MovementDirection.OUT),
+  SALE(MovementDirection.OUT),
   GIFT(MovementDirection.OUT),
   LOSS(MovementDirection.OUT),
   DAMAGE(MovementDirection.OUT),

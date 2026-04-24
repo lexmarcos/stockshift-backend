@@ -9,6 +9,9 @@ spring:
       hibernate:
         format_sql: true
 
+cors:
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://stag-above-hog.ngrok-free.app}
+
 jwt:
   secret: ${JWT_SECRET:dev-secret-key-change-in-production-must-be-at-least-256-bits-long}
 

@@ -91,7 +91,7 @@ public class SaleService {
         StockMovement stockMovement = StockMovement.builder()
                 .code(movementCode)
                 .warehouseId(warehouseId)
-                .type(StockMovementType.USAGE)
+                .type(StockMovementType.SALE)
                 .direction(MovementDirection.OUT)
                 .referenceType("SALE")
                 .referenceId(savedSale.getId())
@@ -180,6 +180,10 @@ public class SaleService {
 
         // Generate payment link for LINK mode
         if (resolvePaymentMode(request) == PaymentMode.LINK) {
+            if (total < 100) {
+                throw new BadRequestException("Total da venda deve ser no mínimo R$ 1,00 para gerar link de pagamento");
+            }
+
             Tenant tenant = tenantRepository.findById(tenantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Tenant", "id", tenantId));
 
@@ -379,7 +383,7 @@ public class SaleService {
     @Transactional
     public void confirmInfinitePayWebhook(UUID saleId, String transactionNsu,
                                            String captureMethod, String invoiceSlug,
-                                           String receiptUrl) {
+                                           String receiptUrl, Integer installments) {
         Sale sale = saleRepository.findById(saleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
 
@@ -393,9 +397,27 @@ public class SaleService {
         sale.setInfinitepayCardBrand(captureMethod);
         sale.setInfinitepayInvoiceSlug(invoiceSlug);
 
+        PaymentMethod resolvedPaymentMethod = mapCaptureMethodToPaymentMethod(captureMethod);
+        if (resolvedPaymentMethod != null) {
+            sale.setPaymentMethod(resolvedPaymentMethod);
+        }
+        if (installments != null && installments > 0) {
+            sale.setInstallments(installments);
+        }
+
         saleRepository.save(sale);
-        log.info("Sale {} confirmed via InfinitePay webhook (transaction_nsu: {}, capture_method: {})",
-                sale.getCode(), transactionNsu, captureMethod);
+        log.info("Sale {} confirmed via InfinitePay webhook (transaction_nsu: {}, capture_method: {}, installments: {})",
+                sale.getCode(), transactionNsu, captureMethod, installments);
+    }
+
+    private PaymentMethod mapCaptureMethodToPaymentMethod(String captureMethod) {
+        if (captureMethod == null) return null;
+        return switch (captureMethod.toLowerCase()) {
+            case "credit_card" -> PaymentMethod.CREDIT_CARD;
+            case "debit_card" -> PaymentMethod.DEBIT_CARD;
+            case "pix" -> PaymentMethod.PIX;
+            default -> null;
+        };
     }
 
     // ── Next code ───────────────────────────────────────────────────────────

@@ -1,11 +1,11 @@
 services:
   nginx:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
     container_name: stockshift-nginx
     ports:
       - "9000:9000"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

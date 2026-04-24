@@ -356,6 +356,7 @@ public class StockMovementService {
   private LedgerEntryType mapToLedgerType(StockMovementType type) {
     return switch (type) {
       case USAGE -> LedgerEntryType.USAGE_OUT;
+      case SALE -> LedgerEntryType.SALE_OUT;
       case GIFT -> LedgerEntryType.GIFT_OUT;
       case LOSS -> LedgerEntryType.LOSS_OUT;
       case DAMAGE -> LedgerEntryType.DAMAGE_OUT;

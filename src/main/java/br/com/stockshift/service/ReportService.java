@@ -723,7 +723,7 @@ public class ReportService {
             switch (type) {
                 case PURCHASE_IN -> entries += count;
                 case ADJUSTMENT_IN, ADJUSTMENT_OUT -> adjustments += count;
-                case USAGE, GIFT, LOSS, DAMAGE -> exits += count;
+                case USAGE, GIFT, LOSS, DAMAGE, SALE -> exits += count;
                 case TRANSFER_IN, TRANSFER_OUT -> {
                     // Transfer stats are counted by distinct transfer reference to avoid double-counting IN/OUT legs.
                 }
@@ -802,7 +802,7 @@ public class ReportService {
             case PURCHASE_IN -> "ENTRY";
             case TRANSFER_IN, TRANSFER_OUT -> "TRANSFER";
             case ADJUSTMENT_IN, ADJUSTMENT_OUT -> "ADJUSTMENT";
-            case USAGE, GIFT, LOSS, DAMAGE -> "EXIT";
+            case USAGE, GIFT, LOSS, DAMAGE, SALE -> "EXIT";
         };
     }
 

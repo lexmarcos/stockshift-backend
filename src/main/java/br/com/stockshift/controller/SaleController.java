@@ -140,7 +140,8 @@ public class SaleController {
                     request.getTransaction_nsu(),
                     request.getCapture_method(),
                     request.getInvoice_slug(),
-                    request.getReceipt_url());
+                    request.getReceipt_url(),
+                    request.getInstallments());
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             log.warn("Invalid order_nsu from InfinitePay webhook: {}", request.getOrder_nsu());
