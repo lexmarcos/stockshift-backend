@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
@@ -63,6 +64,12 @@ public class Batch extends TenantAwareEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "origin_batch_id")
     private Batch originBatch;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "origin_stock_movement_item_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private StockMovementItem originMovementItem;
 
     @Column(name = "transit_quantity", nullable = false, precision = 19, scale = 4)
     @Builder.Default

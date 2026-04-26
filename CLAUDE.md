@@ -1,26 +1,49 @@
-# StockShift Backend
+## Code style
 
-Multi-tenant stock management system for small businesses to manage inventory across multiple warehouses.
+- Functions: 4-20 lines. Split if longer.
+- Files: under 500 lines. Split by responsibility.
+- One thing per function, one responsibility per module (SRP).
+- Names: specific and unique. Avoid `data`, `handler`, `Manager`.
+  Prefer names that return <5 grep hits in the codebase.
+- Types: explicit. No `any`, no `Dict`, no untyped functions.
+- No code duplication. Extract shared logic into a function/module.
+- Early returns over nested ifs. Max 2 levels of indentation.
+- Exception messages must include the offending value and expected shape.
 
-## Commands
+## Comments
 
-```bash
-./gradlew build      # Build
-./gradlew test       # Run tests
-./gradlew bootRun    # Run application
-docker-compose up -d # Start Postgres + Redis
-```
+- Keep your own comments. Don't strip them on refactor — they carry
+  intent and provenance.
+- Write WHY, not WHAT. Skip `// increment counter` above `i++`.
+- Docstrings on public functions: intent + one usage example.
+- Reference issue numbers / commit SHAs when a line exists because
+  of a specific bug or upstream constraint.
 
-## Key Patterns
+## Tests
 
-- **Multi-tenancy:** All tenant-scoped entities extend `TenantAwareEntity` with `tenant_id`
-- **API wrapper:** All endpoints return `ApiResponse<T>` at base path `/stockshift`
-- **XSS prevention:** Use `SanitizationUtil` for user input
+- Tests run with a single command: `./gradlew test`.
+- Every new function gets a test. Bug fixes get a regression test.
+- Mock external I/O (API, DB, filesystem) with named fake classes,
+  not inline stubs.
+- Tests must be F.I.R.S.T: fast, independent, repeatable,
+  self-validating, timely.
 
-## Guidelines
+## Dependencies
 
-- [Architecture](.claude/architecture.md) - Project structure, entities, layered design
-- [Security](.claude/security.md) - JWT, permissions, rate limiting
-- [Database](.claude/database.md) - Migrations, table conventions
-- [Testing](.claude/testing.md) - Testcontainers, integration tests
-- [Configuration](.claude/configuration.md) - Environment variables, local setup
+- Inject dependencies through constructor/parameter, not global/import.
+- Wrap third-party libs behind a thin interface owned by this project.
+
+## Structure
+
+- Follow the framework's convention (Spring Boot).
+- Prefer small focused modules over god files.
+- Predictable paths: controller/model/view, src/lib/test, etc.
+
+## Formatting
+
+- Use the language default formatter (IDE defaults) or explicit gradle tasks like spotless if configured. Don't discuss style beyond that.
+
+## Logging
+
+- Structured JSON when logging for debugging / observability.
+- Plain text only for user-facing CLI output.

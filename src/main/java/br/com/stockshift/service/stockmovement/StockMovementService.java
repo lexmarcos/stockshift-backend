@@ -12,6 +12,7 @@ import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.ProductService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -42,11 +44,17 @@ public class StockMovementService {
   private final InventoryLedgerRepository ledgerRepository;
   private final StockMovementMapper mapper;
   private final SecurityUtils securityUtils;
+  private final ProductService productService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
   @Transactional
   public StockMovementResponse create(CreateStockMovementRequest request) {
+    return create(request, List.of());
+  }
+
+  @Transactional
+  public StockMovementResponse create(CreateStockMovementRequest request, List<MultipartFile> inlineProductImages) {
     UUID tenantId = TenantContext.getTenantId();
     UUID warehouseId = securityUtils.getCurrentWarehouseId();
     UUID userId = securityUtils.getCurrentUserId();
@@ -58,6 +66,7 @@ public class StockMovementService {
 
     String code = generateCode(tenantId);
     MovementDirection direction = request.getType().getDirection();
+    validateInlineProductsAllowed(request, direction);
 
     StockMovement movement = StockMovement.builder()
         .code(code)
@@ -68,26 +77,68 @@ public class StockMovementService {
         .createdByUserId(userId)
         .build();
     movement.setTenantId(tenantId);
+    StockMovement saved = movementRepository.save(movement);
+    Deque<MultipartFile> productImages = new ArrayDeque<>(
+        inlineProductImages != null ? inlineProductImages : List.of());
+    List<Product> createdInlineProducts = new ArrayList<>();
 
-    // Process each item
-    for (CreateStockMovementItemRequest itemReq : request.getItems()) {
-      Product product = productRepository.findByTenantIdAndId(tenantId, itemReq.getProductId())
-          .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
+    try {
+      for (CreateStockMovementItemRequest itemReq : request.getItems()) {
+        MultipartFile image = pollInlineProductImage(itemReq, productImages);
+        Product product = resolveMovementProduct(itemReq, tenantId, image);
+        if (itemReq.getNewProduct() != null) {
+          createdInlineProducts.add(product);
+        }
 
-      if (direction == MovementDirection.OUT) {
-        processOutItems(movement, product, itemReq.getQuantity(), warehouseId, tenantId, userId, request.getType());
-      } else {
-        processInItem(movement, product, itemReq.getQuantity(), warehouseId, tenantId, userId, request.getType());
+        if (direction == MovementDirection.OUT) {
+          processOutItems(saved, product, itemReq.getQuantity(), warehouseId, tenantId, userId, request.getType());
+        } else {
+          processInItem(saved, product, itemReq, warehouseId, tenantId, userId, request.getType());
+        }
       }
+    } catch (RuntimeException exception) {
+      cleanupInlineProductImages(createdInlineProducts);
+      throw exception;
     }
 
-    StockMovement saved = movementRepository.save(movement);
+    saved = movementRepository.save(saved);
     log.info("StockMovement {} ({}) created by user {} in warehouse {}",
         saved.getCode(), saved.getType(), userId, warehouseId);
 
     String warehouseName = warehouseRepository.findById(warehouseId)
         .map(Warehouse::getName).orElse("Unknown");
     return mapper.toResponse(saved, warehouseName);
+  }
+
+  private void validateInlineProductsAllowed(CreateStockMovementRequest request, MovementDirection direction) {
+    boolean hasNewProduct = request.getItems().stream()
+        .anyMatch(item -> item.getNewProduct() != null);
+    if (hasNewProduct && direction == MovementDirection.OUT) {
+      throw new BadRequestException("New products can only be used in IN stock movements. Received: "
+          + request.getType());
+    }
+  }
+
+  private MultipartFile pollInlineProductImage(CreateStockMovementItemRequest itemReq, Deque<MultipartFile> images) {
+    if (itemReq.getNewProduct() == null || images.isEmpty()) {
+      return null;
+    }
+    return images.removeFirst();
+  }
+
+  private Product resolveMovementProduct(CreateStockMovementItemRequest itemReq, UUID tenantId, MultipartFile image) {
+    if (itemReq.getProductId() != null) {
+      return productRepository.findByTenantIdAndId(tenantId, itemReq.getProductId())
+          .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
+    }
+
+    return productService.createEntity(itemReq.getNewProduct(), image);
+  }
+
+  private void cleanupInlineProductImages(List<Product> products) {
+    for (Product product : products) {
+      productService.deleteUploadedImageQuietly(product.getImageUrl());
+    }
   }
 
   private void processOutItems(StockMovement movement, Product product, BigDecimal quantity,
@@ -146,8 +197,9 @@ public class StockMovementService {
     }
   }
 
-  private void processInItem(StockMovement movement, Product product, BigDecimal quantity,
+  private void processInItem(StockMovement movement, Product product, CreateStockMovementItemRequest itemReq,
       UUID warehouseId, UUID tenantId, UUID userId, StockMovementType type) {
+    BigDecimal quantity = itemReq.getQuantity();
     Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
         .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", warehouseId));
 
@@ -156,17 +208,21 @@ public class StockMovementService {
         product.getId(), warehouseId, tenantId);
 
     Batch batch;
+    boolean createdBatch = false;
     if (!existingBatches.isEmpty()) {
       batch = existingBatches.get(0);
       batch.setQuantity(batch.getQuantity().add(quantity));
       batchRepository.save(batch);
     } else {
+      createdBatch = true;
       String batchCode = "MOV-" + LocalDate.now() + "-" + product.getSku();
       batch = Batch.builder()
           .product(product)
           .warehouse(warehouse)
           .batchCode(batchCode)
           .quantity(quantity)
+          .costPrice(itemReq.getCostPrice())
+          .sellingPrice(itemReq.getSellingPrice())
           .transitQuantity(BigDecimal.ZERO)
           .build();
       batch.setTenantId(tenantId);
@@ -182,6 +238,11 @@ public class StockMovementService {
         .quantity(quantity)
         .build();
     movement.addItem(item);
+    if (createdBatch) {
+      movementRepository.saveAndFlush(movement);
+      batch.setOriginMovementItem(item);
+      batchRepository.save(batch);
+    }
 
     LedgerEntryType ledgerType = mapToLedgerType(type);
     InventoryLedger ledger = InventoryLedger.builder()

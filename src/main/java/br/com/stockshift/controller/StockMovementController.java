@@ -11,11 +11,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -26,11 +29,21 @@ public class StockMovementController {
 
   private final StockMovementService stockMovementService;
 
-  @PostMapping
+  @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
   @PreAuthorize("@permissionGuard.hasAny('stock_movements:create')")
   public ResponseEntity<ApiResponse<StockMovementResponse>> create(
       @Valid @RequestBody CreateStockMovementRequest request) {
     StockMovementResponse response = stockMovementService.create(request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+        .body(ApiResponse.success("Stock movement created successfully", response));
+  }
+
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("@permissionGuard.hasAny('stock_movements:create')")
+  public ResponseEntity<ApiResponse<StockMovementResponse>> createWithInlineImages(
+      @RequestPart("movement") @Valid CreateStockMovementRequest request,
+      @RequestPart(value = "inlineProductImages", required = false) List<MultipartFile> inlineProductImages) {
+    StockMovementResponse response = stockMovementService.create(request, inlineProductImages);
     return ResponseEntity.status(HttpStatus.CREATED)
         .body(ApiResponse.success("Stock movement created successfully", response));
   }

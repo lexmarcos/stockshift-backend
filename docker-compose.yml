@@ -11,23 +11,23 @@ services:
     networks:
       - stockshift-network
 
-  backend:
-    build: .
-    container_name: stockshift-backend
-    env_file:
-      - .env
-    environment:
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - stockshift-network
-    expose:
-      - "8080"
-    restart: unless-stopped
+  # backend:
+  #   build: .
+  #   container_name: stockshift-backend
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - stockshift-network
+  #   expose:
+  #     - "8080"
+  #   restart: unless-stopped
 
   redis:
     image: redis:7-alpine

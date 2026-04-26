@@ -423,6 +423,9 @@ public class BatchService {
                 .productName(batch.getProduct().getName())
                 .warehouseId(batch.getWarehouse().getId())
                 .warehouseName(batch.getWarehouse().getName())
+                .originStockMovementItemId(resolveOriginMovementItemId(batch))
+                .originStockMovementId(resolveOriginMovementId(batch))
+                .originStockMovementCode(resolveOriginMovementCode(batch))
                 .batchCode(batch.getBatchCode())
                 .quantity(batch.getQuantity())
                 .manufacturedDate(batch.getManufacturedDate())
@@ -432,6 +435,27 @@ public class BatchService {
                 .createdAt(batch.getCreatedAt())
                 .updatedAt(batch.getUpdatedAt())
                 .build();
+    }
+
+    private UUID resolveOriginMovementItemId(Batch batch) {
+        if (batch.getOriginMovementItem() == null) {
+            return null;
+        }
+        return batch.getOriginMovementItem().getId();
+    }
+
+    private UUID resolveOriginMovementId(Batch batch) {
+        if (batch.getOriginMovementItem() == null) {
+            return null;
+        }
+        return batch.getOriginMovementItem().getStockMovement().getId();
+    }
+
+    private String resolveOriginMovementCode(Batch batch) {
+        if (batch.getOriginMovementItem() == null) {
+            return null;
+        }
+        return batch.getOriginMovementItem().getStockMovement().getCode();
     }
 
     private UUID resolveCurrentWarehouseId() {

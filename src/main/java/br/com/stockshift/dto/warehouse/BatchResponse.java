@@ -20,6 +20,9 @@ public class BatchResponse {
     private String productName;
     private UUID warehouseId;
     private String warehouseName;
+    private UUID originStockMovementItemId;
+    private UUID originStockMovementId;
+    private String originStockMovementCode;
     private String batchCode;
     private java.math.BigDecimal quantity;
     private LocalDate manufacturedDate;

@@ -65,12 +65,41 @@ public class ProductService {
 
     @Transactional
     public ProductResponse create(ProductRequest request, MultipartFile image) {
-        // Upload image if provided
-        if (image != null && !image.isEmpty() && storageService != null) {
-            String imageUrl = storageService.uploadImage(image);
-            request.setImageUrl(imageUrl);
+        return mapToResponse(createEntity(request, image));
+    }
+
+    @Transactional
+    public ProductResponse create(ProductRequest request) {
+        return create(request, null);
+    }
+
+    @Transactional
+    public Product createEntity(ProductRequest request) {
+        return createProductEntity(request);
+    }
+
+    @Transactional
+    public Product createEntity(ProductRequest request, MultipartFile image) {
+        Product product = createProductEntity(request);
+        return attachProductImage(product, image);
+    }
+
+    private Product attachProductImage(Product product, MultipartFile image) {
+        if (image == null || image.isEmpty() || storageService == null) {
+            return product;
         }
 
+        String imageUrl = storageService.uploadImage(image);
+        try {
+            product.setImageUrl(SanitizationUtil.sanitizeUrl(imageUrl));
+            return productRepository.save(product);
+        } catch (RuntimeException exception) {
+            deleteUploadedImageQuietly(imageUrl);
+            throw exception;
+        }
+    }
+
+    private Product createProductEntity(ProductRequest request) {
         UUID tenantId = TenantContext.getTenantId();
 
         // Validate unique barcode if provided
@@ -128,12 +157,19 @@ public class ProductService {
         Product saved = productRepository.save(product);
         log.info("Created product {} for tenant {}", saved.getId(), tenantId);
 
-        return mapToResponse(saved);
+        return saved;
     }
 
-    @Transactional
-    public ProductResponse create(ProductRequest request) {
-        return create(request, null);
+    public void deleteUploadedImageQuietly(String imageUrl) {
+        if (imageUrl == null || storageService == null) {
+            return;
+        }
+
+        try {
+            storageService.deleteImage(imageUrl);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to delete uploaded image after stock movement rollback: {}", imageUrl, exception);
+        }
     }
 
     @Transactional(readOnly = true)
