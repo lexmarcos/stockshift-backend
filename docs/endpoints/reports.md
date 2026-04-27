@@ -12,7 +12,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
 **Summary**: Get dashboard summary with key metrics
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`
@@ -54,7 +54,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
     ],
     "stockByCategory": [
       {
-        "categoryId": "660e8400-e29b-41d4-a716-446655440001",
+        "categoryId": "electronics",
         "categoryName": "Electronics",
         "batchCount": 45,
         "stockValue": 35000.00,
@@ -103,7 +103,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
 **Summary**: Get complete stock report
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`
@@ -119,58 +119,39 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
     {
       "productId": "550e8400-e29b-41d4-a716-446655440000",
       "productName": "Product Name",
-      "productSku": "PROD-001",
-      "categoryId": "660e8400-e29b-41d4-a716-446655440001",
-      "categoryName": "Electronics",
-      "totalQuantity": 250,
+      "warehouseId": "770e8400-e29b-41d4-a716-446655440002",
+      "warehouseName": "Main Warehouse",
+      "totalQuantity": 250.000,
       "totalValue": 2625.00,
-      "averageCostPrice": 10.50,
-      "batchCount": 5,
-      "warehouseCount": 2,
-      "oldestExpirationDate": "2026-03-15",
-      "newestExpirationDate": "2027-12-31",
-      "warehouses": [
-        {
-          "warehouseId": "770e8400-e29b-41d4-a716-446655440002",
-          "warehouseName": "Main Warehouse",
-          "warehouseCode": "WH-001",
-          "quantity": 150,
-          "batchCount": 3
-        },
-        {
-          "warehouseId": "880e8400-e29b-41d4-a716-446655440003",
-          "warehouseName": "Secondary Warehouse",
-          "warehouseCode": "WH-002",
-          "quantity": 100,
-          "batchCount": 2
-        }
-      ],
-      "batches": [
-        {
-          "batchId": "990e8400-e29b-41d4-a716-446655440004",
-          "batchNumber": "BATCH-2025-001",
-          "warehouseName": "Main Warehouse",
-          "quantity": 80,
-          "expirationDate": "2026-03-15",
-          "costPrice": 10.50
-        }
-      ]
+      "nearestExpiration": "2026-03-15",
+      "batchCount": 5
     }
   ]
 }
 ```
 
+### Fields
+| Field | Type | Description |
+|---|---|---|
+| `productId` | UUID | Product identifier |
+| `productName` | String | Product name |
+| `warehouseId` | UUID | Warehouse identifier |
+| `warehouseName` | String | Warehouse name |
+| `totalQuantity` | BigDecimal | Total quantity in stock |
+| `totalValue` | BigDecimal | Total stock value (`costPrice * quantity`) |
+| `nearestExpiration` | LocalDate | Nearest batch expiration date (nullable) |
+| `batchCount` | Integer | Number of batches for this product/warehouse |
+
 ### Frontend Implementation Guide
 1. **Comprehensive Table**: Display all stock data in sortable table
-2. **Expandable Rows**: Expand to show warehouse/batch details
-3. **Export Options**: Export to CSV, Excel, PDF
-4. **Print View**: Optimized print layout
-5. **Filters**: Filter by category, warehouse, stock level
-6. **Search**: Full-text search across products
-7. **Aggregations**: Show totals at bottom (quantity, value)
-8. **Visualization**: Charts for top products, categories
-9. **Stock Levels**: Visual indicators (bars, gauges)
-10. **Drill-down**: Link to product details
+2. **Export Options**: Export to CSV, Excel, PDF
+3. **Print View**: Optimized print layout
+4. **Filters**: Filter by warehouse, stock level
+5. **Search**: Full-text search across products
+6. **Aggregations**: Show totals at bottom (quantity, value)
+7. **Visualization**: Charts for top products
+8. **Stock Levels**: Visual indicators (bars, gauges)
+9. **Drill-down**: Link to product details
 
 ---
 
@@ -178,7 +159,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
 **Summary**: Get low stock report
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`  
@@ -199,35 +180,12 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
     {
       "productId": "550e8400-e29b-41d4-a716-446655440000",
       "productName": "Product Name",
-      "productSku": "PROD-001",
-      "categoryId": "660e8400-e29b-41d4-a716-446655440001",
-      "categoryName": "Electronics",
-      "totalQuantity": 8,
+      "warehouseId": "770e8400-e29b-41d4-a716-446655440002",
+      "warehouseName": "Main Warehouse",
+      "totalQuantity": 8.000,
       "totalValue": 84.00,
-      "averageCostPrice": 10.50,
-      "batchCount": 2,
-      "warehouseCount": 1,
-      "oldestExpirationDate": "2026-03-15",
-      "newestExpirationDate": null,
-      "warehouses": [
-        {
-          "warehouseId": "770e8400-e29b-41d4-a716-446655440002",
-          "warehouseName": "Main Warehouse",
-          "warehouseCode": "WH-001",
-          "quantity": 8,
-          "batchCount": 2
-        }
-      ],
-      "batches": [
-        {
-          "batchId": "990e8400-e29b-41d4-a716-446655440004",
-          "batchNumber": "BATCH-2025-001",
-          "warehouseName": "Main Warehouse",
-          "quantity": 5,
-          "expirationDate": "2026-03-15",
-          "costPrice": 10.50
-        }
-      ]
+      "nearestExpiration": "2026-03-15",
+      "batchCount": 2
     }
   ]
 }
@@ -251,7 +209,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
 **Summary**: Get expiring products report
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`  
@@ -272,45 +230,12 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
     {
       "productId": "550e8400-e29b-41d4-a716-446655440000",
       "productName": "Product Name",
-      "productSku": "PROD-001",
-      "categoryId": "660e8400-e29b-41d4-a716-446655440001",
-      "categoryName": "Food Items",
-      "totalQuantity": 45,
+      "warehouseId": "770e8400-e29b-41d4-a716-446655440002",
+      "warehouseName": "Main Warehouse",
+      "totalQuantity": 45.000,
       "totalValue": 472.50,
-      "averageCostPrice": 10.50,
-      "batchCount": 3,
-      "warehouseCount": 2,
-      "oldestExpirationDate": "2026-01-15",
-      "newestExpirationDate": "2026-02-28",
-      "warehouses": [
-        {
-          "warehouseId": "770e8400-e29b-41d4-a716-446655440002",
-          "warehouseName": "Main Warehouse",
-          "warehouseCode": "WH-001",
-          "quantity": 30,
-          "batchCount": 2
-        }
-      ],
-      "batches": [
-        {
-          "batchId": "990e8400-e29b-41d4-a716-446655440004",
-          "batchNumber": "BATCH-2025-001",
-          "warehouseName": "Main Warehouse",
-          "quantity": 15,
-          "expirationDate": "2026-01-15",
-          "costPrice": 10.50,
-          "daysUntilExpiration": 18
-        },
-        {
-          "batchId": "aa0e8400-e29b-41d4-a716-446655440005",
-          "batchNumber": "BATCH-2025-002",
-          "warehouseName": "Main Warehouse",
-          "quantity": 15,
-          "expirationDate": "2026-01-20",
-          "costPrice": 10.50,
-          "daysUntilExpiration": 23
-        }
-      ]
+      "nearestExpiration": "2026-01-15",
+      "batchCount": 3
     }
   ]
 }
@@ -337,7 +262,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
 **Summary**: Get dashboard quick summary with key operational metrics
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`
@@ -388,7 +313,7 @@ These endpoints provide dashboard summaries, stock reports, and analytics for th
 **Summary**: Get financial KPIs with month-over-month comparison
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`
@@ -470,7 +395,7 @@ Each field represents the percentage change: `((current - previous) / previous) 
 **Summary**: Get operational alerts for the dashboard
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`
@@ -553,7 +478,7 @@ Each field represents the percentage change: `((current - previous) / previous) 
 **Summary**: Get daily movement volume trend for charts
 
 ### Authorization
-**Required Permissions**: `REPORT_READ` or `ROLE_ADMIN`
+**Required Permissions**: `reports:read`
 
 ### Request
 **Method**: `GET`
@@ -629,6 +554,87 @@ Same structure as `DailyMovement` but aggregated across all days in the period.
 4. **Tooltip**: Show exact values on hover
 5. **Summary Stats**: Display `totals` below the chart
 6. **Zero-fill**: API already returns zero-filled days, no frontend gap-filling needed
+
+---
+
+## GET /api/transfers/{id}/discrepancy-report
+**Summary**: Get discrepancy report for a completed transfer
+
+### Authorization
+**Required Permissions**: `transfers:read`
+
+### Request
+**Method**: `GET`
+**Path Parameters**:
+- `id` (UUID, required) - Transfer ID
+
+**Example**: `/api/transfers/550e8400-e29b-41d4-a716-446655440000/discrepancy-report`
+
+### Response
+**Status Code**: `200 OK`
+
+```json
+{
+  "success": true,
+  "message": null,
+  "data": {
+    "transferId": "550e8400-e29b-41d4-a716-446655440000",
+    "transferCode": "TRF-2026-001",
+    "sourceWarehouseName": "Main Warehouse",
+    "destinationWarehouseName": "Secondary Warehouse",
+    "completedAt": "2026-04-25T14:30:00Z",
+    "discrepancies": [
+      {
+        "productName": "Product A",
+        "productBarcode": "1234567890128",
+        "quantitySent": 100.000,
+        "quantityReceived": 95.000,
+        "difference": -5.000,
+        "type": "SHORTAGE"
+      },
+      {
+        "productName": "Product B",
+        "productBarcode": "9876543210987",
+        "quantitySent": 50.000,
+        "quantityReceived": 52.000,
+        "difference": 2.000,
+        "type": "OVERAGE"
+      }
+    ],
+    "totalShortage": -5.000,
+    "totalOverage": 2.000
+  }
+}
+```
+
+### Fields
+| Field | Type | Description |
+|---|---|---|
+| `transferId` | UUID | Transfer identifier |
+| `transferCode` | String | Human-readable transfer code |
+| `sourceWarehouseName` | String | Origin warehouse name |
+| `destinationWarehouseName` | String | Destination warehouse name |
+| `completedAt` | Instant | Timestamp when transfer was completed |
+| `discrepancies` | List\<DiscrepancyItem\> | List of item-level discrepancies |
+| `totalShortage` | BigDecimal | Sum of all SHORTAGE differences (negative) |
+| `totalOverage` | BigDecimal | Sum of all OVERAGE differences (positive) |
+
+#### DiscrepancyItem Fields
+| Field | Type | Description |
+|---|---|---|
+| `productName` | String | Product name |
+| `productBarcode` | String | Product barcode |
+| `quantitySent` | BigDecimal | Quantity sent from source |
+| `quantityReceived` | BigDecimal | Quantity received at destination |
+| `difference` | BigDecimal | `quantityReceived - quantitySent` |
+| `type` | DiscrepancyType | `SHORTAGE` (received less) or `OVERAGE` (received more) |
+
+### Frontend Implementation Guide
+1. **Discrepancy Table**: Show each item with sent vs received quantities
+2. **Color Coding**: Red for SHORTAGE, green for OVERAGE
+3. **Summary Cards**: Display totalShortage and totalOverage as KPIs
+4. **Print**: Support printing the report for physical records
+5. **Export**: Export to CSV or PDF for documentation
 
 ---
 

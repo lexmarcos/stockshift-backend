@@ -19,17 +19,17 @@ Autenticacao: obrigatoria (JWT em cookie `accessToken` ou header `Authorization`
 
 ## Authorization Matrix
 
-- `POST /api/transfers`: `TRANSFER_CREATE` ou `ROLE_ADMIN`
-- `GET /api/transfers`: `TRANSFER_READ` ou `ROLE_ADMIN`
-- `GET /api/transfers/{id}`: `TRANSFER_READ` ou `ROLE_ADMIN`
-- `PATCH /api/transfers/{id}`: `TRANSFER_UPDATE` ou `ROLE_ADMIN`
-- `DELETE /api/transfers/{id}`: `TRANSFER_CANCEL` ou `ROLE_ADMIN`
-- `POST /api/transfers/{id}/execute`: `TRANSFER_EXECUTE` ou `ROLE_ADMIN`
-- `POST /api/transfers/{id}/start-validation`: `TRANSFER_VALIDATE` ou `ROLE_ADMIN`
-- `POST /api/transfers/{id}/scan`: `TRANSFER_VALIDATE` ou `ROLE_ADMIN`
-- `POST /api/transfers/{id}/complete-validation`: `TRANSFER_VALIDATE` ou `ROLE_ADMIN`
-- `GET /api/transfers/{id}/discrepancy-report`: `TRANSFER_READ` ou `ROLE_ADMIN`
-- `GET /api/transfers/{id}/validation-logs`: `TRANSFER_READ` ou `ROLE_ADMIN`
+- `POST /api/transfers`: `transfers:create`
+- `GET /api/transfers`: `transfers:read`
+- `GET /api/transfers/{id}`: `transfers:read`
+- `PATCH /api/transfers/{id}`: `transfers:update`
+- `DELETE /api/transfers/{id}`: `transfers:delete`
+- `POST /api/transfers/{id}/execute`: `transfers:execute`
+- `POST /api/transfers/{id}/start-validation`: `transfers:validate`
+- `POST /api/transfers/{id}/scan`: `transfers:validate`
+- `POST /api/transfers/{id}/complete-validation`: `transfers:validate`
+- `GET /api/transfers/{id}/discrepancy-report`: `transfers:read`
+- `GET /api/transfers/{id}/validation-logs`: `transfers:read`
 
 ## Endpoints
 

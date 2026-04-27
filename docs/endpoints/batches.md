@@ -1,6 +1,7 @@
 # Batch Endpoints
 
 ## Overview
+
 Batches represent specific quantities of products stored in warehouses. Each batch tracks quantity, expiration date, and location.
 
 **Base URL**: `/api/batches`  
@@ -9,39 +10,45 @@ Batches represent specific quantities of products stored in warehouses. Each bat
 ---
 
 ## POST /api/batches
+
 **Summary**: Create a new batch
 
 ### Authorization
+
 **Required Permissions**: `BATCH_CREATE` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `POST`  
 **Content-Type**: `application/json`
 
 #### Request Body
+
 ```json
 {
   "productId": "550e8400-e29b-41d4-a716-446655440000",
   "warehouseId": "660e8400-e29b-41d4-a716-446655440001",
-  "quantity": 100,
+  "quantity": 100.0,
   "batchCode": "BATCH-2025-001",
   "expirationDate": "2026-12-31",
   "costPrice": 1050,
-  "notes": "Initial stock from supplier"
+  "sellingPrice": 2000
 }
 ```
 
 **Field Details**:
+
 - `productId`: Required, UUID of the product
 - `warehouseId`: Required, UUID of the warehouse
-- `quantity`: Required, positive integer
+- `quantity`: Required, positive number (BigDecimal format)
 - `batchCode`: Optional, unique batch identifier. If not provided, will be auto-generated in format `BATCH-YYYYMMDD-XXX`
 - `manufacturedDate`: Optional, ISO date string for manufacturing date
 - `expirationDate`: Optional, ISO date string (required if product has expiration)
 - `costPrice`: Optional, cost per unit in cents (e.g., 1050 = R$10,50)
-- `notes`: Optional, additional notes
+- `sellingPrice`: Optional, selling price per unit in cents (e.g., 2000 = R$20,00)
 
 ### Response
+
 **Status Code**: `201 CREATED`
 
 ```json
@@ -52,16 +59,17 @@ Batches represent specific quantities of products stored in warehouses. Each bat
     "id": "770e8400-e29b-41d4-a716-446655440002",
     "productId": "550e8400-e29b-41d4-a716-446655440000",
     "productName": "Product Name",
-    "productSku": "PROD-001",
     "warehouseId": "660e8400-e29b-41d4-a716-446655440001",
     "warehouseName": "Main Warehouse",
-    "warehouseCode": "WH-001",
-    "quantity": 100,
+    "originStockMovementItemId": null,
+    "originStockMovementId": null,
+    "originStockMovementCode": null,
     "batchCode": "BATCH-2025-001",
+    "quantity": 100.0,
     "manufacturedDate": "2026-01-01",
     "expirationDate": "2026-12-31",
     "costPrice": 1050,
-    "notes": "Initial stock from supplier",
+    "sellingPrice": 2000,
     "createdAt": "2025-12-28T10:00:00Z",
     "updatedAt": "2025-12-28T10:00:00Z"
   }
@@ -70,6 +78,7 @@ Batches represent specific quantities of products stored in warehouses. Each bat
 ```
 
 ### Frontend Implementation Guide
+
 1. **Product Selector**: Autocomplete/dropdown with search
 2. **Warehouse Selector**: Dropdown of active warehouses
 3. **Quantity Input**: Numeric input with validation (positive numbers)
@@ -82,23 +91,29 @@ Batches represent specific quantities of products stored in warehouses. Each bat
 ---
 
 ## POST /api/batches/with-product
+
 **Summary**: Create a new product with initial stock in warehouse
 
 ### Authorization
+
 **Required Permissions**: `BATCH_CREATE` and `PRODUCT_CREATE` or `ROLE_ADMIN`
 
 ### Description
+
 This endpoint atomically creates a new product and its first batch in a single transaction. Use this when receiving a new product that needs to be registered and stocked immediately. If the product already exists, use `POST /api/batches` instead.
 
 ### Request
+
 **Method**: `POST`  
 **Content-Type**: `multipart/form-data`
 
 #### Request Parts
+
 - `product`: JSON object (see below)
 - `image`: Optional, image file (PNG, JPG, JPEG, WEBP)
 
 #### Product JSON Structure
+
 ```json
 {
   "name": "New Product Name",
@@ -125,6 +140,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 **Product Fields**:
+
 - `name`: Required, product name
 - `description`: Optional, detailed product description
 - `categoryId`: Optional, UUID of the category
@@ -137,6 +153,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 - `attributes`: Optional, custom product attributes as key-value pairs
 
 **Batch Fields**:
+
 - `warehouseId`: Required, UUID of the warehouse
 - `batchCode`: Optional, unique batch identifier. If not provided, will be auto-generated in format `BATCH-YYYYMMDD-XXX`
 - `quantity`: Required, positive integer or zero
@@ -146,6 +163,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 - `sellingPrice`: Optional, selling price per unit in cents (e.g., 2000 = R$20,00)
 
 ### Response
+
 **Status Code**: `201 CREATED`
 
 ```json
@@ -184,8 +202,11 @@ This endpoint atomically creates a new product and its first batch in a single t
       "productName": "New Product Name",
       "warehouseId": "660e8400-e29b-41d4-a716-446655440001",
       "warehouseName": "Main Warehouse",
+      "originStockMovementItemId": null,
+      "originStockMovementId": null,
+      "originStockMovementCode": null,
       "batchCode": "BATCH-2026-001",
-      "quantity": 100,
+      "quantity": 100.0,
       "manufacturedDate": "2026-01-01",
       "expirationDate": "2026-12-31",
       "costPrice": 1050,
@@ -200,6 +221,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ### Error Responses
 
 #### 400 Bad Request - SKU Already Exists
+
 ```json
 {
   "status": 400,
@@ -210,6 +232,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 400 Bad Request - Barcode Already Exists
+
 ```json
 {
   "status": 400,
@@ -220,6 +243,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 400 Bad Request - Warehouse Inactive
+
 ```json
 {
   "status": 400,
@@ -230,6 +254,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 400 Bad Request - Batch Code Already Exists
+
 ```json
 {
   "status": 400,
@@ -240,6 +265,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 400 Bad Request - Missing Expiration Date
+
 ```json
 {
   "status": 400,
@@ -250,6 +276,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 400 Bad Request - Invalid Date Range
+
 ```json
 {
   "status": 400,
@@ -260,6 +287,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 404 Not Found - Warehouse Not Found
+
 ```json
 {
   "status": 404,
@@ -270,6 +298,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 #### 404 Not Found - Category Not Found
+
 ```json
 {
   "status": 404,
@@ -280,6 +309,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 ### Frontend Implementation Guide
+
 1. **Form Handling**: Use `FormData` to handle file upload and JSON data (`product` part)
 2. **Image Preview**: Implement client-side image preview before upload
 3. **Use Case**: Product registration + stock entry workflow
@@ -298,6 +328,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 9. **UX Tip**: Combine product and batch forms in a single wizard or tabbed interface
 
 ### When to Use This Endpoint
+
 - ✅ Registering a brand new product with initial stock and optional image
 - ✅ Receiving new products from suppliers
 - ✅ Quick product + stock entry workflow
@@ -307,15 +338,19 @@ This endpoint atomically creates a new product and its first batch in a single t
 ---
 
 ## GET /api/batches
+
 **Summary**: Get all batches
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`
 
 ### Response
+
 **Status Code**: `200 OK`
 
 ```json
@@ -327,16 +362,17 @@ This endpoint atomically creates a new product and its first batch in a single t
       "id": "770e8400-e29b-41d4-a716-446655440002",
       "productId": "550e8400-e29b-41d4-a716-446655440000",
       "productName": "Product Name",
-      "productSku": "PROD-001",
       "warehouseId": "660e8400-e29b-41d4-a716-446655440001",
       "warehouseName": "Main Warehouse",
-      "warehouseCode": "WH-001",
-      "quantity": 100,
+      "originStockMovementItemId": null,
+      "originStockMovementId": null,
+      "originStockMovementCode": null,
       "batchCode": "BATCH-2025-001",
+      "quantity": 100.0,
       "manufacturedDate": "2026-01-01",
       "expirationDate": "2026-12-31",
       "costPrice": 1050,
-      "notes": "Initial stock from supplier",
+      "sellingPrice": 2000,
       "createdAt": "2025-12-28T10:00:00Z",
       "updatedAt": "2025-12-28T10:00:00Z"
     }
@@ -345,6 +381,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 ### Frontend Implementation Guide
+
 1. **Table View**: Display batches in data table
 2. **Columns**: Product, Warehouse, Quantity, Batch #, Expiration, Actions
 3. **Expiration Warning**: Highlight batches near expiration
@@ -357,16 +394,20 @@ This endpoint atomically creates a new product and its first batch in a single t
 ---
 
 ## GET /api/batches/{id}
+
 **Summary**: Get batch by ID
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`  
 **URL Parameters**: `id` (UUID) - Batch identifier
 
 ### Response
+
 **Status Code**: `200 OK`
 
 ```json
@@ -377,16 +418,17 @@ This endpoint atomically creates a new product and its first batch in a single t
     "id": "770e8400-e29b-41d4-a716-446655440002",
     "productId": "550e8400-e29b-41d4-a716-446655440000",
     "productName": "Product Name",
-    "productSku": "PROD-001",
     "warehouseId": "660e8400-e29b-41d4-a716-446655440001",
     "warehouseName": "Main Warehouse",
-    "warehouseCode": "WH-001",
-    "quantity": 100,
+    "originStockMovementItemId": null,
+    "originStockMovementId": null,
+    "originStockMovementCode": null,
     "batchCode": "BATCH-2025-001",
+    "quantity": 100.0,
     "manufacturedDate": "2026-01-01",
     "expirationDate": "2026-12-31",
     "costPrice": 1050,
-    "notes": "Initial stock from supplier",
+    "sellingPrice": 2000,
     "createdAt": "2025-12-28T10:00:00Z",
     "updatedAt": "2025-12-28T10:00:00Z"
   }
@@ -394,6 +436,7 @@ This endpoint atomically creates a new product and its first batch in a single t
 ```
 
 ### Frontend Implementation Guide
+
 1. **Detail View**: Show all batch information
 2. **Product Link**: Link to product detail page
 3. **Warehouse Link**: Link to warehouse detail page
@@ -405,19 +448,24 @@ This endpoint atomically creates a new product and its first batch in a single t
 ---
 
 ## GET /api/batches/warehouse/{warehouseId}
+
 **Summary**: Get batches by warehouse
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`  
 **URL Parameters**: `warehouseId` (UUID) - Warehouse identifier
 
 ### Response
+
 Same format as GET /api/batches (returns array of batches)
 
 ### Frontend Implementation Guide
+
 1. **Warehouse View**: Use in warehouse detail page
 2. **Stock Overview**: Show all products in warehouse
 3. **Filtering**: Additional filters within warehouse
@@ -427,19 +475,24 @@ Same format as GET /api/batches (returns array of batches)
 ---
 
 ## GET /api/batches/product/{productId}
+
 **Summary**: Get batches by product
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`  
 **URL Parameters**: `productId` (UUID) - Product identifier
 
 ### Response
+
 Same format as GET /api/batches (returns array of batches)
 
 ### Frontend Implementation Guide
+
 1. **Product View**: Use in product detail page
 2. **Stock Locations**: Show where product is stored
 3. **Total Quantity**: Calculate total across all batches
@@ -449,21 +502,27 @@ Same format as GET /api/batches (returns array of batches)
 ---
 
 ## GET /api/batches/warehouses/{warehouseId}/products/{productId}/batches
+
 **Summary**: Get batches by warehouse and product
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`  
 **URL Parameters**:
+
 - `warehouseId` (UUID) - Warehouse identifier
 - `productId` (UUID) - Product identifier
 
 ### Response
+
 Same format as GET /api/batches (returns array of batches)
 
 ### Frontend Implementation Guide
+
 1. **Product-in-Warehouse View**: Use in warehouse product detail pages
 2. **Precise Stock Query**: Fetch only batches for a specific product in a specific warehouse
 3. **Batch Selection**: Support FEFO/FIFO batch picking in transfer and picking flows
@@ -473,21 +532,26 @@ Same format as GET /api/batches (returns array of batches)
 ---
 
 ## GET /api/batches/expiring/{daysAhead}
+
 **Summary**: Get batches expiring in next N days
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`  
 **URL Parameters**: `daysAhead` (Integer) - Number of days to look ahead
 
 **Example**: `/api/batches/expiring/30` - Get batches expiring in next 30 days
 
 ### Response
+
 Same format as GET /api/batches (returns array of expiring batches)
 
 ### Frontend Implementation Guide
+
 1. **Dashboard Widget**: Show on dashboard as alert widget
 2. **Color Coding**: Red for <7 days, yellow for 7-30 days
 3. **Urgency Sorting**: Sort by expiration date (soonest first)
@@ -498,21 +562,26 @@ Same format as GET /api/batches (returns array of expiring batches)
 ---
 
 ## GET /api/batches/low-stock/{threshold}
+
 **Summary**: Get batches with quantity below threshold
 
 ### Authorization
+
 **Required Permissions**: `BATCH_READ` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `GET`  
 **URL Parameters**: `threshold` (Integer) - Quantity threshold
 
 **Example**: `/api/batches/low-stock/10` - Get batches with quantity < 10
 
 ### Response
+
 Same format as GET /api/batches (returns array of low-stock batches)
 
 ### Frontend Implementation Guide
+
 1. **Dashboard Widget**: Low stock alert on dashboard
 2. **Reorder List**: Use for creating purchase orders
 3. **Threshold Settings**: Allow setting per-product thresholds
@@ -523,22 +592,27 @@ Same format as GET /api/batches (returns array of low-stock batches)
 ---
 
 ## PUT /api/batches/{id}
+
 **Summary**: Update batch
 
 ### Authorization
+
 **Required Permissions**: `BATCH_UPDATE` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `PUT`  
 **URL Parameters**: `id` (UUID) - Batch identifier  
 **Content-Type**: `application/json`
 
 #### Request Body
+
 Same structure as POST /api/batches
 
 **Note**: Quantity should typically be updated via stock movements, not direct updates.
 
 ### Response
+
 **Status Code**: `200 OK`
 
 ```json
@@ -552,6 +626,7 @@ Same structure as POST /api/batches
 ```
 
 ### Frontend Implementation Guide
+
 1. **Edit Form**: Pre-populate with current values
 2. **Restricted Fields**: Disable product and warehouse fields
 3. **Quantity Warning**: Warn about direct quantity changes
@@ -562,16 +637,20 @@ Same structure as POST /api/batches
 ---
 
 ## DELETE /api/batches/{id}
+
 **Summary**: Delete batch
 
 ### Authorization
+
 **Required Permissions**: `BATCH_DELETE` or `ROLE_ADMIN`
 
 ### Request
+
 **Method**: `DELETE`  
 **URL Parameters**: `id` (UUID) - Batch identifier
 
 ### Response
+
 **Status Code**: `200 OK`
 
 ```json
@@ -583,6 +662,7 @@ Same structure as POST /api/batches
 ```
 
 ### Frontend Implementation Guide
+
 1. **Confirmation**: Require strong confirmation
 2. **Quantity Check**: Warn if batch still has quantity
 3. **Movement Check**: Warn if batch has movements
@@ -592,24 +672,30 @@ Same structure as POST /api/batches
 
 ---
 
-## DELETE /api/warehouses/{warehouseId}/products/{productId}/batches
+## DELETE /api/batches/warehouses/{warehouseId}/products/{productId}/batches
+
 **Summary**: Delete all batches of a product in a warehouse
 
 ### Authorization
+
 **Required Permissions**: `BATCH_DELETE` or `ROLE_ADMIN`
 
 ### Description
+
 This endpoint performs a bulk soft-delete operation, removing all batches that match the specified product and warehouse combination. The batches are soft-deleted (marked with a deletion timestamp) rather than permanently removed, preserving data for audit purposes. The operation is scoped to the current tenant and validates that both the warehouse and product exist before proceeding.
 
 ### Request
+
 **Method**: `DELETE`
 **URL Parameters**:
+
 - `warehouseId` (UUID) - Warehouse identifier
 - `productId` (UUID) - Product identifier
 
-**Example**: `/api/warehouses/660e8400-e29b-41d4-a716-446655440001/products/550e8400-e29b-41d4-a716-446655440000/batches`
+**Example**: `/api/batches/warehouses/660e8400-e29b-41d4-a716-446655440001/products/550e8400-e29b-41d4-a716-446655440000/batches`
 
 ### Response
+
 **Status Code**: `200 OK`
 
 ```json
@@ -622,6 +708,7 @@ This endpoint performs a bulk soft-delete operation, removing all batches that m
 ```
 
 **Response Fields**:
+
 - `message`: Descriptive message indicating the number of batches deleted
 - `deletedCount`: Integer count of batches that were soft-deleted
 - `productId`: UUID of the product (confirmation)
@@ -630,7 +717,9 @@ This endpoint performs a bulk soft-delete operation, removing all batches that m
 ### Success Scenarios
 
 #### Batches Deleted
+
 Returns 200 with the count of deleted batches:
+
 ```json
 {
   "message": "Successfully deleted 3 batches",
@@ -641,7 +730,9 @@ Returns 200 with the count of deleted batches:
 ```
 
 #### No Batches to Delete
+
 Returns 200 with zero count (idempotent operation):
+
 ```json
 {
   "message": "Successfully deleted 0 batches",
@@ -654,6 +745,7 @@ Returns 200 with zero count (idempotent operation):
 ### Error Responses
 
 #### 404 Not Found - Warehouse Not Found
+
 ```json
 {
   "status": 404,
@@ -664,6 +756,7 @@ Returns 200 with zero count (idempotent operation):
 ```
 
 #### 404 Not Found - Product Not Found
+
 ```json
 {
   "status": 404,
@@ -674,6 +767,7 @@ Returns 200 with zero count (idempotent operation):
 ```
 
 #### 403 Forbidden - Insufficient Permissions
+
 ```json
 {
   "status": 403,
@@ -754,6 +848,7 @@ Returns 200 with zero count (idempotent operation):
 ## Frontend Component Examples
 
 ### Batch Table
+
 ```typescript
 interface BatchTableProps {
   batches: Batch[];
@@ -782,6 +877,7 @@ interface BatchTableProps {
 ```
 
 ### Batch Status Badges
+
 ```typescript
 interface BatchStatusProps {
   batch: Batch;
@@ -798,10 +894,11 @@ interface BatchStatusProps {
 ```
 
 ### Stock Level Visualization
+
 ```typescript
 interface StockLevelProps {
   batches: Batch[];
-  groupBy: 'warehouse' | 'product';
+  groupBy: "warehouse" | "product";
 }
 
 // Visualizations:
@@ -817,6 +914,7 @@ interface StockLevelProps {
 ## Frontend Best Practices
 
 ### Expiration Management
+
 1. **Color System**: Consistent color coding for expiration status
 2. **FEFO Display**: Show First-Expired-First-Out order
 3. **Alerts**: Proactive alerts before expiration
@@ -824,6 +922,7 @@ interface StockLevelProps {
 5. **Reports**: Expiration reports and forecasts
 
 ### Stock Monitoring
+
 1. **Real-time Updates**: Update stock levels in real-time
 2. **Threshold Alerts**: Configurable low-stock thresholds
 3. **Multi-level Alerts**: Different alert levels (critical, warning, info)
@@ -831,6 +930,7 @@ interface StockLevelProps {
 5. **Dashboard Widgets**: Key metrics on dashboard
 
 ### Data Entry
+
 1. **Smart Defaults**: Pre-fill common values
 2. **Batch Number Generation**: Auto-generate with pattern
 3. **Barcode Integration**: Scan products for quick entry
@@ -838,6 +938,7 @@ interface StockLevelProps {
 5. **Error Prevention**: Prevent common mistakes
 
 ### Performance
+
 1. **Pagination**: Essential for large batch lists
 2. **Lazy Loading**: Load details on demand
 3. **Caching**: Cache batch data with smart invalidation
@@ -849,6 +950,7 @@ interface StockLevelProps {
 ## Common Error Responses
 
 ### 400 Bad Request - Duplicate Batch Number
+
 ```json
 {
   "success": false,
@@ -858,6 +960,7 @@ interface StockLevelProps {
 ```
 
 ### 400 Bad Request - Invalid Quantity
+
 ```json
 {
   "success": false,
@@ -867,6 +970,7 @@ interface StockLevelProps {
 ```
 
 ### 400 Bad Request - Expiration Required
+
 ```json
 {
   "success": false,
@@ -876,6 +980,7 @@ interface StockLevelProps {
 ```
 
 ### 409 Conflict - Batch in Use
+
 ```json
 {
   "success": false,
@@ -891,18 +996,22 @@ interface StockLevelProps {
 ## Integration Points
 
 ### With Products
+
 - Validate product has expiration if expiration date provided
 - Display product details in batch views
 
 ### With Warehouses
+
 - Validate warehouse is active
 - Show warehouse capacity and utilization
 
 ### With Stock Movements
+
 - Batches are affected by stock movements
 - Movement history shows batch transactions
 
 ### With Reports
+
 - Stock reports aggregate batch data
 - Expiration reports use batch expiration dates
 - Cost analysis uses batch cost prices

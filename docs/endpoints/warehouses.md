@@ -14,13 +14,14 @@ Autenticacao: obrigatoria.
 
 ## Authorization Matrix
 
-- `POST /api/warehouses`: `WAREHOUSE_CREATE` ou `ROLE_ADMIN`
-- `GET /api/warehouses`: `WAREHOUSE_READ` ou `ROLE_ADMIN`
-- `GET /api/warehouses/{id}`: `WAREHOUSE_READ` ou `ROLE_ADMIN`
-- `GET /api/warehouses/active/{isActive}`: `WAREHOUSE_READ` ou `ROLE_ADMIN`
-- `PUT /api/warehouses/{id}`: `WAREHOUSE_UPDATE` ou `ROLE_ADMIN`
-- `DELETE /api/warehouses/{id}`: `WAREHOUSE_DELETE` ou `ROLE_ADMIN`
-- `GET /api/warehouses/{id}/products`: `WAREHOUSE_READ` ou `ROLE_ADMIN`
+- `POST /api/warehouses`: `warehouses:create` ou `ROLE_ADMIN`
+- `GET /api/warehouses`: `warehouses:read` ou `ROLE_ADMIN`
+- `GET /api/warehouses/stock-summary`: `warehouses:read` ou `ROLE_ADMIN`
+- `GET /api/warehouses/{id}`: `warehouses:read` ou `ROLE_ADMIN`
+- `GET /api/warehouses/active/{isActive}`: `warehouses:read` ou `ROLE_ADMIN`
+- `PUT /api/warehouses/{id}`: `warehouses:update` ou `ROLE_ADMIN`
+- `DELETE /api/warehouses/{id}`: `warehouses:delete` ou `ROLE_ADMIN`
+- `GET /api/warehouses/{id}/products`: `warehouses:read` + `warehouseGuard.isCurrent` ou `ROLE_ADMIN`
 
 ## WarehouseRequest
 
@@ -53,11 +54,23 @@ Se `code` nao for enviado, o backend gera automaticamente com base em nome/cidad
 ### POST /api/warehouses
 Cria warehouse para o tenant atual.
 
+Retorna `201 Created`.
+
 ### GET /api/warehouses
 Lista warehouses visiveis para o usuario atual.
 
 - Admin (`ROLE_ADMIN`) ve todas do tenant.
 - Usuario sem full-access ve apenas warehouses permitidas.
+
+### GET /api/warehouses/stock-summary
+Retorna resumo de estoque por warehouse acessivel.
+
+Response (lista de `WarehouseStockSummaryResponse`):
+
+- `warehouseId` (UUID)
+- `productCount` (Long)
+- `batchCount` (Long)
+- `totalQuantity` (BigDecimal)
 
 ### GET /api/warehouses/{id}
 Retorna warehouse por ID com validacao de acesso.
@@ -74,11 +87,15 @@ Remove warehouse.
 ### GET /api/warehouses/{id}/products
 Retorna produtos com estoque agregado no warehouse.
 
-Query params de paginacao/sort:
+Requer adicionalmente `warehouseGuard.isCurrent(#id)` — o warehouse
+solicitado deve ser o mesmo do contexto do token JWT.
 
-- `page`
-- `size`
-- `sort`
+Query params:
+
+- `search` (opcional) — busca por nome, SKU ou barcode do produto
+- `page` — pagina (zero-based)
+- `size` — tamanho da pagina
+- `sort` — campo,direcao (ex: `name,asc`)
 
 Sort permitido apenas em:
 

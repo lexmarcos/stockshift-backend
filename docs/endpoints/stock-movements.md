@@ -6,17 +6,17 @@ Modulo de movimentacao de estoque para registrar entradas e saidas manuais (uso,
 
 Tipos de movimentacao e direcao:
 
-| Tipo             | Direcao | Descricao                                  |
-|------------------|---------|---------------------------------------------|
-| `USAGE`          | `OUT`   | Produto consumido/utilizado                 |
-| `GIFT`           | `OUT`   | Produto dado como presente                  |
-| `LOSS`           | `OUT`   | Produto perdido/extraviado                  |
-| `DAMAGE`         | `OUT`   | Produto danificado                          |
-| `ADJUSTMENT_OUT` | `OUT`   | Ajuste manual de saida                      |
-| `PURCHASE_IN`    | `IN`    | Entrada por compra                          |
-| `ADJUSTMENT_IN`  | `IN`    | Ajuste manual de entrada                    |
-| `TRANSFER_IN`    | `IN`    | *(automatico)* Entrada por transferencia    |
-| `TRANSFER_OUT`   | `OUT`   | *(automatico)* Saida por transferencia      |
+| Tipo             | Direcao | Descricao                                |
+| ---------------- | ------- | ---------------------------------------- |
+| `USAGE`          | `OUT`   | Produto consumido/utilizado              |
+| `GIFT`           | `OUT`   | Produto dado como presente               |
+| `LOSS`           | `OUT`   | Produto perdido/extraviado               |
+| `DAMAGE`         | `OUT`   | Produto danificado                       |
+| `ADJUSTMENT_OUT` | `OUT`   | Ajuste manual de saida                   |
+| `PURCHASE_IN`    | `IN`    | Entrada por compra                       |
+| `ADJUSTMENT_IN`  | `IN`    | Ajuste manual de entrada                 |
+| `TRANSFER_IN`    | `IN`    | _(automatico)_ Entrada por transferencia |
+| `TRANSFER_OUT`   | `OUT`   | _(automatico)_ Saida por transferencia   |
 
 Base path de aplicacao: `/stockshift`
 
@@ -28,14 +28,15 @@ Autenticacao: obrigatoria (JWT em cookie `accessToken` ou header `Authorization`
 
 ## Authorization Matrix
 
-- `POST /api/stock-movements`: `stock_movements:create`
+- `POST /api/stock-movements` (application/json): `stock_movements:create`
+- `POST /api/stock-movements` (multipart/form-data): `stock_movements:create`
 - `GET /api/stock-movements`: `stock_movements:read`
 - `GET /api/stock-movements/{id}`: `stock_movements:read`
 - `GET /api/stock-movements/warehouse-summary`: `stock_movements:read`
 
 ## Endpoints
 
-### POST /api/stock-movements
+### POST /api/stock-movements (application/json)
 
 Cria uma movimentacao de estoque manual.
 
@@ -51,8 +52,30 @@ Request:
       "quantity": 5
     },
     {
+      "newProduct": {
+        "name": "Novo Produto Exemplo",
+        "description": "Descricao do novo produto",
+        "sku": "NP-001",
+        "barcode": "1234567890123",
+        "categoryId": "440e8400-e29b-41d4-a716-446655440000",
+        "brandId": "330e8400-e29b-41d4-a716-446655440000",
+        "minStock": 10,
+        "maxStock": 100,
+        "taxPercentage": 5.5,
+        "unitOfMeasure": "UN",
+        "costPrice": 1050,
+        "sellingPrice": 2000,
+        "isEnabled": true
+      },
+      "quantity": 10,
+      "costPrice": 1050,
+      "sellingPrice": 2000
+    },
+    {
       "productId": "660e8400-e29b-41d4-a716-446655440001",
-      "quantity": 2.5
+      "quantity": 2.5,
+      "costPrice": 500,
+      "sellingPrice": 800
     }
   ]
 }
@@ -63,14 +86,29 @@ Regras:
 - `type` obrigatorio. Valores permitidos: `USAGE`, `GIFT`, `LOSS`, `DAMAGE`, `ADJUSTMENT_OUT`, `PURCHASE_IN`, `ADJUSTMENT_IN`.
 - `type` **nao** pode ser `TRANSFER_IN` ou `TRANSFER_OUT` (retorna `400`).
 - `items` obrigatorio e nao vazio.
-- Cada item precisa de `productId` (UUID) e `quantity` (positivo).
+- Cada item precisa possuir **obrigatoriamente** `productId` (UUID) ou `newProduct` (objeto `ProductRequest` com os dados do novo produto a ser salvo), mas nao ambos simultaneamente. Retorna validação se colocar ambos ou nenhum.
+- `quantity` (positivo) obrigatorio para todos os itens.
+- Para movimentos `IN` (`PURCHASE_IN`, `ADJUSTMENT_IN`), valores opcionais `costPrice` e `sellingPrice` podem ser repassados no item.
 - Para movimentos `OUT`, o sistema deduz automaticamente dos batches usando FIFO (batch mais antigo primeiro).
 - Se a quantidade total disponivel no warehouse for insuficiente, retorna `400` com mensagem de estoque insuficiente.
-- Para movimentos `IN`, o sistema cria um novo batch ou adiciona ao batch existente do produto.
+- Para movimentos `IN`, o sistema cria um novo batch ou adiciona ao batch existente do produto. Se passado um `newProduct`, o sistema antes ira cadastrar tal produto no BD para em seguida criar o seu batch com as premissas deste estoque de entrada.
 - O `warehouseId` e determinado automaticamente pelo warehouse do usuario logado.
 - Um codigo unico e gerado automaticamente (ex: `MOV-2026-0001`).
 
-Response (`201 Created`):
+---
+
+### POST /api/stock-movements (multipart/form-data)
+
+Cria uma movimentacao de estoque semelhante ao endpoint json, porem com suporte a envio de imagens do novo produto gerado inline, utilizando content-type `multipart/form-data`.
+
+Parts:
+
+- `movement` (Obrigatorio): Parte contendo o JSON com o body equivalente a `CreateStockMovementRequest`. Content-Type dessa part deve ser `application/json`.
+- `inlineProductImages` (Opcional): Lista de arquivos de imagem (`MultipartFile`). Permite anexar a imagem do novo produto listado em `movement.items.newProduct`. Apos cadastrar o produto (que ira ser associado a essa mov), o sistema fara upload desta imagem associando-a ao novo produto. O suporte aceita o envio de varias fotos num unico vetor de dados, caso aja varios novos produtos com imagens enviadas na mesma transacao, preenchendo da forma programada.
+
+Response (`201 Created`): Retorna as mesmas informacoes geradas do modo padrao da aplicacao json.
+
+Response (`201 Created`) comum:
 
 ```json
 {
@@ -123,16 +161,16 @@ Lista movimentacoes com filtros opcionais e paginacao.
 
 Query parameters:
 
-| Parametro     | Tipo            | Obrigatorio | Descricao                                    |
-|---------------|-----------------|-------------|----------------------------------------------|
-| `warehouseId` | UUID            | Nao         | Filtra por warehouse (padrao: warehouse do usuario) |
-| `productId`   | UUID            | Nao         | Filtra movimentacoes que contenham o produto |
-| `type`        | StockMovementType | Nao       | Filtra por tipo (ex: `USAGE`, `GIFT`)        |
-| `dateFrom`    | ISO DateTime    | Nao         | Data/hora inicial (ex: `2026-03-01T00:00:00`) |
-| `dateTo`      | ISO DateTime    | Nao         | Data/hora final (ex: `2026-03-31T23:59:59`)  |
-| `page`        | int             | Nao         | Numero da pagina (0-indexed, padrao: 0)      |
-| `size`        | int             | Nao         | Tamanho da pagina (padrao: 20)               |
-| `sort`        | string          | Nao         | Campo e direcao (ex: `createdAt,desc`)       |
+| Parametro     | Tipo              | Obrigatorio | Descricao                                           |
+| ------------- | ----------------- | ----------- | --------------------------------------------------- |
+| `warehouseId` | UUID              | Nao         | Filtra por warehouse (padrao: warehouse do usuario) |
+| `productId`   | UUID              | Nao         | Filtra movimentacoes que contenham o produto        |
+| `type`        | StockMovementType | Nao         | Filtra por tipo (ex: `USAGE`, `GIFT`)               |
+| `dateFrom`    | ISO DateTime      | Nao         | Data/hora inicial (ex: `2026-03-01T00:00:00`)       |
+| `dateTo`      | ISO DateTime      | Nao         | Data/hora final (ex: `2026-03-31T23:59:59`)         |
+| `page`        | int               | Nao         | Numero da pagina (0-indexed, padrao: 0)             |
+| `size`        | int               | Nao         | Tamanho da pagina (padrao: 20)                      |
+| `sort`        | string            | Nao         | Campo e direcao (ex: `createdAt,desc`)              |
 
 Exemplo de chamada:
 
@@ -191,10 +229,10 @@ Retorna relatorio resumido de movimentacoes agrupado por warehouse e tipo.
 
 Query parameters:
 
-| Parametro  | Tipo         | Obrigatorio | Descricao                                     |
-|------------|--------------|-------------|-----------------------------------------------|
-| `dateFrom` | ISO DateTime | Nao         | Data/hora inicial do periodo                  |
-| `dateTo`   | ISO DateTime | Nao         | Data/hora final do periodo                    |
+| Parametro  | Tipo         | Obrigatorio | Descricao                    |
+| ---------- | ------------ | ----------- | ---------------------------- |
+| `dateFrom` | ISO DateTime | Nao         | Data/hora inicial do periodo |
+| `dateTo`   | ISO DateTime | Nao         | Data/hora final do periodo   |
 
 Exemplo de chamada:
 
@@ -217,24 +255,24 @@ Response (`200 OK`):
           {
             "type": "USAGE",
             "direction": "OUT",
-            "totalQuantity": 150.00,
+            "totalQuantity": 150.0,
             "count": 12
           },
           {
             "type": "GIFT",
             "direction": "OUT",
-            "totalQuantity": 25.00,
+            "totalQuantity": 25.0,
             "count": 3
           },
           {
             "type": "PURCHASE_IN",
             "direction": "IN",
-            "totalQuantity": 500.00,
+            "totalQuantity": 500.0,
             "count": 5
           }
         ],
-        "totalIn": 500.00,
-        "totalOut": 175.00
+        "totalIn": 500.0,
+        "totalOut": 175.0
       },
       {
         "warehouseId": "880e8400-e29b-41d4-a716-446655440000",
@@ -250,33 +288,33 @@ Response (`200 OK`):
 
 ## Campos do response `StockMovementResponse`
 
-| Campo              | Tipo     | Descricao                                                  |
-|--------------------|----------|------------------------------------------------------------|
-| `id`               | UUID     | ID da movimentacao                                         |
-| `code`             | string   | Codigo unico gerado (ex: `MOV-2026-0001`)                 |
-| `warehouseId`      | UUID     | ID do warehouse                                            |
-| `warehouseName`    | string   | Nome do warehouse                                          |
-| `type`             | string   | Tipo da movimentacao (ver tabela acima)                    |
-| `direction`        | string   | `IN` ou `OUT`                                              |
-| `notes`            | string?  | Observacoes opcionais                                      |
-| `createdByUserId`  | UUID     | ID do usuario que criou                                    |
-| `referenceType`    | string?  | Tipo da referencia (ex: `TRANSFER` para movimentos automaticos) |
-| `referenceId`      | UUID?    | ID do recurso referenciado (ex: ID da transferencia)       |
-| `createdAt`        | ISO 8601 | Data/hora de criacao                                       |
-| `updatedAt`        | ISO 8601 | Data/hora da ultima atualizacao                            |
-| `items`            | array    | Lista de items da movimentacao                             |
+| Campo             | Tipo     | Descricao                                                       |
+| ----------------- | -------- | --------------------------------------------------------------- |
+| `id`              | UUID     | ID da movimentacao                                              |
+| `code`            | string   | Codigo unico gerado (ex: `MOV-2026-0001`)                       |
+| `warehouseId`     | UUID     | ID do warehouse                                                 |
+| `warehouseName`   | string   | Nome do warehouse                                               |
+| `type`            | string   | Tipo da movimentacao (ver tabela acima)                         |
+| `direction`       | string   | `IN` ou `OUT`                                                   |
+| `notes`           | string?  | Observacoes opcionais                                           |
+| `createdByUserId` | UUID     | ID do usuario que criou                                         |
+| `referenceType`   | string?  | Tipo da referencia (ex: `TRANSFER` para movimentos automaticos) |
+| `referenceId`     | UUID?    | ID do recurso referenciado (ex: ID da transferencia)            |
+| `createdAt`       | ISO 8601 | Data/hora de criacao                                            |
+| `updatedAt`       | ISO 8601 | Data/hora da ultima atualizacao                                 |
+| `items`           | array    | Lista de items da movimentacao                                  |
 
 ## Campos do response `StockMovementItemResponse`
 
-| Campo         | Tipo       | Descricao                           |
-|---------------|------------|-------------------------------------|
-| `id`          | UUID       | ID do item                          |
-| `productId`   | UUID       | ID do produto                       |
-| `productName` | string     | Nome do produto (snapshot)          |
-| `productSku`  | string?    | SKU do produto (snapshot)           |
-| `batchId`     | UUID       | ID do batch afetado                 |
-| `batchCode`   | string     | Codigo do batch afetado (snapshot)  |
-| `quantity`    | BigDecimal | Quantidade movimentada neste batch  |
+| Campo         | Tipo       | Descricao                          |
+| ------------- | ---------- | ---------------------------------- |
+| `id`          | UUID       | ID do item                         |
+| `productId`   | UUID       | ID do produto                      |
+| `productName` | string     | Nome do produto (snapshot)         |
+| `productSku`  | string?    | SKU do produto (snapshot)          |
+| `batchId`     | UUID       | ID do batch afetado                |
+| `batchCode`   | string     | Codigo do batch afetado (snapshot) |
+| `quantity`    | BigDecimal | Quantidade movimentada neste batch |
 
 ## Integracao com Transfer
 
@@ -285,6 +323,7 @@ Quando uma transferencia e executada (`POST /api/transfers/{id}/execute`), o sis
 Quando uma transferencia e validada com sucesso (`POST /api/transfers/{id}/complete-validation`), o sistema cria automaticamente um `StockMovement` do tipo `TRANSFER_IN` no warehouse de destino.
 
 Esses movimentos possuem:
+
 - `referenceType`: `"TRANSFER"`
 - `referenceId`: ID da transferencia
 
