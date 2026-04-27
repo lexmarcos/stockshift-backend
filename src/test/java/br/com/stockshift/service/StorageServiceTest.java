@@ -66,4 +66,55 @@ class StorageServiceTest {
             });
         }
     }
+
+    @Test
+    void shouldAcceptValidCompanyLogoTypes() {
+        String[] validTypes = {"image/svg+xml", "image/png", "image/jpeg", "image/jpg"};
+
+        for (String type : validTypes) {
+            MockMultipartFile file = new MockMultipartFile(
+                "logo",
+                "logo.svg",
+                type,
+                "test data".getBytes()
+            );
+
+            assertDoesNotThrow(() -> {
+                try {
+                    storageService.uploadCompanyLogo(file);
+                } catch (StorageException e) {
+                    // Ignore storage exceptions, we're only testing validation
+                }
+            });
+        }
+    }
+
+    @Test
+    void shouldRejectCompanyLogoWebp() {
+        MultipartFile file = new MockMultipartFile(
+            "logo",
+            "logo.webp",
+            "image/webp",
+            "test data".getBytes()
+        );
+
+        assertThrows(InvalidFileTypeException.class, () -> {
+            storageService.uploadCompanyLogo(file);
+        });
+    }
+
+    @Test
+    void shouldRejectCompanyLogoLargerThanTwoMb() {
+        byte[] content = new byte[(2 * 1024 * 1024) + 1];
+        MultipartFile file = new MockMultipartFile(
+            "logo",
+            "logo.png",
+            "image/png",
+            content
+        );
+
+        assertThrows(InvalidFileTypeException.class, () -> {
+            storageService.uploadCompanyLogo(file);
+        });
+    }
 }

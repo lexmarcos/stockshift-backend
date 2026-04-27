@@ -11,5 +11,6 @@ public class CompanyConfigResponse {
     private String document;
     private String email;
     private String phone;
+    private String logoUrl;
     private boolean isActive;
 }

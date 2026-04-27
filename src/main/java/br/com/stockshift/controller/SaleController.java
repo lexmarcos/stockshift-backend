@@ -20,10 +20,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -106,26 +106,35 @@ public class SaleController {
 
             if (warning != null && !warning.isBlank()) {
                 log.warn("InfinitePay callback with warning for sale {}: {}", saleId, warning);
-                return ResponseEntity.status(302)
-                        .header("Location", frontendUrl + "/sales/pdv?infinitepay=error&sale_id=" + saleId + "&message=" + URLEncoder.encode(warning, StandardCharsets.UTF_8))
-                        .build();
+                return redirectToInfinitePayResult("error", saleId.toString(), warning);
             }
 
             saleService.confirmInfinitePayPayment(saleId, nsu, aut, card_brand);
-            return ResponseEntity.status(302)
-                    .header("Location", frontendUrl + "/sales/pdv?infinitepay=success&sale_id=" + saleId)
-                    .build();
+            return redirectToInfinitePayResult("success", saleId.toString(), null);
         } catch (IllegalArgumentException e) {
             log.warn("Invalid order_id from InfinitePay callback: {}", order_id);
-            return ResponseEntity.status(302)
-                    .header("Location", frontendUrl + "/sales/pdv?infinitepay=error&message=invalid_order")
-                    .build();
+            return redirectToInfinitePayResult("error", null, "invalid_order");
         } catch (Exception e) {
             log.error("Error processing InfinitePay callback for order {}: {}", order_id, e.getMessage());
-            return ResponseEntity.status(302)
-                    .header("Location", frontendUrl + "/sales/pdv?infinitepay=error&sale_id=" + order_id)
-                    .build();
+            return redirectToInfinitePayResult("error", order_id, null);
         }
+    }
+
+    private ResponseEntity<Void> redirectToInfinitePayResult(String status, String saleId, String message) {
+        return ResponseEntity.status(302)
+                .header("Location", buildInfinitePayResultUrl(status, saleId, message))
+                .build();
+    }
+
+    private String buildInfinitePayResultUrl(String status, String saleId, String message) {
+        return UriComponentsBuilder.fromUriString(frontendUrl)
+                .path("/sales/infinitepay/result")
+                .queryParam("status", status)
+                .queryParamIfPresent("sale_id", Optional.ofNullable(saleId))
+                .queryParamIfPresent("message", Optional.ofNullable(message))
+                .build()
+                .encode()
+                .toUriString();
     }
 
     @PostMapping("/infinitepay/webhook")

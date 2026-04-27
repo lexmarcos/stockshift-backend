@@ -28,16 +28,30 @@ public class StorageService {
     private final S3Client s3Client;
     private final StorageProperties properties;
 
-    private static final Set<String> ALLOWED_TYPES = Set.of(
+    private static final Set<String> PRODUCT_IMAGE_TYPES = Set.of(
         "image/png", "image/jpeg", "image/jpg", "image/webp"
     );
-    private static final String FOLDER = "products/";
+    private static final Set<String> COMPANY_LOGO_TYPES = Set.of(
+        "image/svg+xml", "image/png", "image/jpeg", "image/jpg"
+    );
+    private static final long COMPANY_LOGO_MAX_SIZE = 2 * 1024 * 1024;
+    private static final String PRODUCT_FOLDER = "products/";
+    private static final String COMPANY_LOGO_FOLDER = "company-logos/";
 
     public String uploadImage(MultipartFile file) {
+        validateFileType(file, PRODUCT_IMAGE_TYPES, "Only PNG, JPG, JPEG and WEBP images are allowed");
+        return uploadFile(file, PRODUCT_FOLDER);
+    }
+
+    public String uploadCompanyLogo(MultipartFile file) {
+        validateCompanyLogo(file);
+        return uploadFile(file, COMPANY_LOGO_FOLDER);
+    }
+
+    private String uploadFile(MultipartFile file, String folder) {
         try {
-            validateFileType(file);
             String fileName = generateUniqueFileName(file.getOriginalFilename());
-            String key = FOLDER + fileName;
+            String key = folder + fileName;
 
             PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(properties.getBucketName())
@@ -84,15 +98,24 @@ public class StorageService {
         }
     }
 
-    private void validateFileType(MultipartFile file) {
+    private void validateCompanyLogo(MultipartFile file) {
+        validateFileType(file, COMPANY_LOGO_TYPES, "Only SVG, PNG, JPG and JPEG logos are allowed");
+        if (file.getSize() > COMPANY_LOGO_MAX_SIZE) {
+            throw new InvalidFileTypeException(
+                "Company logo is too large. Got: " + file.getSize() + " bytes, max: " + COMPANY_LOGO_MAX_SIZE
+            );
+        }
+    }
+
+    private void validateFileType(MultipartFile file, Set<String> allowedTypes, String message) {
         if (file == null || file.isEmpty()) {
             throw new InvalidFileTypeException("File cannot be empty");
         }
 
         String contentType = file.getContentType();
-        if (!ALLOWED_TYPES.contains(contentType)) {
+        if (!allowedTypes.contains(contentType)) {
             throw new InvalidFileTypeException(
-                "Only PNG, JPG, JPEG and WEBP images are allowed. Got: " + contentType
+                message + ". Got: " + contentType
             );
         }
     }

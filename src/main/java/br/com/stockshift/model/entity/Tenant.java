@@ -26,6 +26,9 @@ public class Tenant extends BaseEntity {
     @Column(name = "phone", length = 20)
     private String phone;
 
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

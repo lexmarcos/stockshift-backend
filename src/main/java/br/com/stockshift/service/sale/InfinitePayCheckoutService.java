@@ -16,9 +16,6 @@ public class InfinitePayCheckoutService {
 
     private static final String CHECKOUT_URL = "https://api.infinitepay.io/invoices/public/checkout/links";
 
-    @Value("${app.frontend-url:http://localhost:3000}")
-    private String frontendUrl;
-
     @Value("${app.api-base-url:http://localhost:8080/stockshift}")
     private String apiBaseUrl;
 
@@ -32,7 +29,6 @@ public class InfinitePayCheckoutService {
         payload.setHandle(handle);
         payload.setItems(items);
         payload.setOrderNsu(orderNsu);
-        payload.setRedirectUrl(frontendUrl + "/sales/pdv?infinitepay=success&sale_id=" + orderNsu);
         payload.setWebhookUrl(apiBaseUrl + "/api/sales/infinitepay/webhook");
 
         HttpEntity<CheckoutRequest> entity = new HttpEntity<>(payload, headers);
@@ -60,8 +56,6 @@ public class InfinitePayCheckoutService {
         private List<CheckoutItem> items;
         @JsonProperty("order_nsu")
         private String orderNsu;
-        @JsonProperty("redirect_url")
-        private String redirectUrl;
         @JsonProperty("webhook_url")
         private String webhookUrl;
     }
