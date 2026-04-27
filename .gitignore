@@ -48,3 +48,4 @@ src/main/resources/application-dev.yml
 
 #Agents
 strix_runs
+src/main/resources/application-dev.yml
