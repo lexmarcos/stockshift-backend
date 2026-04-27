@@ -8,12 +8,25 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://stag-above-hog.ngrok-free.app}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000}
 
 jwt:
-  secret: ${JWT_SECRET:dev-secret-key-change-in-production-must-be-at-least-256-bits-long}
+  secret: ${JWT_SECRET:change-me-in-application-dev-yml}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  cookie:
+    secure: ${JWT_COOKIE_SECURE:false}
+    same-site: ${JWT_COOKIE_SAME_SITE:Lax}
+    domain: ${JWT_COOKIE_DOMAIN:}
+    path: /
+    http-only: true
 
 logging:
   level:
@@ -29,8 +42,12 @@ storage:
 
 hcaptcha:
   secret-key: ${HCAPTCHA_SECRET_KEY:}
-  enabled: ${HCAPTCHA_ENABLED:false}
+  enabled: false
 
 openai:
   api-key: ${OPENAI_API_KEY:}
   model: ${OPENAI_MODEL:gpt-4.1-nano}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  api-base-url: ${API_BASE_URL:http://localhost:8080/stockshift}
