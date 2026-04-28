@@ -101,23 +101,50 @@ public class SaleController {
             @RequestParam(required = false) String card_brand,
             @RequestParam(value = "warning", required = false) String warning) {
 
+        InfinitePayConfirmResponse response = confirmInfinitePayReturn(order_id, nsu, aut, card_brand, warning);
+        return redirectToInfinitePayResult(response.getStatus(), response.getSaleId(), response.getMessage());
+    }
+
+    @GetMapping("/infinitepay/confirm")
+    public ResponseEntity<ApiResponse<InfinitePayConfirmResponse>> infinitepayConfirm(
+            @RequestParam String order_id,
+            @RequestParam(required = false) String nsu,
+            @RequestParam(required = false) String aut,
+            @RequestParam(required = false) String card_brand,
+            @RequestParam(value = "warning", required = false) String warning) {
+
+        InfinitePayConfirmResponse response = confirmInfinitePayReturn(order_id, nsu, aut, card_brand, warning);
+        return ResponseEntity.ok(ApiResponse.success("InfinitePay payment confirmation processed", response));
+    }
+
+    private InfinitePayConfirmResponse confirmInfinitePayReturn(
+            String orderId, String nsu, String aut, String cardBrand, String warning) {
         try {
-            UUID saleId = UUID.fromString(order_id);
+            UUID saleId = UUID.fromString(orderId);
 
             if (warning != null && !warning.isBlank()) {
                 log.warn("InfinitePay callback with warning for sale {}: {}", saleId, warning);
-                return redirectToInfinitePayResult("error", saleId.toString(), warning);
+                return buildInfinitePayConfirmResponse("error", saleId.toString(), warning);
             }
 
-            saleService.confirmInfinitePayPayment(saleId, nsu, aut, card_brand);
-            return redirectToInfinitePayResult("success", saleId.toString(), null);
+            saleService.confirmInfinitePayPayment(saleId, nsu, aut, cardBrand);
+            return buildInfinitePayConfirmResponse("success", saleId.toString(), null);
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid order_id from InfinitePay callback: {}", order_id);
-            return redirectToInfinitePayResult("error", null, "invalid_order");
+            log.warn("Invalid order_id from InfinitePay callback: {}", orderId);
+            return buildInfinitePayConfirmResponse("error", null, "invalid_order");
         } catch (Exception e) {
-            log.error("Error processing InfinitePay callback for order {}: {}", order_id, e.getMessage());
-            return redirectToInfinitePayResult("error", order_id, null);
+            log.error("Error processing InfinitePay callback for order {}: {}", orderId, e.getMessage());
+            return buildInfinitePayConfirmResponse("error", orderId, null);
         }
+    }
+
+    private InfinitePayConfirmResponse buildInfinitePayConfirmResponse(
+            String status, String saleId, String message) {
+        return InfinitePayConfirmResponse.builder()
+                .status(status)
+                .saleId(saleId)
+                .message(message)
+                .build();
     }
 
     private ResponseEntity<Void> redirectToInfinitePayResult(String status, String saleId, String message) {

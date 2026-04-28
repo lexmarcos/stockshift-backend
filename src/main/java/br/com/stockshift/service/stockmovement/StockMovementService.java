@@ -223,6 +223,8 @@ public class StockMovementService {
           .quantity(quantity)
           .costPrice(itemReq.getCostPrice())
           .sellingPrice(itemReq.getSellingPrice())
+          .manufacturedDate(itemReq.getManufacturedDate())
+          .expirationDate(itemReq.getExpirationDate())
           .transitQuantity(BigDecimal.ZERO)
           .build();
       batch.setTenantId(tenantId);

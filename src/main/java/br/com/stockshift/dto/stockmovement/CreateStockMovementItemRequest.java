@@ -12,6 +12,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -34,6 +35,10 @@ public class CreateStockMovementItemRequest {
 
   @PositiveOrZero(message = "Selling price must be zero or positive")
   private Long sellingPrice;
+
+  private LocalDate manufacturedDate;
+
+  private LocalDate expirationDate;
 
   @AssertTrue(message = "Item must contain either productId or newProduct, but not both")
   public boolean isProductReferenceValid() {

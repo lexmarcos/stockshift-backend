@@ -27,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,7 +88,10 @@ class StockMovementServiceTest {
     assertThat(response.getWarehouseId()).isEqualTo(warehouseId);
     verify(productService).createEntity(any(ProductRequest.class), any());
     verify(batchRepository, atLeastOnce()).save(argThat(batch -> {
-      return batch.getCostPrice().equals(1290L) && batch.getSellingPrice().equals(2490L);
+      return batch.getCostPrice().equals(1290L)
+          && batch.getSellingPrice().equals(2490L)
+          && LocalDate.of(2026, 4, 1).equals(batch.getManufacturedDate())
+          && LocalDate.of(2026, 12, 31).equals(batch.getExpirationDate());
     }));
     verify(batchRepository, atLeastOnce()).save(argThat(batch -> batch.getOriginMovementItem() != null));
     verify(ledgerRepository).save(argThat(ledger -> ledger.getReferenceId() != null));
@@ -150,6 +154,8 @@ class StockMovementServiceTest {
         .quantity(new BigDecimal("3"))
         .costPrice(1290L)
         .sellingPrice(2490L)
+        .manufacturedDate(LocalDate.of(2026, 4, 1))
+        .expirationDate(LocalDate.of(2026, 12, 31))
         .build();
     return CreateStockMovementRequest.builder()
         .type(type)
