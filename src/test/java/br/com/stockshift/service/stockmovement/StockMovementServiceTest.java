@@ -9,19 +9,23 @@ import br.com.stockshift.mapper.StockMovementMapper;
 import br.com.stockshift.model.entity.Batch;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.StockMovement;
+import br.com.stockshift.model.entity.StockMovementItem;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.InventoryLedgerRepository;
 import br.com.stockshift.repository.ProductRepository;
+import br.com.stockshift.repository.StockMovementItemRepository;
 import br.com.stockshift.repository.StockMovementRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.ProductService;
+import br.com.stockshift.service.audit.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
@@ -46,6 +51,8 @@ class StockMovementServiceTest {
 
   @Mock
   private StockMovementRepository movementRepository;
+  @Mock
+  private StockMovementItemRepository movementItemRepository;
   @Mock
   private BatchRepository batchRepository;
   @Mock
@@ -60,6 +67,8 @@ class StockMovementServiceTest {
   private SecurityUtils securityUtils;
   @Mock
   private ProductService productService;
+  @Mock
+  private AuditService auditService;
 
   @InjectMocks
   private StockMovementService service;
@@ -93,7 +102,9 @@ class StockMovementServiceTest {
           && LocalDate.of(2026, 4, 1).equals(batch.getManufacturedDate())
           && LocalDate.of(2026, 12, 31).equals(batch.getExpirationDate());
     }));
-    verify(batchRepository, atLeastOnce()).save(argThat(batch -> batch.getOriginMovementItem() != null));
+    InOrder persistenceOrder = inOrder(batchRepository, movementItemRepository);
+    persistenceOrder.verify(movementItemRepository).saveAndFlush(any(StockMovementItem.class));
+    persistenceOrder.verify(batchRepository).save(argThat(batch -> batch.getOriginMovementItem() != null));
     verify(ledgerRepository).save(argThat(ledger -> ledger.getReferenceId() != null));
   }
 
@@ -125,16 +136,16 @@ class StockMovementServiceTest {
     when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(
         product.getId(), warehouseId, tenantId)).thenReturn(List.of());
     when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(movementItemRepository.saveAndFlush(any(StockMovementItem.class))).thenAnswer(invocation -> {
+      StockMovementItem item = invocation.getArgument(0);
+      item.setId(UUID.randomUUID());
+      return item;
+    });
     when(movementRepository.save(any(StockMovement.class))).thenAnswer(invocation -> {
       StockMovement movement = invocation.getArgument(0);
       if (movement.getId() == null) {
         movement.setId(UUID.randomUUID());
       }
-      return movement;
-    });
-    when(movementRepository.saveAndFlush(any(StockMovement.class))).thenAnswer(invocation -> {
-      StockMovement movement = invocation.getArgument(0);
-      movement.getItems().forEach(item -> item.setId(UUID.randomUUID()));
       return movement;
     });
     when(warehouseRepository.findById(warehouseId)).thenReturn(Optional.of(warehouse));

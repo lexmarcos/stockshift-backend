@@ -13,6 +13,8 @@ import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.ProductService;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +40,7 @@ public class StockMovementService {
       StockMovementType.TRANSFER_IN, StockMovementType.TRANSFER_OUT);
 
   private final StockMovementRepository movementRepository;
+  private final StockMovementItemRepository movementItemRepository;
   private final BatchRepository batchRepository;
   private final ProductRepository productRepository;
   private final WarehouseRepository warehouseRepository;
@@ -45,6 +48,7 @@ public class StockMovementService {
   private final StockMovementMapper mapper;
   private final SecurityUtils securityUtils;
   private final ProductService productService;
+  private final AuditService auditService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
@@ -102,6 +106,7 @@ public class StockMovementService {
     }
 
     saved = movementRepository.save(saved);
+    recordStockMovementCreated(saved, null);
     log.info("StockMovement {} ({}) created by user {} in warehouse {}",
         saved.getCode(), saved.getType(), userId, warehouseId);
 
@@ -241,8 +246,8 @@ public class StockMovementService {
         .build();
     movement.addItem(item);
     if (createdBatch) {
-      movementRepository.saveAndFlush(movement);
-      batch.setOriginMovementItem(item);
+      StockMovementItem savedItem = movementItemRepository.saveAndFlush(item);
+      batch.setOriginMovementItem(savedItem);
       batchRepository.save(batch);
     }
 
@@ -288,9 +293,30 @@ public class StockMovementService {
     }
 
     StockMovement saved = movementRepository.save(movement);
+    recordStockMovementCreated(saved, transferId);
     log.info("StockMovement {} ({}) created for transfer {} in warehouse {}",
         saved.getCode(), saved.getType(), transferId, warehouseId);
     return saved;
+  }
+
+  private void recordStockMovementCreated(StockMovement movement, UUID transferId) {
+    Map<String, Object> metadata = new LinkedHashMap<>();
+    metadata.put("code", movement.getCode());
+    metadata.put("type", movement.getType().name());
+    metadata.put("direction", movement.getDirection().name());
+    metadata.put("itemCount", movement.getItems().size());
+    if (transferId != null) {
+      metadata.put("transferId", transferId.toString());
+    }
+    auditService.record(AuditEventCreateRequest.builder()
+        .operation(AuditService.OPERATION_BUSINESS)
+        .action("STOCK_MOVEMENT_CREATED")
+        .outcome(AuditService.OUTCOME_SUCCESS)
+        .resourceType("STOCK_MOVEMENT")
+        .resourceId(movement.getId().toString())
+        .warehouseId(movement.getWarehouseId())
+        .metadata(metadata)
+        .build());
   }
 
   // ── Read operations ────────────────────────────────────────────────────
