@@ -9,6 +9,9 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.audit.AuditSnapshotService;
 import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +37,8 @@ public class WarehouseService {
     private final WarehouseRepository warehouseRepository;
     private final BatchRepository batchRepository;
     private final WarehouseAccessService warehouseAccessService;
+    private final AuditService auditService;
+    private final AuditSnapshotService auditSnapshotService;
 
     @Transactional
     public WarehouseResponse create(WarehouseRequest request) {
@@ -74,6 +79,7 @@ public class WarehouseService {
         warehouse.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
 
         Warehouse saved = warehouseRepository.save(warehouse);
+        recordWarehouseAudit("WAREHOUSE_CREATED", null, auditSnapshotService.snapshot(saved), saved.getId());
         log.info("Created warehouse {} for tenant {}", saved.getId(), tenantId);
 
         return mapToResponse(saved);
@@ -147,6 +153,7 @@ public class WarehouseService {
 
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
+        var before = auditSnapshotService.snapshot(warehouse);
 
         // Sanitize input to prevent XSS
         String sanitizedName = SanitizationUtil.sanitizeForHtml(request.getName());
@@ -178,6 +185,8 @@ public class WarehouseService {
         warehouse.setIsActive(request.getIsActive() != null ? request.getIsActive() : true);
 
         Warehouse updated = warehouseRepository.save(warehouse);
+        var after = auditSnapshotService.snapshot(updated);
+        recordWarehouseAudit("WAREHOUSE_UPDATED", before, after, updated.getId());
         log.info("Updated warehouse {} for tenant {}", id, tenantId);
 
         return mapToResponse(updated);
@@ -191,8 +200,27 @@ public class WarehouseService {
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", id));
 
+        var before = auditSnapshotService.snapshot(warehouse);
         warehouseRepository.delete(warehouse);
+        recordWarehouseAudit("WAREHOUSE_DELETED", before, null, id);
         log.info("Deleted warehouse {} for tenant {}", id, tenantId);
+    }
+
+    private void recordWarehouseAudit(
+            String action,
+            java.util.Map<String, Object> before,
+            java.util.Map<String, Object> after,
+            UUID warehouseId) {
+        auditService.record(AuditEventCreateRequest.builder()
+                .operation(AuditService.OPERATION_TECHNICAL)
+                .action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .resourceType("WAREHOUSE")
+                .resourceId(warehouseId.toString())
+                .beforeState(before)
+                .afterState(after)
+                .changedFields(auditSnapshotService.diff(before, after))
+                .build());
     }
 
     private String generateWarehouseCode(String name, String city, UUID tenantId) {

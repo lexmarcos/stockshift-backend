@@ -16,6 +16,9 @@ import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.UserRoleWarehouseRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.UserPrincipal;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.audit.AuditSnapshotService;
 import br.com.stockshift.util.PasswordGeneratorUtil;
 import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +43,8 @@ public class UserService {
     private final WarehouseRepository warehouseRepository;
     private final UserRoleWarehouseRepository userRoleWarehouseRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
+    private final AuditSnapshotService auditSnapshotService;
 
     @Transactional
     public CreateUserResponse createUser(CreateUserRequest request) {
@@ -73,6 +78,7 @@ public class UserService {
 
         user = userRepository.save(user);
         syncRoleWarehouseAssignments(user, roles, warehouses);
+        recordUserAudit("USER_CREATED", null, auditSnapshotService.snapshot(user), user.getId());
         log.info("Created user with ID: {} for tenant: {}", user.getId(), tenantId);
 
         List<String> roleNames = roles.stream()
@@ -182,6 +188,7 @@ public class UserService {
 
         User user = userRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", id));
+        var before = auditSnapshotService.snapshot(user);
 
         // Validate and fetch roles
         Set<Role> roles = validateAndFetchRoles(request.getRoleIds(), tenantId);
@@ -199,6 +206,8 @@ public class UserService {
 
         user = userRepository.save(user);
         syncRoleWarehouseAssignments(user, roles, warehouses);
+        var after = auditSnapshotService.snapshot(user);
+        recordUserAudit("USER_UPDATED", before, after, user.getId());
         log.info("Updated user: {} for tenant: {}", id, tenantId);
 
         return toUserResponse(user);
@@ -220,8 +229,27 @@ public class UserService {
             throw new BusinessException("Cannot delete your own account");
         }
 
+        var before = auditSnapshotService.snapshot(user);
         userRepository.delete(user);
+        recordUserAudit("USER_DELETED", before, null, id);
         log.info("Deleted user: {} for tenant: {}", id, tenantId);
+    }
+
+    private void recordUserAudit(
+            String action,
+            java.util.Map<String, Object> before,
+            java.util.Map<String, Object> after,
+            UUID userId) {
+        auditService.record(AuditEventCreateRequest.builder()
+                .operation(AuditService.OPERATION_TECHNICAL)
+                .action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .resourceType("USER")
+                .resourceId(userId.toString())
+                .beforeState(before)
+                .afterState(after)
+                .changedFields(auditSnapshotService.diff(before, after))
+                .build());
     }
 
     private void syncRoleWarehouseAssignments(User user, Set<Role> roles, Set<Warehouse> warehouses) {

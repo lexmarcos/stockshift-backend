@@ -1,6 +1,7 @@
 package br.com.stockshift.config;
 
 import br.com.stockshift.security.JwtAuthenticationFilter;
+import br.com.stockshift.security.audit.AuditContextFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final AuditContextFilter auditContextFilter;
   private final CorsConfigurationSource corsConfigurationSource;
 
   @Bean
@@ -62,7 +64,8 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/sales/infinitepay/webhook").permitAll()
             // All other requests require authentication
             .anyRequest().authenticated())
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(auditContextFilter, JwtAuthenticationFilter.class);
 
     return http.build();
   }

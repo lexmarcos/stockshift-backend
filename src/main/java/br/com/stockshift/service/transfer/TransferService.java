@@ -14,6 +14,8 @@ import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.service.stockmovement.StockMovementService;
 import br.com.stockshift.model.entity.StockMovementItem;
 import br.com.stockshift.model.enums.StockMovementType;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,7 +27,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -45,6 +49,7 @@ public class TransferService {
     private final TransferStateMachine stateMachine;
     private final SecurityUtils securityUtils;
     private final StockMovementService stockMovementService;
+    private final AuditService auditService;
 
     @Transactional
     public TransferResponse create(CreateTransferRequest request) {
@@ -85,6 +90,7 @@ public class TransferService {
         }
 
         Transfer saved = transferRepository.save(transfer);
+        recordTransferEvent("TRANSFER_CREATED", saved, userId, null);
         log.info("Transfer {} created by user {}", saved.getCode(), userId);
 
         return transferMapper.toResponse(saved, sourceWarehouse.getName(), destinationWarehouse.getName());
@@ -192,6 +198,7 @@ public class TransferService {
     public TransferResponse update(UUID id, UpdateTransferRequest request) {
         UUID tenantId = TenantContext.getTenantId();
         UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+        UUID userId = securityUtils.getCurrentUserId();
 
         Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
@@ -215,6 +222,7 @@ public class TransferService {
         }
 
         Transfer saved = transferRepository.save(transfer);
+        recordTransferEvent("TRANSFER_UPDATED", saved, userId, null);
 
         String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");
@@ -277,6 +285,7 @@ public class TransferService {
         transfer.setExecutedAt(Instant.now());
 
         Transfer saved = transferRepository.save(transfer);
+        recordTransferEvent("TRANSFER_EXECUTED", saved, userId, null);
         log.info("Transfer {} executed by user {}", saved.getCode(), userId);
 
         String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
@@ -352,6 +361,7 @@ public class TransferService {
         transfer.setCancellationReason(request.getReason());
 
         Transfer saved = transferRepository.save(transfer);
+        recordTransferEvent("TRANSFER_CANCELLED", saved, userId, request.getReason());
         log.info("Transfer {} cancelled by user {}", saved.getCode(), userId);
 
         String sourceWarehouseName = warehouseRepository.findById(transfer.getSourceWarehouseId())
@@ -372,5 +382,26 @@ public class TransferService {
         if (!transfer.getDestinationWarehouseId().equals(currentWarehouseId)) {
             throw new ForbiddenException("Only destination warehouse can perform this action");
         }
+    }
+
+    private void recordTransferEvent(String action, Transfer transfer, UUID actorUserId, String reason) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("code", transfer.getCode());
+        metadata.put("status", transfer.getStatus().name());
+        metadata.put("sourceWarehouseId", transfer.getSourceWarehouseId().toString());
+        metadata.put("destinationWarehouseId", transfer.getDestinationWarehouseId().toString());
+        metadata.put("itemCount", transfer.getItems().size());
+        auditService.record(AuditEventCreateRequest.builder()
+                .tenantId(transfer.getTenantId())
+                .actorUserId(actorUserId)
+                .warehouseId(transfer.getSourceWarehouseId())
+                .operation(AuditService.OPERATION_BUSINESS)
+                .action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .resourceType("TRANSFER")
+                .resourceId(transfer.getId().toString())
+                .reason(reason)
+                .metadata(metadata)
+                .build());
     }
 }

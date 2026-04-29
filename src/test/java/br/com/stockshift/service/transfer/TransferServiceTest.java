@@ -16,6 +16,7 @@ import br.com.stockshift.repository.TransferValidationLogRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +58,8 @@ class TransferServiceTest {
         private SecurityUtils securityUtils;
         @Mock
         private br.com.stockshift.service.stockmovement.StockMovementService stockMovementService;
+        @Mock
+        private AuditService auditService;
 
         @InjectMocks
         private TransferService transferService;

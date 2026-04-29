@@ -1,6 +1,9 @@
 package br.com.stockshift.exception;
 
 import br.com.stockshift.security.ratelimit.RateLimitService;
+import br.com.stockshift.security.audit.AuditContextHolder;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 import br.com.stockshift.util.IpUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -34,6 +37,7 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private final RateLimitService rateLimitService;
+    private final AuditService auditService;
 
     private boolean shouldRequireCaptcha(WebRequest request) {
         if (request instanceof ServletWebRequest servletWebRequest) {
@@ -154,6 +158,8 @@ public class GlobalExceptionHandler {
             AccessDeniedException ex,
             WebRequest request
     ) {
+        recordAccessDenied(ex.getMessage(), HttpStatus.FORBIDDEN.value());
+
         ErrorResponse error = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.FORBIDDEN.value())
@@ -170,6 +176,8 @@ public class GlobalExceptionHandler {
             ForbiddenException ex,
             WebRequest request
     ) {
+        recordAccessDenied(ex.getMessage(), HttpStatus.FORBIDDEN.value());
+
         ErrorResponse error = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.FORBIDDEN.value())
@@ -420,5 +428,20 @@ public class GlobalExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    private void recordAccessDenied(String reason, int status) {
+        try {
+            AuditContextHolder.setHttpStatus(status);
+            auditService.record(AuditEventCreateRequest.builder()
+                    .operation(AuditService.OPERATION_SECURITY)
+                    .action("ACCESS_DENIED")
+                    .outcome(AuditService.OUTCOME_DENIED)
+                    .reason(reason)
+                    .httpStatus(status)
+                    .build());
+        } catch (RuntimeException exception) {
+            log.warn("Failed to record access denied audit event: {}", exception.getMessage());
+        }
     }
 }

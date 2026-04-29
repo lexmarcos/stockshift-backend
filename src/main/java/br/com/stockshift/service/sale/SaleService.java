@@ -12,6 +12,8 @@ import br.com.stockshift.repository.*;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,7 @@ public class SaleService {
     private final SecurityUtils securityUtils;
     private final InfinitePayCheckoutService infinitePayCheckoutService;
     private final TenantRepository tenantRepository;
+    private final AuditService auditService;
 
     // ── Create sale ─────────────────────────────────────────────────────────
 
@@ -219,6 +222,7 @@ public class SaleService {
             response.setPaymentLink(linkResponse.getUrl());
         }
 
+        recordSaleEvent("SALE_CREATED", saved, null);
         return response;
     }
 
@@ -351,6 +355,7 @@ public class SaleService {
         movementRepository.save(stockMovement);
 
         log.info("Sale {} cancelled by user {}", saved.getCode(), userId);
+        recordSaleEvent("SALE_CANCELLED", saved, request.getCancellationReason());
 
         String warehouseName = warehouseRepository.findById(saved.getWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");
@@ -375,6 +380,7 @@ public class SaleService {
         sale.setInfinitepayCardBrand(cardBrand);
 
         saleRepository.save(sale);
+        recordSaleEvent("SALE_PAYMENT_CONFIRMED", sale, null);
         log.info("Sale {} confirmed via InfinitePay (nsu: {}, card_brand: {})", sale.getCode(), nsu, cardBrand);
     }
 
@@ -406,6 +412,7 @@ public class SaleService {
         }
 
         saleRepository.save(sale);
+        recordSaleEvent("SALE_PAYMENT_CONFIRMED", sale, null);
         log.info("Sale {} confirmed via InfinitePay webhook (transaction_nsu: {}, capture_method: {}, installments: {})",
                 sale.getCode(), transactionNsu, captureMethod, installments);
     }
@@ -543,5 +550,29 @@ public class SaleService {
                         .comparing(Batch::getExpirationDate, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(Batch::getCreatedAt))
                 .collect(Collectors.toList());
+    }
+
+    private void recordSaleEvent(String action, Sale sale, String reason) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("code", sale.getCode());
+        metadata.put("status", sale.getStatus().name());
+        metadata.put("total", sale.getTotal());
+        metadata.put("paymentMode", sale.getPaymentMode().name());
+        auditService.record(AuditEventCreateRequest.builder()
+                .tenantId(sale.getTenantId())
+                .actorUserId(saleActorUserId(sale))
+                .warehouseId(sale.getWarehouseId())
+                .operation(AuditService.OPERATION_BUSINESS)
+                .action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .resourceType("SALE")
+                .resourceId(sale.getId().toString())
+                .reason(reason)
+                .metadata(metadata)
+                .build());
+    }
+
+    private UUID saleActorUserId(Sale sale) {
+        return sale.getCancelledByUserId() != null ? sale.getCancelledByUserId() : sale.getCreatedByUserId();
     }
 }

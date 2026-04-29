@@ -30,11 +30,14 @@ import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.JwtTokenProvider;
 import br.com.stockshift.security.UserPrincipal;
 import br.com.stockshift.security.WarehouseContext;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -53,6 +56,7 @@ public class AuthService {
     private final UserRoleWarehouseRepository userRoleWarehouseRepository;
     private final PermissionResolverService permissionResolverService;
     private final WarehouseAccessService warehouseAccessService;
+    private final AuditService auditService;
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -68,6 +72,7 @@ public class AuthService {
                     .orElseThrow(() -> new UnauthorizedException("User not found"));
 
             if (!user.getIsActive()) {
+                recordAuth("LOGIN_FAILED", AuditService.OUTCOME_FAILURE, user, null, "ACCOUNT_DISABLED", null);
                 throw new UnauthorizedException("User account is disabled");
             }
 
@@ -89,6 +94,7 @@ public class AuthService {
             // Update last login
             user.setLastLogin(LocalDateTime.now());
             userRepository.save(user);
+            recordAuth("LOGIN_SUCCEEDED", AuditService.OUTCOME_SUCCESS, user, warehouseId, null, null);
 
             return LoginResponse.builder()
                     .accessToken(accessToken)
@@ -103,6 +109,9 @@ public class AuthService {
 
         } catch (AuthenticationException e) {
             log.error("Authentication failed for user: {}", request.getEmail());
+            User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+            recordAuth("LOGIN_FAILED", AuditService.OUTCOME_FAILURE, user, null, "BAD_CREDENTIALS",
+                    Map.of("email", request.getEmail()));
             throw new UnauthorizedException("Invalid email or password");
         }
     }
@@ -145,6 +154,7 @@ public class AuthService {
                 permissions);
 
         RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user, warehouseId);
+        recordAuth("TOKEN_REFRESHED", AuditService.OUTCOME_SUCCESS, user, warehouseId, null, null);
 
         return RefreshTokenResponse.builder()
                 .accessToken(accessToken)
@@ -174,6 +184,11 @@ public class AuthService {
                 log.warn("Failed to add access token to denylist: {}", e.getMessage());
             }
         }
+        auditService.record(AuditEventCreateRequest.builder()
+                .operation(AuditService.OPERATION_SECURITY)
+                .action("LOGOUT")
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .build());
     }
 
     @Transactional
@@ -192,6 +207,7 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         user.setMustChangePassword(false);
         userRepository.save(user);
+        recordAuth("PASSWORD_CHANGED", AuditService.OUTCOME_SUCCESS, user, WarehouseContext.getWarehouseId(), null, null);
 
         log.info("Password changed successfully for user: {}", user.getId());
     }
@@ -302,6 +318,8 @@ public class AuthService {
                 user.getEmail(),
                 roles,
                 permissions);
+        recordAuth("WAREHOUSE_SWITCHED", AuditService.OUTCOME_SUCCESS, user, request.getWarehouseId(), null,
+                Map.of("warehouseId", request.getWarehouseId().toString()));
 
         return RefreshTokenResponse.builder()
                 .accessToken(accessToken)
@@ -340,5 +358,27 @@ public class AuthService {
         return user.getRoles().stream()
                 .map(role -> role.getName())
                 .anyMatch(roleName -> "ADMIN".equalsIgnoreCase(roleName) || "SUPER_ADMIN".equalsIgnoreCase(roleName));
+    }
+
+    private void recordAuth(
+            String action,
+            String outcome,
+            User user,
+            UUID warehouseId,
+            String reason,
+            Map<String, Object> metadata) {
+        auditService.record(AuditEventCreateRequest.builder()
+                .tenantId(user != null ? user.getTenantId() : null)
+                .actorUserId(user != null ? user.getId() : null)
+                .actorEmail(user != null ? user.getEmail() : null)
+                .warehouseId(warehouseId)
+                .operation(AuditService.OPERATION_SECURITY)
+                .action(action)
+                .outcome(outcome)
+                .resourceType("AUTH")
+                .resourceId(user != null ? user.getId().toString() : null)
+                .reason(reason)
+                .metadata(metadata)
+                .build());
     }
 }

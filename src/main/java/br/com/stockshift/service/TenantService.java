@@ -12,6 +12,8 @@ import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.JwtTokenProvider;
 import br.com.stockshift.config.JwtProperties;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +36,7 @@ public class TenantService {
   private final JwtTokenProvider jwtTokenProvider;
   private final RefreshTokenService refreshTokenService;
   private final JwtProperties jwtProperties;
+  private final AuditService auditService;
 
   @Transactional
   public RegisterResponse register(RegisterRequest request) {
@@ -92,6 +96,17 @@ public class TenantService {
         permissions);
 
     RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+    auditService.record(AuditEventCreateRequest.builder()
+        .tenantId(tenant.getId())
+        .actorUserId(user.getId())
+        .actorEmail(user.getEmail())
+        .operation(AuditService.OPERATION_SECURITY)
+        .action("TENANT_REGISTERED")
+        .outcome(AuditService.OUTCOME_SUCCESS)
+        .resourceType("TENANT")
+        .resourceId(tenant.getId().toString())
+        .metadata(Map.of("businessName", tenant.getBusinessName()))
+        .build());
 
     log.info("Registration completed successfully for tenant: {}", tenant.getId());
 

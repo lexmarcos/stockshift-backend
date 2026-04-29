@@ -12,6 +12,9 @@ import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.audit.AuditSnapshotService;
 import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +37,8 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
+    private final AuditService auditService;
+    private final AuditSnapshotService auditSnapshotService;
     @Autowired(required = false)
     @Nullable
     private StorageService storageService;
@@ -155,6 +160,7 @@ public class ProductService {
         product.setImageUrl(SanitizationUtil.sanitizeUrl(request.getImageUrl()));
 
         Product saved = productRepository.save(product);
+        recordProductAudit("PRODUCT_CREATED", null, auditSnapshotService.snapshot(saved), saved.getId());
         log.info("Created product {} for tenant {}", saved.getId(), tenantId);
 
         return saved;
@@ -234,6 +240,7 @@ public class ProductService {
 
         Product product = productRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        var before = auditSnapshotService.snapshot(product);
 
         // Upload new image if provided
         if (image != null && !image.isEmpty() && storageService != null) {
@@ -291,6 +298,8 @@ public class ProductService {
         product.setActive(request.getActive() != null ? request.getActive() : true);
 
         Product updated = productRepository.save(product);
+        var after = auditSnapshotService.snapshot(updated);
+        recordProductAudit("PRODUCT_UPDATED", before, after, updated.getId());
         log.info("Updated product {} for tenant {}", id, tenantId);
 
         return mapToResponse(updated);
@@ -307,6 +316,7 @@ public class ProductService {
 
         Product product = productRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
+        var before = auditSnapshotService.snapshot(product);
 
         // Delete image if exists
         if (product.getImageUrl() != null) {
@@ -315,9 +325,28 @@ public class ProductService {
 
         // Soft delete
         product.setDeletedAt(LocalDateTime.now());
-        productRepository.save(product);
+        Product deleted = productRepository.save(product);
+        var after = auditSnapshotService.snapshot(deleted);
+        recordProductAudit("PRODUCT_DELETED", before, after, id);
 
         log.info("Soft deleted product {} for tenant {}", id, tenantId);
+    }
+
+    private void recordProductAudit(
+            String action,
+            java.util.Map<String, Object> before,
+            java.util.Map<String, Object> after,
+            UUID productId) {
+        auditService.record(AuditEventCreateRequest.builder()
+                .operation(AuditService.OPERATION_TECHNICAL)
+                .action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .resourceType("PRODUCT")
+                .resourceId(productId.toString())
+                .beforeState(before)
+                .afterState(after)
+                .changedFields(auditSnapshotService.diff(before, after))
+                .build());
     }
 
     private ProductResponse mapToResponse(Product product) {

@@ -12,6 +12,8 @@ import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.audit.AuditSnapshotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +51,12 @@ class BatchServiceTest {
 
         @Mock
         private br.com.stockshift.security.SecurityUtils securityUtils;
+
+        @Mock
+        private AuditService auditService;
+
+        @Mock
+        private AuditSnapshotService auditSnapshotService;
 
         @InjectMocks
         private BatchService batchService;

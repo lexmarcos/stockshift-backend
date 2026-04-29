@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,6 +31,9 @@ import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.audit.AuditSnapshotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,6 +48,8 @@ public class BatchService {
     private final ProductService productService;
     private final WarehouseAccessService warehouseAccessService;
     private final SecurityUtils securityUtils;
+    private final AuditService auditService;
+    private final AuditSnapshotService auditSnapshotService;
 
     /**
      * Generates a unique batch code in the format: BATCH-YYYYMMDD-XXX
@@ -68,10 +74,8 @@ public class BatchService {
     @Transactional
     public BatchResponse create(BatchRequest request) {
         UUID tenantId = TenantContext.getTenantId();
-
         // Validate warehouse access
         warehouseAccessService.validateWarehouseAccess(request.getWarehouseId());
-
         // Generate batch code if not provided
         String batchCode = request.getBatchCode();
         if (batchCode == null || batchCode.trim().isEmpty()) {
@@ -89,11 +93,9 @@ public class BatchService {
         // Validate product
         Product product = productRepository.findByTenantIdAndId(tenantId, request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
-
         // Validate warehouse
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
-
         // Validate expiration date if product has expiration
         if (product.getHasExpiration() && request.getExpirationDate() == null) {
             throw new BusinessException("Expiration date is required for products with expiration tracking");
@@ -111,6 +113,7 @@ public class BatchService {
         batch.setSellingPrice(request.getSellingPrice());
 
         Batch saved = batchRepository.save(batch);
+        recordBatchAudit("BATCH_CREATED", null, auditSnapshotService.snapshot(saved), saved.getId());
         log.info("Created batch {} for tenant {}", saved.getId(), tenantId);
 
         return mapToResponse(saved);
@@ -139,7 +142,6 @@ public class BatchService {
         UUID tenantId = TenantContext.getTenantId();
         Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
-
         warehouseAccessService.validateWarehouseAccess(batch.getWarehouse().getId());
 
         return mapToResponse(batch);
@@ -229,11 +231,10 @@ public class BatchService {
     @Transactional
     public BatchResponse update(UUID id, BatchRequest request) {
         UUID tenantId = TenantContext.getTenantId();
-
         Batch batch = batchRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
         warehouseAccessService.validateWarehouseAccess(batch.getWarehouse().getId());
-
+        var before = auditSnapshotService.snapshot(batch);
         // Validate unique batch code if changed
         if (!batch.getBatchCode().equals(request.getBatchCode())) {
             batchRepository.findByTenantIdAndBatchCode(tenantId, request.getBatchCode())
@@ -241,14 +242,12 @@ public class BatchService {
                         throw new BusinessException("Batch with code " + request.getBatchCode() + " already exists");
                     });
         }
-
         // Validate product if changed
         if (!batch.getProduct().getId().equals(request.getProductId())) {
             Product product = productRepository.findByTenantIdAndId(tenantId, request.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Product", "id", request.getProductId()));
             batch.setProduct(product);
         }
-
         // Validate warehouse if changed
         if (!batch.getWarehouse().getId().equals(request.getWarehouseId())) {
             warehouseAccessService.validateWarehouseAccess(request.getWarehouseId());
@@ -266,6 +265,8 @@ public class BatchService {
 
         try {
             Batch updated = batchRepository.save(batch);
+            var after = auditSnapshotService.snapshot(updated);
+            recordBatchAudit("BATCH_UPDATED", before, after, updated.getId());
             log.info("Updated batch {} for tenant {}", id, tenantId);
             return mapToResponse(updated);
         } catch (ObjectOptimisticLockingFailureException e) {
@@ -281,7 +282,9 @@ public class BatchService {
                 .orElseThrow(() -> new ResourceNotFoundException("Batch", "id", id));
         warehouseAccessService.validateWarehouseAccess(batch.getWarehouse().getId());
 
+        var before = auditSnapshotService.snapshot(batch);
         batchRepository.delete(batch);
+        recordBatchAudit("BATCH_DELETED", before, null, id);
         log.info("Deleted batch {} for tenant {}", id, tenantId);
     }
 
@@ -306,6 +309,15 @@ public class BatchService {
         // Soft delete all batches
         int deletedCount = batchRepository.softDeleteByProductAndWarehouse(
             productId, warehouseId, tenantId);
+        auditService.record(AuditEventCreateRequest.builder()
+            .operation(AuditService.OPERATION_TECHNICAL).action("BATCHES_DELETED")
+            .outcome(AuditService.OUTCOME_SUCCESS).resourceType("BATCH")
+            .resourceId(productId + ":" + warehouseId)
+            .metadata(Map.of(
+                "deletedCount", deletedCount,
+                "productId", productId.toString(),
+                "warehouseId", warehouseId.toString()))
+            .build());
 
         log.info("Soft deleted {} batches for product {} in warehouse {} for tenant {}",
             deletedCount, productId, warehouseId, tenantId);
@@ -407,6 +419,7 @@ public class BatchService {
         batch.setSellingPrice(request.getSellingPrice());
 
         Batch savedBatch = batchRepository.save(batch);
+        recordBatchAudit("BATCH_CREATED", null, auditSnapshotService.snapshot(savedBatch), savedBatch.getId());
         log.info("Created product {} with batch {} for tenant {}",
                 productResponse.getId(), savedBatch.getId(), tenantId);
 
@@ -473,5 +486,14 @@ public class BatchService {
         return batches.stream()
             .map(Batch::getQuantity)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private void recordBatchAudit(String action, Map<String, Object> before, Map<String, Object> after, UUID batchId) {
+        auditService.record(AuditEventCreateRequest.builder()
+                .operation(AuditService.OPERATION_TECHNICAL).action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS).resourceType("BATCH")
+                .resourceId(batchId.toString()).beforeState(before).afterState(after)
+                .changedFields(auditSnapshotService.diff(before, after))
+                .build());
     }
 }

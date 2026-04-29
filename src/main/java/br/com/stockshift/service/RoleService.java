@@ -9,6 +9,9 @@ import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.repository.PermissionRepository;
 import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.audit.AuditSnapshotService;
 import br.com.stockshift.util.SanitizationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,8 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
+    private final AuditService auditService;
+    private final AuditSnapshotService auditSnapshotService;
 
     @Transactional
     public RoleResponse create(RoleRequest request) {
@@ -60,6 +65,7 @@ public class RoleService {
         }
 
         Role saved = roleRepository.save(role);
+        recordRoleAudit("ROLE_CREATED", null, auditSnapshotService.snapshot(saved), saved.getId());
         log.info("Created role {} for tenant {}", saved.getId(), tenantId);
 
         return mapToResponse(saved);
@@ -95,6 +101,7 @@ public class RoleService {
         if (role.getIsSystemRole()) {
             throw new BusinessException("System roles cannot be modified");
         }
+        var before = auditSnapshotService.snapshot(role);
 
         // Check if another role with same name exists
         roleRepository.findByTenantIdAndName(tenantId, request.getName())
@@ -122,6 +129,8 @@ public class RoleService {
         }
 
         Role updated = roleRepository.save(role);
+        var after = auditSnapshotService.snapshot(updated);
+        recordRoleAudit("ROLE_UPDATED", before, after, updated.getId());
         log.info("Updated role {} for tenant {}", id, tenantId);
 
         return mapToResponse(updated);
@@ -140,9 +149,28 @@ public class RoleService {
             throw new BusinessException("System roles cannot be deleted");
         }
 
+        var before = auditSnapshotService.snapshot(role);
         roleRepository.delete(role);
+        recordRoleAudit("ROLE_DELETED", before, null, id);
 
         log.info("Deleted role {} for tenant {}", id, tenantId);
+    }
+
+    private void recordRoleAudit(
+            String action,
+            java.util.Map<String, Object> before,
+            java.util.Map<String, Object> after,
+            UUID roleId) {
+        auditService.record(AuditEventCreateRequest.builder()
+                .operation(AuditService.OPERATION_TECHNICAL)
+                .action(action)
+                .outcome(AuditService.OUTCOME_SUCCESS)
+                .resourceType("ROLE")
+                .resourceId(roleId.toString())
+                .beforeState(before)
+                .afterState(after)
+                .changedFields(auditSnapshotService.diff(before, after))
+                .build());
     }
 
     private RoleResponse mapToResponse(Role role) {

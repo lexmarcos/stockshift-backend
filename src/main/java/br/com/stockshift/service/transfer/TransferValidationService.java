@@ -13,6 +13,8 @@ import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.service.stockmovement.StockMovementService;
 import br.com.stockshift.model.enums.StockMovementType;
+import br.com.stockshift.service.audit.AuditEventCreateRequest;
+import br.com.stockshift.service.audit.AuditService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -40,11 +44,13 @@ public class TransferValidationService {
         private final TransferStateMachine stateMachine;
         private final SecurityUtils securityUtils;
         private final StockMovementService stockMovementService;
+        private final AuditService auditService;
 
         @Transactional
         public TransferResponse startValidation(UUID transferId) {
                 UUID tenantId = TenantContext.getTenantId();
                 UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+                UUID userId = securityUtils.getCurrentUserId();
 
                 Transfer transfer = transferRepository.findByTenantIdAndId(tenantId, transferId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Transfer not found"));
@@ -54,6 +60,8 @@ public class TransferValidationService {
 
                 transfer.setStatus(TransferStatus.PENDING_VALIDATION);
                 Transfer saved = transferRepository.save(transfer);
+                recordTransferValidationEvent("TRANSFER_VALIDATION_STARTED", saved, userId,
+                                AuditService.OUTCOME_SUCCESS, null);
 
                 log.info("Transfer {} validation started", saved.getCode());
 
@@ -100,6 +108,8 @@ public class TransferValidationService {
 
                 if (matchingItem == null) {
                         log.warn("Invalid barcode {} scanned for transfer {}", barcode, transfer.getCode());
+                        recordTransferValidationEvent("TRANSFER_BARCODE_SCANNED", transfer, userId,
+                                        AuditService.OUTCOME_FAILURE, Map.of("barcode", barcode, "valid", false));
                         return ScanBarcodeResponse.builder()
                                         .valid(false)
                                         .message("Product does not belong to this transfer")
@@ -122,6 +132,11 @@ public class TransferValidationService {
                         responseBuilder.warning("Quantity received exceeds quantity sent");
                 }
 
+                recordTransferValidationEvent("TRANSFER_BARCODE_SCANNED", transfer, userId,
+                                AuditService.OUTCOME_SUCCESS, Map.of(
+                                                "barcode", barcode,
+                                                "valid", true,
+                                                "transferItemId", matchingItem.getId().toString()));
                 return responseBuilder.build();
         }
 
@@ -226,6 +241,8 @@ public class TransferValidationService {
                 transfer.setValidatedByUserId(userId);
                 transfer.setValidatedAt(Instant.now());
                 transferRepository.save(transfer);
+                recordTransferValidationEvent("TRANSFER_COMPLETED", transfer, userId,
+                                AuditService.OUTCOME_SUCCESS, Map.of("finalStatus", finalStatus.name()));
 
                 log.info("Transfer {} completed with status {}", transfer.getCode(), finalStatus);
 
@@ -340,5 +357,32 @@ public class TransferValidationService {
                 if (!transfer.getDestinationWarehouseId().equals(currentWarehouseId)) {
                         throw new ForbiddenException("Only destination warehouse can perform this action");
                 }
+        }
+
+        private void recordTransferValidationEvent(
+                        String action,
+                        Transfer transfer,
+                        UUID actorUserId,
+                        String outcome,
+                        Map<String, Object> extraMetadata) {
+                Map<String, Object> metadata = new LinkedHashMap<>();
+                metadata.put("code", transfer.getCode());
+                metadata.put("status", transfer.getStatus().name());
+                metadata.put("sourceWarehouseId", transfer.getSourceWarehouseId().toString());
+                metadata.put("destinationWarehouseId", transfer.getDestinationWarehouseId().toString());
+                if (extraMetadata != null) {
+                        metadata.putAll(extraMetadata);
+                }
+                auditService.record(AuditEventCreateRequest.builder()
+                                .tenantId(transfer.getTenantId())
+                                .actorUserId(actorUserId)
+                                .warehouseId(transfer.getDestinationWarehouseId())
+                                .operation(AuditService.OPERATION_BUSINESS)
+                                .action(action)
+                                .outcome(outcome)
+                                .resourceType("TRANSFER")
+                                .resourceId(transfer.getId().toString())
+                                .metadata(metadata)
+                                .build());
         }
 }

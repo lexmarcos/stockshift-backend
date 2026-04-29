@@ -1,6 +1,7 @@
 package br.com.stockshift.exception;
 
 import br.com.stockshift.security.ratelimit.RateLimitService;
+import br.com.stockshift.service.audit.AuditService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,11 +27,14 @@ class GlobalExceptionHandlerTest {
     private RateLimitService rateLimitService;
 
     @Mock
+    private AuditService auditService;
+
+    @Mock
     private WebRequest webRequest;
 
     @BeforeEach
     void setUp() {
-        handler = new GlobalExceptionHandler(rateLimitService);
+        handler = new GlobalExceptionHandler(rateLimitService, auditService);
         when(webRequest.getDescription(anyBoolean())).thenReturn("uri=/test/path");
     }
 
