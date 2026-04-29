@@ -14,8 +14,8 @@ import br.com.stockshift.security.ratelimit.RateLimitService;
 import br.com.stockshift.service.AuthService;
 import br.com.stockshift.service.HCaptchaService;
 import br.com.stockshift.service.TenantService;
+import br.com.stockshift.util.ClientIpResolver;
 import br.com.stockshift.util.CookieUtil;
-import br.com.stockshift.util.IpUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -38,6 +38,7 @@ public class AuthController {
     private final CookieUtil cookieUtil;
     private final RateLimitService rateLimitService;
     private final HCaptchaService hCaptchaService;
+    private final ClientIpResolver clientIpResolver;
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Authenticate user and set HTTP-only cookies")
@@ -47,7 +48,7 @@ public class AuthController {
             HttpServletResponse response) {
 
         // Check if captcha is required for this IP and validate it
-        String clientIp = IpUtil.getClientIp(httpRequest);
+        String clientIp = clientIpResolver.resolve(httpRequest);
         boolean captchaRequired = rateLimitService.shouldRequireCaptcha(clientIp);
 
         if (captchaRequired) {

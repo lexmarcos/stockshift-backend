@@ -1,13 +1,15 @@
 package br.com.stockshift.security.ratelimit;
 
 import br.com.stockshift.dto.ApiResponse;
+import br.com.stockshift.config.ClientIpProperties;
+import br.com.stockshift.util.ClientIpResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -18,15 +20,25 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-@RequiredArgsConstructor
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final RateLimitService rateLimitService;
+    private final ClientIpResolver clientIpResolver;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String LOGIN_PATH = "/stockshift/api/auth/login";
+
+    public RateLimitFilter(RateLimitService rateLimitService) {
+        this(rateLimitService, new ClientIpResolver(new ClientIpProperties()));
+    }
+
+    @Autowired
+    public RateLimitFilter(RateLimitService rateLimitService, ClientIpResolver clientIpResolver) {
+        this.rateLimitService = rateLimitService;
+        this.clientIpResolver = clientIpResolver;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -39,7 +51,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        String clientIp = extractClientIp(request);
+        String clientIp = clientIpResolver.resolve(request);
         log.debug("Rate limit check for IP: {} on path: {}", clientIp, request.getRequestURI());
 
         if (!rateLimitService.tryConsume(clientIp)) {
@@ -68,30 +80,4 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 && LOGIN_PATH.equals(request.getRequestURI());
     }
 
-    /**
-     * Extracts the client IP address, considering proxy headers.
-     * Priority: CF-Connecting-IP > X-Forwarded-For > X-Real-IP > RemoteAddr
-     */
-    private String extractClientIp(HttpServletRequest request) {
-        // Cloudflare
-        String cfConnectingIp = request.getHeader("CF-Connecting-IP");
-        if (cfConnectingIp != null && !cfConnectingIp.isEmpty()) {
-            return cfConnectingIp.trim();
-        }
-
-        // Standard proxy header
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isEmpty()) {
-            // X-Forwarded-For can contain multiple IPs, first one is the original client
-            return xForwardedFor.split(",")[0].trim();
-        }
-
-        // Nginx proxy
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isEmpty()) {
-            return xRealIp.trim();
-        }
-
-        return request.getRemoteAddr();
-    }
 }

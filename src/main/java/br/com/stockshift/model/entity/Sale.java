@@ -86,6 +86,9 @@ public class Sale extends TenantAwareEntity {
     @Column(name = "infinitepay_invoice_slug")
     private String infinitepayInvoiceSlug;
 
+    @Column(name = "infinitepay_webhook_token_hash", length = 64)
+    private String infinitepayWebhookTokenHash;
+
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     private List<SaleItem> items = new ArrayList<>();

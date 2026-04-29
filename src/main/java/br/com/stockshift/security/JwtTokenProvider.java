@@ -3,6 +3,7 @@ package br.com.stockshift.security;
 import br.com.stockshift.config.JwtProperties;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,11 +21,53 @@ import java.util.UUID;
 @Slf4j
 public class JwtTokenProvider {
 
+    private static final int MIN_HS256_KEY_BYTES = 32;
+
     private final JwtProperties jwtProperties;
 
+    @PostConstruct
+    public void validateConfiguration() {
+        getSigningSecretBytes();
+    }
+
     private SecretKey getSigningKey() {
-        byte[] keyBytes = jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+        return Keys.hmacShaKeyFor(getSigningSecretBytes());
+    }
+
+    private byte[] getSigningSecretBytes() {
+        String secret = jwtProperties.getSecret();
+        byte[] keyBytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
+        validateSigningSecret(secret, keyBytes.length);
+        return keyBytes;
+    }
+
+    private void validateSigningSecret(String secret, int byteLength) {
+        if (byteLength >= MIN_HS256_KEY_BYTES && !isUnresolvedPlaceholder(secret)) {
+            return;
+        }
+        throw new IllegalStateException(jwtSecretMessage(secret, byteLength));
+    }
+
+    private boolean isUnresolvedPlaceholder(String secret) {
+        return secret != null && secret.startsWith("${") && secret.endsWith("}");
+    }
+
+    private String jwtSecretMessage(String secret, int byteLength) {
+        return "Invalid jwt.secret; offending value: " + describeSecret(secret, byteLength)
+                + "; expected shape: at least 32 UTF-8 bytes for HS256 via JWT_SECRET.";
+    }
+
+    private String describeSecret(String secret, int byteLength) {
+        if (secret == null) {
+            return "<null>";
+        }
+        if (secret.isBlank()) {
+            return "<blank:" + byteLength + " bytes>";
+        }
+        if (isUnresolvedPlaceholder(secret)) {
+            return secret;
+        }
+        return "<redacted:" + byteLength + " bytes>";
     }
 
     public String generateAccessToken(UUID userId, UUID tenantId, String email, List<String> roles, List<String> authorities) {

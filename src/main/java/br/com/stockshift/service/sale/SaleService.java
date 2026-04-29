@@ -22,6 +22,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -36,6 +40,7 @@ import java.util.stream.Collectors;
 public class SaleService {
 
     private static final int CODE_SEQUENCE_PADDING = 4;
+    private static final int WEBHOOK_TOKEN_BYTES = 32;
 
     private final SaleRepository saleRepository;
     private final BatchRepository batchRepository;
@@ -49,6 +54,7 @@ public class SaleService {
     private final InfinitePayCheckoutService infinitePayCheckoutService;
     private final TenantRepository tenantRepository;
     private final AuditService auditService;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     // ── Create sale ─────────────────────────────────────────────────────────
 
@@ -209,11 +215,15 @@ public class SaleService {
                         });
             }
 
+            String webhookToken = generateWebhookToken();
+            saved.setInfinitepayWebhookTokenHash(hashWebhookToken(webhookToken));
+
             InfinitePayCheckoutService.CheckoutLinkResponse linkResponse =
                     infinitePayCheckoutService.generatePaymentLink(
                             tenant.getInfinitepayHandle(),
                             aggregated.values().stream().toList(),
-                            saved.getId().toString());
+                            saved.getId().toString(),
+                            webhookToken);
 
             saved.setPaymentLink(linkResponse.getUrl());
             saved.setInfinitepayInvoiceSlug(linkResponse.getSlug());
@@ -366,8 +376,7 @@ public class SaleService {
 
     @Transactional
     public void confirmInfinitePayPayment(UUID saleId, String nsu, String aut, String cardBrand) {
-        Sale sale = saleRepository.findById(saleId)
-                .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
+        Sale sale = findPaymentSale(saleId);
 
         if (sale.getStatus() != SaleStatus.PENDING) {
             log.warn("Sale {} is not PENDING (status: {}), ignoring InfinitePay callback", saleId, sale.getStatus());
@@ -384,37 +393,108 @@ public class SaleService {
         log.info("Sale {} confirmed via InfinitePay (nsu: {}, card_brand: {})", sale.getCode(), nsu, cardBrand);
     }
 
+    @Transactional(readOnly = true)
+    public boolean isInfinitePayPaymentCompleted(UUID saleId) {
+        return findPaymentSale(saleId).getStatus() == SaleStatus.COMPLETED;
+    }
+
     // ── Confirm InfinitePay webhook (payment link) ──────────────────────────
 
     @Transactional
-    public void confirmInfinitePayWebhook(UUID saleId, String transactionNsu,
-                                           String captureMethod, String invoiceSlug,
-                                           String receiptUrl, Integer installments) {
+    public void confirmInfinitePayWebhook(String webhookToken, InfinitePayWebhookRequest request) {
+        UUID saleId = parseWebhookSaleId(request.getOrder_nsu());
         Sale sale = saleRepository.findById(saleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
 
-        if (sale.getStatus() != SaleStatus.PENDING) {
-            log.warn("Sale {} is not PENDING (status: {}), ignoring webhook", saleId, sale.getStatus());
+        validateWebhookToken(sale, webhookToken);
+        if (sale.getStatus() == SaleStatus.COMPLETED) {
+            log.info("Ignoring idempotent InfinitePay webhook for already completed sale {}", sale.getCode());
             return;
         }
 
+        validatePaymentLinkSale(sale, request);
+        Tenant tenant = findActiveInfinitePayTenant(sale);
+
+        InfinitePayCheckoutService.PaymentCheckResponse paymentCheck =
+                infinitePayCheckoutService.checkPayment(
+                        tenant.getInfinitepayHandle(),
+                        sale.getId().toString(),
+                        requireWebhookText(request.getTransaction_nsu(), "transaction_nsu", sale.getId()),
+                        request.getInvoice_slug());
+        validatePaymentCheck(sale, paymentCheck);
+
+        applyInfinitePayConfirmation(sale, request, paymentCheck);
+    }
+
+    private void validatePaymentLinkSale(Sale sale, InfinitePayWebhookRequest request) {
+        if (sale.getStatus() != SaleStatus.PENDING) {
+            throw new BadRequestException("Sale " + sale.getId() + " has status " + sale.getStatus()
+                    + ", expected PENDING for InfinitePay webhook");
+        }
+        if (sale.getPaymentMode() != PaymentMode.LINK) {
+            throw new BadRequestException("Sale " + sale.getId() + " has payment mode " + sale.getPaymentMode()
+                    + ", expected LINK for InfinitePay webhook");
+        }
+        String invoiceSlug = requireWebhookText(request.getInvoice_slug(), "invoice_slug", sale.getId());
+        if (!invoiceSlug.equals(sale.getInfinitepayInvoiceSlug())) {
+            throw new BadRequestException("InfinitePay invoice_slug '" + invoiceSlug
+                    + "' does not match expected slug for sale " + sale.getId());
+        }
+    }
+
+    private Tenant findActiveInfinitePayTenant(Sale sale) {
+        Tenant tenant = tenantRepository.findById(sale.getTenantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant", "id", sale.getTenantId()));
+        if (!Boolean.TRUE.equals(tenant.getIsActive())) {
+            throw new BadRequestException("Tenant " + sale.getTenantId()
+                    + " is inactive, expected active tenant for InfinitePay webhook");
+        }
+        if (tenant.getInfinitepayHandle() == null || tenant.getInfinitepayHandle().isBlank()) {
+            throw new BadRequestException("Tenant " + sale.getTenantId()
+                    + " has blank InfinitePay handle, expected configured handle");
+        }
+        return tenant;
+    }
+
+    private void validatePaymentCheck(Sale sale, InfinitePayCheckoutService.PaymentCheckResponse paymentCheck) {
+        if (paymentCheck == null || !Boolean.TRUE.equals(paymentCheck.getSuccess())
+                || !Boolean.TRUE.equals(paymentCheck.getPaid())) {
+            throw new BadRequestException("InfinitePay payment_check did not confirm paid sale " + sale.getId());
+        }
+        if (!Objects.equals(paymentCheck.getAmount(), sale.getTotal())) {
+            throw new BadRequestException("InfinitePay amount " + paymentCheck.getAmount()
+                    + " does not match expected total " + sale.getTotal() + " for sale " + sale.getId());
+        }
+        if (paymentCheck.getPaidAmount() == null || paymentCheck.getPaidAmount() < sale.getTotal()) {
+            throw new BadRequestException("InfinitePay paid_amount " + paymentCheck.getPaidAmount()
+                    + " is below expected total " + sale.getTotal() + " for sale " + sale.getId());
+        }
+    }
+
+    private void applyInfinitePayConfirmation(
+            Sale sale,
+            InfinitePayWebhookRequest request,
+            InfinitePayCheckoutService.PaymentCheckResponse paymentCheck) {
+        String captureMethod = firstText(paymentCheck.getCaptureMethod(), request.getCapture_method());
+        Integer installments = firstPositive(paymentCheck.getInstallments(), request.getInstallments());
+
         sale.setStatus(SaleStatus.COMPLETED);
-        sale.setInfinitepayNsu(transactionNsu);
+        sale.setInfinitepayNsu(request.getTransaction_nsu());
         sale.setInfinitepayCardBrand(captureMethod);
-        sale.setInfinitepayInvoiceSlug(invoiceSlug);
+        sale.setInfinitepayInvoiceSlug(request.getInvoice_slug());
 
         PaymentMethod resolvedPaymentMethod = mapCaptureMethodToPaymentMethod(captureMethod);
         if (resolvedPaymentMethod != null) {
             sale.setPaymentMethod(resolvedPaymentMethod);
         }
-        if (installments != null && installments > 0) {
+        if (installments != null) {
             sale.setInstallments(installments);
         }
 
         saleRepository.save(sale);
         recordSaleEvent("SALE_PAYMENT_CONFIRMED", sale, null);
         log.info("Sale {} confirmed via InfinitePay webhook (transaction_nsu: {}, capture_method: {}, installments: {})",
-                sale.getCode(), transactionNsu, captureMethod, installments);
+                sale.getCode(), request.getTransaction_nsu(), captureMethod, installments);
     }
 
     private PaymentMethod mapCaptureMethodToPaymentMethod(String captureMethod) {
@@ -425,6 +505,82 @@ public class SaleService {
             case "pix" -> PaymentMethod.PIX;
             default -> null;
         };
+    }
+
+    private UUID parseWebhookSaleId(String orderNsu) {
+        if (orderNsu == null || orderNsu.isBlank()) {
+            throw new BadRequestException("Invalid InfinitePay order_nsu '" + orderNsu + "': expected sale UUID");
+        }
+        try {
+            return UUID.fromString(orderNsu);
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid InfinitePay order_nsu '" + orderNsu + "': expected sale UUID");
+        }
+    }
+
+    private void validateWebhookToken(Sale sale, String webhookToken) {
+        String expectedHash = sale.getInfinitepayWebhookTokenHash();
+        if (expectedHash == null || expectedHash.isBlank() || webhookToken == null || webhookToken.isBlank()) {
+            throw new BadRequestException("Invalid InfinitePay webhook token for sale " + sale.getId()
+                    + ": expected configured opaque token");
+        }
+        byte[] expected = expectedHash.getBytes(StandardCharsets.UTF_8);
+        byte[] provided = hashWebhookToken(webhookToken).getBytes(StandardCharsets.UTF_8);
+        if (!MessageDigest.isEqual(expected, provided)) {
+            throw new BadRequestException("Invalid InfinitePay webhook token for sale " + sale.getId()
+                    + ": expected configured opaque token");
+        }
+    }
+
+    private String requireWebhookText(String value, String fieldName, UUID saleId) {
+        if (value == null || value.isBlank()) {
+            throw new BadRequestException("Invalid InfinitePay " + fieldName + " '" + value
+                    + "' for sale " + saleId + ": expected non-blank value");
+        }
+        return value;
+    }
+
+    private String firstText(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        return fallback;
+    }
+
+    private Integer firstPositive(Integer primary, Integer fallback) {
+        if (primary != null && primary > 0) {
+            return primary;
+        }
+        if (fallback != null && fallback > 0) {
+            return fallback;
+        }
+        return null;
+    }
+
+    private String generateWebhookToken() {
+        byte[] tokenBytes = new byte[WEBHOOK_TOKEN_BYTES];
+        secureRandom.nextBytes(tokenBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes);
+    }
+
+    private String hashWebhookToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm is unavailable for InfinitePay webhook token hashing", e);
+        }
+    }
+
+    private Sale findPaymentSale(UUID saleId) {
+        UUID tenantId = TenantContext.getTenantId();
+        if (tenantId == null) {
+            return saleRepository.findById(saleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
+        }
+        return saleRepository.findByTenantIdAndId(tenantId, saleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
     }
 
     // ── Next code ───────────────────────────────────────────────────────────

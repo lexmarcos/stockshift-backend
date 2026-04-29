@@ -1,5 +1,7 @@
 package br.com.stockshift.security;
 
+import br.com.stockshift.repository.TenantRepository;
+import br.com.stockshift.service.PermissionResolverService;
 import br.com.stockshift.service.TokenDenylistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -22,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Component
@@ -32,6 +35,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider tokenProvider;
     private final CustomUserDetailsService userDetailsService;
     private final TokenDenylistService tokenDenylistService;
+    private final PermissionResolverService permissionResolverService;
+    private final TenantRepository tenantRepository;
 
     @Override
     protected void doFilterInternal(
@@ -39,68 +44,113 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         try {
-            try {
-                String jwt = getJwtFromRequest(request);
-
-                if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                    // Check if token is revoked
-                    String jti = tokenProvider.getJtiFromToken(jwt);
-                    if (tokenDenylistService.isDenylisted(jti)) {
-                        log.warn("Attempted use of revoked token: {}", jti);
-                    } else {
-                        UUID userId = tokenProvider.getUserIdFromToken(jwt);
-                        UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
-                        UUID warehouseId = tokenProvider.getWarehouseIdFromToken(jwt);
-                        List<String> tokenAuthorities = tokenProvider.getAuthoritiesFromToken(jwt);
-                        List<String> tokenRoles = tokenProvider.getRolesFromToken(jwt);
-                        if (tokenAuthorities == null) {
-                            tokenAuthorities = List.of();
-                        }
-                        if (tokenRoles == null) {
-                            tokenRoles = List.of();
-                        }
-
-                        // Set tenant context
-                        TenantContext.setTenantId(tenantId);
-
-                        // Set warehouse context
-                        if (warehouseId != null) {
-                            WarehouseContext.setWarehouseId(warehouseId);
-                        }
-
-                        UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
-
-                        Collection<GrantedAuthority> authorities = new ArrayList<>();
-                        tokenRoles.stream()
-                                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
-                                .map(SimpleGrantedAuthority::new)
-                                .forEach(authorities::add);
-                        tokenAuthorities.stream()
-                                .map(SimpleGrantedAuthority::new)
-                                .forEach(authorities::add);
-
-                        if (authorities.isEmpty()) {
-                            authorities = new ArrayList<>(userDetails.getAuthorities());
-                        }
-
-                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                authorities);
-                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    }
-                }
-            } catch (Exception ex) {
-                log.error("Could not set user authentication in security context", ex);
-            }
-
+            authenticateRequest(request);
             filterChain.doFilter(request, response);
         } finally {
             TenantContext.clear();
             WarehouseContext.clear();
         }
+    }
+
+    private void authenticateRequest(HttpServletRequest request) {
+        try {
+            String jwt = getJwtFromRequest(request);
+            if (!StringUtils.hasText(jwt) || !tokenProvider.validateToken(jwt)) {
+                return;
+            }
+            authenticateToken(request, jwt);
+        } catch (Exception ex) {
+            log.error("Could not set user authentication in security context", ex);
+        }
+    }
+
+    private void authenticateToken(HttpServletRequest request, String jwt) {
+        String jti = tokenProvider.getJtiFromToken(jwt);
+        if (tokenDenylistService.isDenylisted(jti)) {
+            log.warn("Attempted use of revoked token: {}", jti);
+            return;
+        }
+        authenticateAllowedPrincipal(request, jwt);
+    }
+
+    private void authenticateAllowedPrincipal(HttpServletRequest request, String jwt) {
+        UUID userId = tokenProvider.getUserIdFromToken(jwt);
+        UUID tenantId = tokenProvider.getTenantIdFromToken(jwt);
+        UUID warehouseId = tokenProvider.getWarehouseIdFromToken(jwt);
+        UserDetails userDetails = userDetailsService.loadUserById(userId.toString());
+        if (!isCurrentPrincipalAllowed(userDetails, tenantId)) {
+            return;
+        }
+        setAuthentication(request, userDetails, userId, tenantId, warehouseId);
+    }
+
+    private void setAuthentication(
+            HttpServletRequest request,
+            UserDetails userDetails,
+            UUID userId,
+            UUID tenantId,
+            UUID warehouseId) {
+        TenantContext.setTenantId(tenantId);
+        setWarehouseContext(warehouseId);
+        Collection<GrantedAuthority> authorities = resolveCurrentAuthorities(userDetails, userId, warehouseId);
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                authorities);
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+
+    private boolean isCurrentPrincipalAllowed(UserDetails userDetails, UUID tenantId) {
+        return userDetails.isEnabled()
+                && isSameTenant(userDetails, tenantId)
+                && isTenantActive(tenantId);
+    }
+
+    private boolean isSameTenant(UserDetails userDetails, UUID tenantId) {
+        if (userDetails instanceof UserPrincipal principal) {
+            return tenantId.equals(principal.getTenantId());
+        }
+        return true;
+    }
+
+    private boolean isTenantActive(UUID tenantId) {
+        return tenantRepository.findById(tenantId)
+                .map(tenant -> Boolean.TRUE.equals(tenant.getIsActive()))
+                .orElse(false);
+    }
+
+    private void setWarehouseContext(UUID warehouseId) {
+        if (warehouseId != null) {
+            WarehouseContext.setWarehouseId(warehouseId);
+        }
+    }
+
+    private Collection<GrantedAuthority> resolveCurrentAuthorities(
+            UserDetails userDetails,
+            UUID userId,
+            UUID warehouseId) {
+        if (!(userDetails instanceof UserPrincipal) || warehouseId == null) {
+            return new ArrayList<>(userDetails.getAuthorities());
+        }
+
+        Collection<GrantedAuthority> authorities = new ArrayList<>();
+        addRoles(authorities, permissionResolverService.resolveUserRoleNames(userId, warehouseId));
+        addPermissions(authorities, permissionResolverService.resolveUserPermissions(userId, warehouseId));
+        return authorities;
+    }
+
+    private void addRoles(Collection<GrantedAuthority> authorities, Set<String> roles) {
+        roles.stream()
+                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                .map(SimpleGrantedAuthority::new)
+                .forEach(authorities::add);
+    }
+
+    private void addPermissions(Collection<GrantedAuthority> authorities, Set<String> permissions) {
+        permissions.stream()
+                .map(SimpleGrantedAuthority::new)
+                .forEach(authorities::add);
     }
 
     private String getJwtFromRequest(HttpServletRequest request) {

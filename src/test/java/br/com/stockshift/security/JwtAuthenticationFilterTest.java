@@ -1,5 +1,8 @@
 package br.com.stockshift.security;
 
+import br.com.stockshift.model.entity.Tenant;
+import br.com.stockshift.repository.TenantRepository;
+import br.com.stockshift.service.PermissionResolverService;
 import br.com.stockshift.service.TokenDenylistService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,11 +18,11 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +40,12 @@ class JwtAuthenticationFilterTest {
 
   @Mock
   private TokenDenylistService tokenDenylistService;
+
+  @Mock
+  private PermissionResolverService permissionResolverService;
+
+  @Mock
+  private TenantRepository tenantRepository;
 
   @Mock
   private FilterChain filterChain;
@@ -59,10 +68,15 @@ class JwtAuthenticationFilterTest {
     tenantId = UUID.randomUUID();
     warehouseId = UUID.randomUUID();
 
-    userDetails = new User(
-        userId.toString(),
+    userDetails = new UserPrincipal(
+        userId,
+        tenantId,
+        "user@test.com",
         "password",
-        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+        true,
+        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")),
+        Set.of(),
+        false);
   }
 
   @AfterEach
@@ -86,6 +100,7 @@ class JwtAuthenticationFilterTest {
     when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
     when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+    when(tenantRepository.findById(tenantId)).thenReturn(java.util.Optional.of(activeTenant()));
 
     // When
     jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -110,6 +125,7 @@ class JwtAuthenticationFilterTest {
     when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
     when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+    when(tenantRepository.findById(tenantId)).thenReturn(java.util.Optional.of(activeTenant()));
 
     // When
     jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -138,6 +154,7 @@ class JwtAuthenticationFilterTest {
     when(tokenProvider.getUserIdFromToken(cookieToken)).thenReturn(userId);
     when(tokenProvider.getTenantIdFromToken(cookieToken)).thenReturn(tenantId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+    when(tenantRepository.findById(tenantId)).thenReturn(java.util.Optional.of(activeTenant()));
 
     // When
     jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
@@ -172,6 +189,9 @@ class JwtAuthenticationFilterTest {
     when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
     when(tokenProvider.getWarehouseIdFromToken(token)).thenReturn(warehouseId);
     when(userDetailsService.loadUserById(userId.toString())).thenReturn(userDetails);
+    when(tenantRepository.findById(tenantId)).thenReturn(java.util.Optional.of(activeTenant()));
+    when(permissionResolverService.resolveUserRoleNames(userId, warehouseId)).thenReturn(Set.of("USER"));
+    when(permissionResolverService.resolveUserPermissions(userId, warehouseId)).thenReturn(Set.of("users:read"));
 
     jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
 
@@ -188,5 +208,14 @@ class JwtAuthenticationFilterTest {
 
     assertThat(TenantContext.getTenantId()).isNull();
     assertThat(WarehouseContext.getWarehouseId()).isNull();
+  }
+
+  private Tenant activeTenant() {
+    Tenant tenant = new Tenant();
+    tenant.setId(tenantId);
+    tenant.setBusinessName("Tenant");
+    tenant.setEmail("tenant@test.com");
+    tenant.setIsActive(true);
+    return tenant;
   }
 }

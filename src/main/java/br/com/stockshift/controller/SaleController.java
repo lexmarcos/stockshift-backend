@@ -94,31 +94,26 @@ public class SaleController {
     }
 
     @GetMapping("/infinitepay/callback")
+    @PreAuthorize("@permissionGuard.hasAny('sales:create')")
     public ResponseEntity<Void> infinitepayCallback(
             @RequestParam String order_id,
-            @RequestParam(required = false) String nsu,
-            @RequestParam(required = false) String aut,
-            @RequestParam(required = false) String card_brand,
             @RequestParam(value = "warning", required = false) String warning) {
 
-        InfinitePayConfirmResponse response = confirmInfinitePayReturn(order_id, nsu, aut, card_brand, warning);
+        InfinitePayConfirmResponse response = confirmInfinitePayReturn(order_id, warning);
         return redirectToInfinitePayResult(response.getStatus(), response.getSaleId(), response.getMessage());
     }
 
     @GetMapping("/infinitepay/confirm")
+    @PreAuthorize("@permissionGuard.hasAny('sales:create')")
     public ResponseEntity<ApiResponse<InfinitePayConfirmResponse>> infinitepayConfirm(
             @RequestParam String order_id,
-            @RequestParam(required = false) String nsu,
-            @RequestParam(required = false) String aut,
-            @RequestParam(required = false) String card_brand,
             @RequestParam(value = "warning", required = false) String warning) {
 
-        InfinitePayConfirmResponse response = confirmInfinitePayReturn(order_id, nsu, aut, card_brand, warning);
+        InfinitePayConfirmResponse response = confirmInfinitePayReturn(order_id, warning);
         return ResponseEntity.ok(ApiResponse.success("InfinitePay payment confirmation processed", response));
     }
 
-    private InfinitePayConfirmResponse confirmInfinitePayReturn(
-            String orderId, String nsu, String aut, String cardBrand, String warning) {
+    private InfinitePayConfirmResponse confirmInfinitePayReturn(String orderId, String warning) {
         try {
             UUID saleId = UUID.fromString(orderId);
 
@@ -127,8 +122,11 @@ public class SaleController {
                 return buildInfinitePayConfirmResponse("error", saleId.toString(), warning);
             }
 
-            saleService.confirmInfinitePayPayment(saleId, nsu, aut, cardBrand);
-            return buildInfinitePayConfirmResponse("success", saleId.toString(), null);
+            if (saleService.isInfinitePayPaymentCompleted(saleId)) {
+                return buildInfinitePayConfirmResponse("success", saleId.toString(), null);
+            }
+            log.info("InfinitePay callback for sale {} is pending webhook verification", saleId);
+            return buildInfinitePayConfirmResponse("error", saleId.toString(), "pending_verification");
         } catch (IllegalArgumentException e) {
             log.warn("Invalid order_id from InfinitePay callback: {}", orderId);
             return buildInfinitePayConfirmResponse("error", null, "invalid_order");
@@ -164,20 +162,14 @@ public class SaleController {
                 .toUriString();
     }
 
-    @PostMapping("/infinitepay/webhook")
+    @PostMapping("/infinitepay/webhook/{token}")
     public ResponseEntity<Void> infinitepayWebhook(
+            @PathVariable String token,
             @RequestBody InfinitePayWebhookRequest request) {
         try {
-            UUID saleId = UUID.fromString(request.getOrder_nsu());
-            log.info("InfinitePay webhook received for sale {} - capture_method: {}",
-                    saleId, request.getCapture_method());
-            saleService.confirmInfinitePayWebhook(
-                    saleId,
-                    request.getTransaction_nsu(),
-                    request.getCapture_method(),
-                    request.getInvoice_slug(),
-                    request.getReceipt_url(),
-                    request.getInstallments());
+            log.info("InfinitePay webhook received for order {} - capture_method: {}",
+                    request.getOrder_nsu(), request.getCapture_method());
+            saleService.confirmInfinitePayWebhook(token, request);
             return ResponseEntity.ok().build();
         } catch (IllegalArgumentException e) {
             log.warn("Invalid order_nsu from InfinitePay webhook: {}", request.getOrder_nsu());

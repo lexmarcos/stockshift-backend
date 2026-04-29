@@ -3,11 +3,12 @@ package br.com.stockshift.security.audit;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.security.UserPrincipal;
 import br.com.stockshift.security.WarehouseContext;
-import br.com.stockshift.util.IpUtil;
+import br.com.stockshift.util.ClientIpResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -18,9 +19,11 @@ import java.io.IOException;
 import java.util.UUID;
 
 @Component
+@RequiredArgsConstructor
 public class AuditContextFilter extends OncePerRequestFilter {
 
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
+    private final ClientIpResolver clientIpResolver;
 
     @Override
     protected void doFilterInternal(
@@ -57,7 +60,7 @@ public class AuditContextFilter extends OncePerRequestFilter {
                 .httpMethod(request.getMethod())
                 .httpPath(request.getRequestURI())
                 .httpStatus(response.getStatus())
-                .ipAddress(IpUtil.getClientIp(request))
+                .ipAddress(clientIpResolver.resolve(request))
                 .userAgent(request.getHeader("User-Agent"))
                 .build();
     }

@@ -3,6 +3,7 @@ package br.com.stockshift.service.sale;
 import br.com.stockshift.dto.sale.CancelSaleRequest;
 import br.com.stockshift.dto.sale.CreateSaleItemRequest;
 import br.com.stockshift.dto.sale.CreateSaleRequest;
+import br.com.stockshift.dto.sale.InfinitePayWebhookRequest;
 import br.com.stockshift.dto.sale.NextSaleCodeResponse;
 import br.com.stockshift.dto.sale.SaleResponse;
 import br.com.stockshift.dto.sale.SaleSummaryResponse;
@@ -46,9 +47,13 @@ import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -232,13 +237,13 @@ class SaleServiceTest {
 
         when(batchRepository.findByIdForUpdate(batch.getId())).thenReturn(Optional.of(batch));
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
-        when(infinitePayCheckoutService.generatePaymentLink(eq("my-store"), anyList(), anyString()))
+        when(infinitePayCheckoutService.generatePaymentLink(eq("my-store"), anyList(), anyString(), anyString()))
                 .thenReturn(link);
 
         SaleResponse response = saleService.create(request);
 
         assertThat(response.getPaymentLink()).isEqualTo("https://pay.example/link");
-        verify(infinitePayCheckoutService).generatePaymentLink(eq("my-store"), anyList(), anyString());
+        verify(infinitePayCheckoutService).generatePaymentLink(eq("my-store"), anyList(), anyString(), anyString());
     }
 
     @Test
@@ -251,7 +256,7 @@ class SaleServiceTest {
         assertThatThrownBy(() -> saleService.create(request))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("mínimo");
-        verify(infinitePayCheckoutService, never()).generatePaymentLink(anyString(), anyList(), anyString());
+        verify(infinitePayCheckoutService, never()).generatePaymentLink(anyString(), anyList(), anyString(), anyString());
     }
 
     @Test
@@ -278,7 +283,7 @@ class SaleServiceTest {
     @Test
     void confirmInfinitePayPaymentShouldUpdateOnlyPendingSales() {
         Sale pending = sale(PaymentMode.TAP, SaleStatus.PENDING);
-        when(saleRepository.findById(pending.getId())).thenReturn(Optional.of(pending));
+        when(saleRepository.findByTenantIdAndId(tenantId, pending.getId())).thenReturn(Optional.of(pending));
 
         saleService.confirmInfinitePayPayment(pending.getId(), "nsu", "aut", "visa");
 
@@ -288,7 +293,7 @@ class SaleServiceTest {
         assertThat(pending.getInfinitepayCardBrand()).isEqualTo("visa");
 
         Sale completed = sale(PaymentMode.TAP, SaleStatus.COMPLETED);
-        when(saleRepository.findById(completed.getId())).thenReturn(Optional.of(completed));
+        when(saleRepository.findByTenantIdAndId(tenantId, completed.getId())).thenReturn(Optional.of(completed));
         saleService.confirmInfinitePayPayment(completed.getId(), "ignored", "ignored", "ignored");
 
         assertThat(completed.getInfinitepayNsu()).isNull();
@@ -297,14 +302,65 @@ class SaleServiceTest {
     @Test
     void confirmInfinitePayWebhookShouldResolvePaymentMethodAndInstallments() {
         Sale sale = sale(PaymentMode.LINK, SaleStatus.PENDING);
-        when(saleRepository.findById(sale.getId())).thenReturn(Optional.of(sale));
+        sale.setInfinitepayInvoiceSlug("invoice");
+        sale.setInfinitepayWebhookTokenHash(hashWebhookToken("secret-token"));
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setIsActive(true);
+        tenant.setInfinitepayHandle("my-store");
+        InfinitePayCheckoutService.PaymentCheckResponse paymentCheck = paidPaymentCheck(1000L, "credit_card", 3);
+        InfinitePayWebhookRequest request = webhookRequest(sale.getId(), "txn", "invoice");
 
-        saleService.confirmInfinitePayWebhook(sale.getId(), "txn", "credit_card", "invoice", "receipt", 3);
+        when(saleRepository.findById(sale.getId())).thenReturn(Optional.of(sale));
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(infinitePayCheckoutService.checkPayment("my-store", sale.getId().toString(), "txn", "invoice"))
+                .thenReturn(paymentCheck);
+
+        saleService.confirmInfinitePayWebhook("secret-token", request);
 
         assertThat(sale.getStatus()).isEqualTo(SaleStatus.COMPLETED);
         assertThat(sale.getPaymentMethod()).isEqualTo(PaymentMethod.CREDIT_CARD);
         assertThat(sale.getInstallments()).isEqualTo(3);
         assertThat(sale.getInfinitepayInvoiceSlug()).isEqualTo("invoice");
+    }
+
+    @Test
+    void confirmInfinitePayWebhookShouldRejectInvalidTokenBeforePaymentCheck() {
+        Sale sale = sale(PaymentMode.LINK, SaleStatus.PENDING);
+        sale.setInfinitepayInvoiceSlug("invoice");
+        sale.setInfinitepayWebhookTokenHash(hashWebhookToken("secret-token"));
+        when(saleRepository.findById(sale.getId())).thenReturn(Optional.of(sale));
+
+        assertThatThrownBy(() -> saleService.confirmInfinitePayWebhook(
+                "wrong-token", webhookRequest(sale.getId(), "txn", "invoice")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("webhook token");
+
+        assertThat(sale.getStatus()).isEqualTo(SaleStatus.PENDING);
+        verify(infinitePayCheckoutService, never()).checkPayment(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void confirmInfinitePayWebhookShouldRejectPaymentCheckAmountMismatch() {
+        Sale sale = sale(PaymentMode.LINK, SaleStatus.PENDING);
+        sale.setInfinitepayInvoiceSlug("invoice");
+        sale.setInfinitepayWebhookTokenHash(hashWebhookToken("secret-token"));
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        tenant.setIsActive(true);
+        tenant.setInfinitepayHandle("my-store");
+
+        when(saleRepository.findById(sale.getId())).thenReturn(Optional.of(sale));
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(infinitePayCheckoutService.checkPayment("my-store", sale.getId().toString(), "txn", "invoice"))
+                .thenReturn(paidPaymentCheck(900L, "pix", 1));
+
+        assertThatThrownBy(() -> saleService.confirmInfinitePayWebhook(
+                "secret-token", webhookRequest(sale.getId(), "txn", "invoice")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("does not match expected total");
+
+        assertThat(sale.getStatus()).isEqualTo(SaleStatus.PENDING);
     }
 
     @Test
@@ -369,6 +425,41 @@ class SaleServiceTest {
         sale.setId(UUID.randomUUID());
         sale.setTenantId(tenantId);
         return sale;
+    }
+
+    private InfinitePayWebhookRequest webhookRequest(UUID saleId, String transactionNsu, String invoiceSlug) {
+        InfinitePayWebhookRequest request = new InfinitePayWebhookRequest();
+        request.setOrder_nsu(saleId.toString());
+        request.setTransaction_nsu(transactionNsu);
+        request.setInvoice_slug(invoiceSlug);
+        request.setCapture_method("pix");
+        request.setInstallments(1);
+        request.setAmount(1000L);
+        request.setPaid_amount(1000L);
+        return request;
+    }
+
+    private InfinitePayCheckoutService.PaymentCheckResponse paidPaymentCheck(
+            long amount, String captureMethod, int installments) {
+        InfinitePayCheckoutService.PaymentCheckResponse response =
+                new InfinitePayCheckoutService.PaymentCheckResponse();
+        response.setSuccess(true);
+        response.setPaid(true);
+        response.setAmount(amount);
+        response.setPaidAmount(amount);
+        response.setInstallments(installments);
+        response.setCaptureMethod(captureMethod);
+        return response;
+    }
+
+    private String hashWebhookToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable in test runtime", e);
+        }
     }
 
     private SaleItem saleItem(Batch batch, BigDecimal quantity, long unitPrice) {

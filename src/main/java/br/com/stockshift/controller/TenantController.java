@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.lang.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +37,7 @@ public class TenantController {
     private StorageService storageService;
 
     @GetMapping("/me")
+    @PreAuthorize("@permissionGuard.has('tenants:read')")
     public ResponseEntity<ApiResponse<CompanyConfigResponse>> getCompanyConfig() {
         UUID tenantId = TenantContext.getTenantId();
         Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
@@ -46,6 +48,7 @@ public class TenantController {
 
     @Transactional
     @PutMapping(value = "/me", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("@permissionGuard.has('tenants:update')")
     public ResponseEntity<ApiResponse<CompanyConfigResponse>> updateCompanyConfig(
             @RequestBody UpdateCompanyRequest request) {
         return updateCompanyConfig(request, null);
@@ -53,6 +56,7 @@ public class TenantController {
 
     @Transactional
     @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@permissionGuard.has('tenants:update')")
     public ResponseEntity<ApiResponse<CompanyConfigResponse>> updateCompanyConfigWithLogo(
             @RequestPart("company") UpdateCompanyRequest request,
             @RequestPart(value = "logo", required = false) MultipartFile logo) {
@@ -114,6 +118,7 @@ public class TenantController {
     }
 
     @GetMapping("/me/infinitepay")
+    @PreAuthorize("@permissionGuard.has('tenants:read')")
     public ResponseEntity<ApiResponse<InfinitePayConfigResponse>> getInfinitePayConfig() {
         UUID tenantId = TenantContext.getTenantId();
         Tenant tenant = tenantRepository.findById(tenantId).orElseThrow();
@@ -132,6 +137,7 @@ public class TenantController {
     }
 
     @PutMapping("/me/infinitepay")
+    @PreAuthorize("@permissionGuard.has('tenants:update')")
     public ResponseEntity<ApiResponse<InfinitePayConfigResponse>> updateInfinitePayConfig(
             @RequestBody UpdateInfinitePayRequest request) {
         UUID tenantId = TenantContext.getTenantId();

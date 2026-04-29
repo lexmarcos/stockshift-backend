@@ -117,6 +117,7 @@ class SaleControllerTest {
     @Test
     void shouldConfirmInfinitePayReturnAsJson() throws Exception {
         UUID saleId = UUID.randomUUID();
+        when(saleService.isInfinitePayPaymentCompleted(saleId)).thenReturn(true);
 
         mockMvc.perform(get("/api/sales/infinitepay/confirm")
                 .param("order_id", saleId.toString())
@@ -128,7 +129,7 @@ class SaleControllerTest {
                 .andExpect(jsonPath("$.data.status").value("success"))
                 .andExpect(jsonPath("$.data.saleId").value(saleId.toString()));
 
-        verify(saleService).confirmInfinitePayPayment(saleId, "nsu-123", "aut-456", "visa");
+        verify(saleService).isInfinitePayPaymentCompleted(saleId);
     }
 
     @Test
@@ -161,6 +162,7 @@ class SaleControllerTest {
     @Test
     void shouldRedirectInfinitePayCallbackToFrontendResult() throws Exception {
         UUID saleId = UUID.randomUUID();
+        when(saleService.isInfinitePayPaymentCompleted(saleId)).thenReturn(true);
 
         mockMvc.perform(get("/api/sales/infinitepay/callback")
                 .param("order_id", saleId.toString())
@@ -169,14 +171,13 @@ class SaleControllerTest {
                 .andExpect(header().string("Location",
                         "https://app.example/sales/infinitepay/result?status=success&sale_id=" + saleId));
 
-        verify(saleService).confirmInfinitePayPayment(eq(saleId), eq("nsu-123"), eq(null), eq(null));
+        verify(saleService).isInfinitePayPaymentCompleted(saleId);
     }
 
     @Test
     void shouldReturnErrorWhenConfirmServiceFails() throws Exception {
         UUID saleId = UUID.randomUUID();
-        doThrow(new RuntimeException("boom"))
-                .when(saleService).confirmInfinitePayPayment(eq(saleId), any(), any(), any());
+        when(saleService.isInfinitePayPaymentCompleted(saleId)).thenThrow(new RuntimeException("boom"));
 
         mockMvc.perform(get("/api/sales/infinitepay/confirm")
                 .param("order_id", saleId.toString()))
@@ -186,19 +187,35 @@ class SaleControllerTest {
     }
 
     @Test
+    void shouldReturnPendingWhenInfinitePayReturnIsNotYetVerified() throws Exception {
+        UUID saleId = UUID.randomUUID();
+        when(saleService.isInfinitePayPaymentCompleted(saleId)).thenReturn(false);
+
+        mockMvc.perform(get("/api/sales/infinitepay/confirm")
+                .param("order_id", saleId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("error"))
+                .andExpect(jsonPath("$.data.saleId").value(saleId.toString()))
+                .andExpect(jsonPath("$.data.message").value("pending_verification"));
+    }
+
+    @Test
     void shouldProcessInfinitePayWebhookAndRejectInvalidWebhookOrder() throws Exception {
         UUID saleId = UUID.randomUUID();
 
-        mockMvc.perform(post("/api/sales/infinitepay/webhook")
+        mockMvc.perform(post("/api/sales/infinitepay/webhook/secret-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"order_nsu":"%s","transaction_nsu":"txn","capture_method":"pix","invoice_slug":"slug","receipt_url":"receipt","installments":1}
                         """.formatted(saleId)))
                 .andExpect(status().isOk());
 
-        verify(saleService).confirmInfinitePayWebhook(saleId, "txn", "pix", "slug", "receipt", 1);
+        verify(saleService).confirmInfinitePayWebhook(eq("secret-token"), any());
 
-        mockMvc.perform(post("/api/sales/infinitepay/webhook")
+        doThrow(new IllegalArgumentException("invalid order"))
+                .when(saleService).confirmInfinitePayWebhook(eq("secret-token"), any());
+
+        mockMvc.perform(post("/api/sales/infinitepay/webhook/secret-token")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"order_nsu\":\"bad-id\"}"))
                 .andExpect(status().isBadRequest());

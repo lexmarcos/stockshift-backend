@@ -57,11 +57,8 @@ public class SecurityConfig {
             .requestMatchers("/actuator/health/**").permitAll()
             // Auth endpoints
             .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/register").permitAll()
-            // InfinitePay callback (public - called by InfinitePay app)
-            .requestMatchers(HttpMethod.GET, "/api/sales/infinitepay/callback").permitAll()
-            .requestMatchers(HttpMethod.GET, "/api/sales/infinitepay/confirm").permitAll()
-            // InfinitePay webhook (public - called by InfinitePay Checkout)
-            .requestMatchers(HttpMethod.POST, "/api/sales/infinitepay/webhook").permitAll()
+            // InfinitePay sends approved payment notifications to this tokenized public endpoint.
+            .requestMatchers(HttpMethod.POST, "/api/sales/infinitepay/webhook/*").permitAll()
             // All other requests require authentication
             .anyRequest().authenticated())
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
