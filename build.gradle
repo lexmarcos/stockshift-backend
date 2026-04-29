@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '4.0.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -82,4 +83,51 @@ tasks.named('test') {
 	systemProperty 'DOCKER_HOST', 'unix:///var/run/docker.sock'
 	environment 'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE', '/var/run/docker.sock'
 	environment 'DOCKER_HOST', 'unix:///var/run/docker.sock'
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+jacoco {
+	toolVersion = '0.8.13'
+}
+
+def coverageExclusions = [
+		'br/com/stockshift/StockshiftApplication.class',
+		'br/com/stockshift/config/**',
+		'br/com/stockshift/dto/**',
+		'br/com/stockshift/repository/**'
+]
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+	classDirectories.setFrom(files(classDirectories.files.collect {
+		fileTree(dir: it, exclude: coverageExclusions)
+	}))
+}
+
+tasks.register('jacocoCriticalCoverageVerification', JacocoCoverageVerification) {
+	dependsOn tasks.named('test')
+	executionData.setFrom(tasks.named('test').map { it.extensions.getByType(JacocoTaskExtension).destinationFile })
+	sourceDirectories.setFrom(files(sourceSets.main.allSource.srcDirs))
+	classDirectories.setFrom(files(sourceSets.main.output.classesDirs.files.collect {
+		fileTree(dir: it, exclude: coverageExclusions)
+	}))
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.90
+			}
+		}
+	}
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('jacocoCriticalCoverageVerification')
 }
