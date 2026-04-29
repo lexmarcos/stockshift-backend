@@ -2,11 +2,16 @@ package br.com.stockshift.service;
 
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
+import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
+import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.ProductBatchRequest;
 import br.com.stockshift.dto.warehouse.ProductBatchResponse;
 import br.com.stockshift.exception.BusinessException;
+import br.com.stockshift.exception.UnauthorizedException;
 import br.com.stockshift.model.entity.Batch;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.StockMovement;
+import br.com.stockshift.model.entity.StockMovementItem;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.ProductRepository;
@@ -20,9 +25,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,6 +41,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class BatchServiceTest {
 
         @Mock
@@ -99,6 +109,8 @@ class BatchServiceTest {
                 product.setSku("SKU-001");
 
                 doNothing().when(warehouseAccessService).validateWarehouseAccess(any(UUID.class));
+                when(auditSnapshotService.snapshot(any())).thenReturn(Map.of("id", "value"));
+                when(auditSnapshotService.diff(any(), any())).thenReturn(List.of("quantity"));
         }
 
     @Test
@@ -249,5 +261,117 @@ class BatchServiceTest {
                 assertThatThrownBy(() -> batchService.createWithProduct(request, null))
                                 .isInstanceOf(BusinessException.class)
                                 .hasMessageContaining("Expiration date must be after manufactured date");
+        }
+
+        @Test
+        void shouldCreateBatchGenerateCodeAndMapOriginMovement() {
+                BatchRequest batchRequest = BatchRequest.builder()
+                                .productId(productId)
+                                .warehouseId(warehouseId)
+                                .quantity(new BigDecimal("5"))
+                                .costPrice(100L)
+                                .sellingPrice(200L)
+                                .build();
+                StockMovement movement = StockMovement.builder().code("MOV-1").build();
+                movement.setId(UUID.randomUUID());
+                StockMovementItem originItem = StockMovementItem.builder().build();
+                originItem.setId(UUID.randomUUID());
+                originItem.setStockMovement(movement);
+                product.setHasExpiration(false);
+                warehouse.setName("Main");
+                when(batchRepository.findByTenantIdAndBatchCode(any(), any())).thenReturn(Optional.empty());
+                when(productRepository.findByTenantIdAndId(tenantId, productId)).thenReturn(Optional.of(product));
+                when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)).thenReturn(Optional.of(warehouse));
+                when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+                        Batch batch = invocation.getArgument(0);
+                        batch.setId(UUID.randomUUID());
+                        batch.setOriginMovementItem(originItem);
+                        return batch;
+                });
+
+                assertThat(batchService.create(batchRequest).getOriginStockMovementCode()).isEqualTo("MOV-1");
+                verify(auditService).record(any());
+        }
+
+        @Test
+        void shouldReadBatchesByWarehouseProductExpirationAndLowStock() {
+                Batch batch = savedBatch();
+                when(securityUtils.getCurrentWarehouseId()).thenReturn(warehouseId);
+                when(batchRepository.findByWarehouseIdAndTenantId(warehouseId, tenantId)).thenReturn(List.of(batch));
+                when(batchRepository.findByTenantIdAndId(tenantId, batch.getId())).thenReturn(Optional.of(batch));
+                when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(productId, warehouseId, tenantId))
+                                .thenReturn(List.of(batch));
+                when(batchRepository.findExpiringBatches(any(), any(), eq(tenantId))).thenReturn(List.of(batch));
+                when(batchRepository.findLowStock(10, tenantId)).thenReturn(List.of(batch));
+
+                assertThat(batchService.findAll()).hasSize(1);
+                assertThat(batchService.findById(batch.getId()).getBatchCode()).isEqualTo("BATCH-001");
+                assertThat(batchService.findByWarehouse(warehouseId)).hasSize(1);
+                assertThat(batchService.findByProduct(productId)).hasSize(1);
+                assertThat(batchService.findByWarehouseAndProduct(warehouseId, productId)).hasSize(1);
+                assertThat(batchService.findExpiringBatches(30)).hasSize(1);
+                assertThat(batchService.findLowStock(10)).hasSize(1);
+
+                when(securityUtils.getCurrentWarehouseId()).thenThrow(new UnauthorizedException("no warehouse"));
+                when(warehouseAccessService.hasFullAccess()).thenReturn(true);
+                when(batchRepository.findAllByTenantId(tenantId)).thenReturn(List.of(batch));
+                when(batchRepository.findByProductIdAndTenantId(productId, tenantId)).thenReturn(List.of(batch));
+                assertThat(batchService.findAll()).hasSize(1);
+                assertThat(batchService.findByProduct(productId)).hasSize(1);
+        }
+
+        @Test
+        void shouldUpdateDeleteDeleteAllAndSumAvailableQuantity() {
+                Batch batch = savedBatch();
+                Warehouse newWarehouse = new Warehouse();
+                newWarehouse.setId(UUID.randomUUID());
+                newWarehouse.setTenantId(tenantId);
+                newWarehouse.setName("Other");
+                Product newProduct = new Product();
+                newProduct.setId(UUID.randomUUID());
+                newProduct.setTenantId(tenantId);
+                newProduct.setName("Other product");
+                BatchRequest update = BatchRequest.builder()
+                                .productId(newProduct.getId())
+                                .warehouseId(newWarehouse.getId())
+                                .batchCode("BATCH-002")
+                                .quantity(new BigDecimal("7"))
+                                .costPrice(110L)
+                                .sellingPrice(220L)
+                                .build();
+                when(batchRepository.findByTenantIdAndId(tenantId, batch.getId())).thenReturn(Optional.of(batch));
+                when(batchRepository.findByTenantIdAndBatchCode(tenantId, "BATCH-002")).thenReturn(Optional.empty());
+                when(productRepository.findByTenantIdAndId(tenantId, newProduct.getId())).thenReturn(Optional.of(newProduct));
+                when(productRepository.findByTenantIdAndId(tenantId, productId)).thenReturn(Optional.of(product));
+                when(warehouseRepository.findByTenantIdAndId(tenantId, newWarehouse.getId())).thenReturn(Optional.of(newWarehouse));
+                when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)).thenReturn(Optional.of(warehouse));
+                when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                when(batchRepository.softDeleteByProductAndWarehouse(productId, warehouseId, tenantId)).thenReturn(2);
+                when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(productId, warehouseId, tenantId))
+                                .thenReturn(List.of(batch, batch));
+
+                assertThat(batchService.update(batch.getId(), update).getBatchCode()).isEqualTo("BATCH-002");
+                batchService.delete(batch.getId());
+                verify(batchRepository).delete(batch);
+                BatchDeletionResponse deleted = batchService.deleteAllByProductAndWarehouse(warehouseId, productId);
+                assertThat(deleted.deletedCount()).isEqualTo(2);
+                assertThat(batchService.getAvailableQuantity(productId, warehouseId, tenantId))
+                                .isEqualByComparingTo("14");
+        }
+
+        private Batch savedBatch() {
+                warehouse.setName("Main");
+                product.setHasExpiration(false);
+                Batch batch = new Batch();
+                batch.setId(UUID.randomUUID());
+                batch.setTenantId(tenantId);
+                batch.setProduct(product);
+                batch.setWarehouse(warehouse);
+                batch.setBatchCode("BATCH-001");
+                batch.setQuantity(new BigDecimal("7"));
+                batch.setCostPrice(100L);
+                batch.setSellingPrice(200L);
+                batch.setExpirationDate(LocalDate.now().plusDays(10));
+                return batch;
         }
 }
