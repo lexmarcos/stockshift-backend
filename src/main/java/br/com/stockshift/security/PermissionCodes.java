@@ -47,6 +47,10 @@ public final class PermissionCodes {
     public static final String TRANSFERS_EXECUTE = "transfers:execute";
     public static final String TRANSFERS_VALIDATE = "transfers:validate";
 
+    public static final String SALES_CREATE = "sales:create";
+    public static final String SALES_READ = "sales:read";
+    public static final String SALES_CANCEL = "sales:cancel";
+
     public static final String REPORTS_READ = "reports:read";
     public static final String PERMISSIONS_READ = "permissions:read";
     public static final String AUDIT_READ = "audit:read";
@@ -90,6 +94,9 @@ public final class PermissionCodes {
             TRANSFERS_DELETE,
             TRANSFERS_EXECUTE,
             TRANSFERS_VALIDATE,
+            SALES_CREATE,
+            SALES_READ,
+            SALES_CANCEL,
             REPORTS_READ,
             PERMISSIONS_READ,
             AUDIT_READ,
