@@ -200,6 +200,39 @@ class JwtAuthenticationFilterTest {
   }
 
   @Test
+  void shouldKeepAdminAuthoritiesWhenTokenHasWarehouseScope() throws ServletException, IOException {
+    String token = "valid-jwt-token";
+    String jti = "test-jti";
+    UserDetails adminDetails = new UserPrincipal(
+        userId,
+        tenantId,
+        "admin@test.com",
+        "password",
+        true,
+        Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")),
+        Set.of(),
+        true);
+    request.addHeader("Authorization", "Bearer " + token);
+
+    when(tokenProvider.validateToken(token)).thenReturn(true);
+    when(tokenProvider.getJtiFromToken(token)).thenReturn(jti);
+    when(tokenDenylistService.isDenylisted(jti)).thenReturn(false);
+    when(tokenProvider.getUserIdFromToken(token)).thenReturn(userId);
+    when(tokenProvider.getTenantIdFromToken(token)).thenReturn(tenantId);
+    when(tokenProvider.getWarehouseIdFromToken(token)).thenReturn(warehouseId);
+    when(userDetailsService.loadUserById(userId.toString())).thenReturn(adminDetails);
+    when(tenantRepository.findById(tenantId)).thenReturn(java.util.Optional.of(activeTenant()));
+
+    jwtAuthenticationFilter.doFilterInternal(request, response, filterChain);
+
+    assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+        .extracting(authority -> authority.getAuthority())
+        .contains("ROLE_ADMIN");
+    verify(permissionResolverService, never()).resolveUserPermissions(userId, warehouseId);
+    verify(permissionResolverService, never()).resolveUserRoleNames(userId, warehouseId);
+  }
+
+  @Test
   void shouldClearContextsEvenWhenNoToken() throws ServletException, IOException {
     TenantContext.setTenantId(UUID.randomUUID());
     WarehouseContext.setWarehouseId(UUID.randomUUID());

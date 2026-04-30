@@ -130,7 +130,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserDetails userDetails,
             UUID userId,
             UUID warehouseId) {
-        if (!(userDetails instanceof UserPrincipal) || warehouseId == null) {
+        if (!(userDetails instanceof UserPrincipal) || warehouseId == null || hasGlobalAccess(userDetails)) {
             return new ArrayList<>(userDetails.getAuthorities());
         }
 
@@ -138,6 +138,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         addRoles(authorities, permissionResolverService.resolveUserRoleNames(userId, warehouseId));
         addPermissions(authorities, permissionResolverService.resolveUserPermissions(userId, warehouseId));
         return authorities;
+    }
+
+    private boolean hasGlobalAccess(UserDetails userDetails) {
+        return userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority) || "ROLE_SUPER_ADMIN".equals(authority));
     }
 
     private void addRoles(Collection<GrantedAuthority> authorities, Set<String> roles) {
