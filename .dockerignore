@@ -1,0 +1,17 @@
+.git
+.github
+.gradle
+.settings
+.vscode
+.worktrees
+build
+bin
+out
+strix_runs
+.env
+Dockerfile
+docker-compose*.yml
+HELP.md
+*.iml
+*.iws
+*.ipr
