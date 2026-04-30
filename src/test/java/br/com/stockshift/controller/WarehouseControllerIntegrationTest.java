@@ -12,6 +12,9 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 
@@ -22,17 +25,27 @@ import br.com.stockshift.dto.warehouse.WarehouseRequest;
 import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
+import br.com.stockshift.model.entity.User;
+import br.com.stockshift.model.entity.UserRoleWarehouse;
+import br.com.stockshift.model.entity.UserRoleWarehouseId;
 import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.ProductRepository;
+import br.com.stockshift.repository.RoleRepository;
 import br.com.stockshift.repository.TenantRepository;
+import br.com.stockshift.repository.UserRoleWarehouseRepository;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.security.UserPrincipal;
+import br.com.stockshift.security.WarehouseContext;
 import br.com.stockshift.util.TestDataFactory;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 
 class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
 
@@ -46,6 +59,12 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
 
         @Autowired
         private UserRepository userRepository;
+
+        @Autowired
+        private RoleRepository roleRepository;
+
+        @Autowired
+        private UserRoleWarehouseRepository userRoleWarehouseRepository;
 
         @Autowired
         private PasswordEncoder passwordEncoder;
@@ -66,12 +85,15 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
 
         @BeforeEach
         void setUpTestData() {
+                WarehouseContext.clear();
+                userRoleWarehouseRepository.deleteAll();
                 batchRepository.deleteAll();
                 productRepository.deleteAll();
                 categoryRepository.deleteAll();
                 brandRepository.deleteAll();
                 warehouseRepository.deleteAll();
                 userRepository.deleteAll();
+                roleRepository.deleteAll();
                 tenantRepository.deleteAll();
 
                 testTenant = TestDataFactory.createTenant(tenantRepository, "Warehouse Test Tenant", "33333333000103");
@@ -128,6 +150,24 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
         }
 
         @Test
+        @WithMockUser(username = "warehouse@test.com", authorities = { "products:read" })
+        void shouldAllowAuthenticatedUserToLoadWarehouseSelection() throws Exception {
+                mockMvc.perform(get("/api/warehouses"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data").isArray());
+        }
+
+        @Test
+        @WithMockUser(username = "warehouse@test.com", authorities = { "products:read" })
+        void shouldAllowAuthenticatedUserToLoadWarehouseStockSummaries() throws Exception {
+                mockMvc.perform(get("/api/warehouses/stock-summary"))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data").isArray());
+        }
+
+        @Test
         @WithMockUser(username = "warehouse@test.com", authorities = { "ROLE_ADMIN" })
         void shouldReturnProductsWithStockForWarehouse() throws Exception {
                 // Given: warehouse, category, brand, products, and batches
@@ -166,6 +206,69 @@ class WarehouseControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(jsonPath("$.data.content.length()").value(2))
                                 .andExpect(jsonPath("$.data.content[0].totalQuantity").exists())
                                 .andExpect(jsonPath("$.data.totalElements").value(2));
+        }
+
+        @Test
+        void shouldReturnProductsWithStockForCurrentWarehouseWithProductReadPermission() throws Exception {
+                Warehouse warehouse = TestDataFactory.createWarehouse(warehouseRepository,
+                                testTenant.getId(), "Products Warehouse");
+
+                Category category = TestDataFactory.createCategory(categoryRepository,
+                                testTenant.getId(), "Products Category");
+
+                Brand brand = TestDataFactory.createBrand(brandRepository,
+                                testTenant.getId(), "Products Brand");
+
+                Product product = TestDataFactory.createProduct(productRepository,
+                                testTenant.getId(), "Readable Product", "SKU-READ", category, brand);
+
+                TestDataFactory.createBatch(batchRepository, testTenant.getId(),
+                                product, warehouse, "BATCH-READ", 8);
+
+                WarehouseContext.setWarehouseId(warehouse.getId());
+                assignWarehouseToUser(warehouse);
+
+                mockMvc.perform(get("/api/warehouses/{id}/products", warehouse.getId())
+                                .with(authentication(productReadAuthentication(warehouse))))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data.content.length()").value(1))
+                                .andExpect(jsonPath("$.data.content[0].name").value("Readable Product"));
+        }
+
+        private void assignWarehouseToUser(Warehouse warehouse) {
+                User user = userRepository.findByEmail("warehouse@test.com").orElseThrow();
+                Role role = new Role();
+                role.setTenantId(testTenant.getId());
+                role.setName("VENDEDOR");
+                role.setDescription("Seller");
+                role.setIsSystemRole(true);
+                role = roleRepository.save(role);
+
+                UserRoleWarehouse assignment = new UserRoleWarehouse();
+                assignment.setId(new UserRoleWarehouseId(user.getId(), role.getId(), warehouse.getId()));
+                assignment.setUser(user);
+                assignment.setRole(role);
+                assignment.setWarehouse(warehouse);
+                userRoleWarehouseRepository.saveAndFlush(assignment);
+        }
+
+        private Authentication productReadAuthentication(Warehouse warehouse) {
+                User user = userRepository.findByEmail("warehouse@test.com").orElseThrow();
+                UserPrincipal principal = new UserPrincipal(
+                                user.getId(),
+                                user.getTenantId(),
+                                user.getEmail(),
+                                user.getPassword(),
+                                user.getIsActive(),
+                                java.util.List.of(new SimpleGrantedAuthority("products:read")),
+                                java.util.Set.of(warehouse.getId()),
+                                false);
+
+                return new UsernamePasswordAuthenticationToken(
+                                principal,
+                                principal.getPassword(),
+                                principal.getAuthorities());
         }
 
         @Test

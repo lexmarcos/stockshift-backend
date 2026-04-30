@@ -42,7 +42,7 @@ public class WarehouseController {
     }
 
     @GetMapping
-    @PreAuthorize("@permissionGuard.hasAny('warehouses:read')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get all warehouses")
     public ResponseEntity<ApiResponse<List<WarehouseResponse>>> findAll() {
         List<WarehouseResponse> warehouses = warehouseService.findAll();
@@ -50,7 +50,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/stock-summary")
-    @PreAuthorize("@permissionGuard.hasAny('warehouses:read')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get stock summary for accessible warehouses")
     public ResponseEntity<ApiResponse<List<WarehouseStockSummaryResponse>>> getStockSummaries() {
         List<WarehouseStockSummaryResponse> summaries = warehouseService.getStockSummaries();
@@ -92,7 +92,7 @@ public class WarehouseController {
     }
 
     @GetMapping("/{id}/products")
-    @PreAuthorize("@permissionGuard.has('warehouses:read') and @warehouseGuard.isCurrent(#id)")
+    @PreAuthorize("@permissionGuard.has('products:read') and @warehouseGuard.isCurrent(#id)")
     @Operation(summary = "Get products with stock for warehouse")
     public ResponseEntity<ApiResponse<Page<ProductWithStockResponse>>> getProductsWithStock(
             @PathVariable UUID id,
