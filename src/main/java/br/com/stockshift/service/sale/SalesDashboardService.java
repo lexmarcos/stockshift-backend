@@ -4,27 +4,38 @@ import br.com.stockshift.dto.sale.*;
 import br.com.stockshift.repository.SaleRepository;
 import br.com.stockshift.security.TenantContext;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class SalesDashboardService {
 
     private final SaleRepository saleRepository;
+    private final Clock clock;
+
+    @Autowired
+    public SalesDashboardService(SaleRepository saleRepository) {
+        this(saleRepository, Clock.systemDefaultZone());
+    }
+
+    SalesDashboardService(SaleRepository saleRepository, Clock clock) {
+        this.saleRepository = saleRepository;
+        this.clock = clock;
+    }
 
     @Transactional(readOnly = true)
     public SalesDashboardResponse getDashboard(UUID warehouseId) {
         UUID tenantId = TenantContext.getTenantId();
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         KpiPeriod todayKpi = buildKpi(tenantId, warehouseId,
                 today.atStartOfDay(), today.plusDays(1).atStartOfDay());

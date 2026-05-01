@@ -11,7 +11,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.sql.Date;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +25,11 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SalesDashboardServiceTest {
+
+    private static final LocalDate FIXED_TODAY = LocalDate.of(2026, 4, 15);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-04-15T12:00:00Z"),
+            ZoneOffset.UTC);
 
     @Mock
     private SaleRepository saleRepository;
@@ -35,7 +43,7 @@ class SalesDashboardServiceTest {
         tenantId = UUID.randomUUID();
         warehouseId = UUID.randomUUID();
         TenantContext.setTenantId(tenantId);
-        service = new SalesDashboardService(saleRepository);
+        service = new SalesDashboardService(saleRepository, FIXED_CLOCK);
     }
 
     @AfterEach
@@ -45,7 +53,7 @@ class SalesDashboardServiceTest {
 
     @Test
     void getDashboardShouldBuildKpisAndFillDailyChartGaps() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = FIXED_TODAY;
         when(saleRepository.countAndRevenueByPeriod(eq(tenantId), eq(warehouseId), any(), any()))
                 .thenReturn(List.<Object[]>of(new Object[] { 4L, 2000L }));
         when(saleRepository.dailySalesInPeriod(eq(tenantId), eq(warehouseId), any(), any()))
