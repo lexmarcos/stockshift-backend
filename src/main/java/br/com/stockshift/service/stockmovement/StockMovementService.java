@@ -137,6 +137,7 @@ public class StockMovementService {
           .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
     }
 
+    itemReq.getNewProduct().setHasExpiration(itemReq.getExpirationDate() != null);
     return productService.createEntity(itemReq.getNewProduct(), image);
   }
 

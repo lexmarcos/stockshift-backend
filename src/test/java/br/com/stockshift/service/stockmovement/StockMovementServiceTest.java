@@ -111,7 +111,9 @@ class StockMovementServiceTest {
     StockMovementResponse response = service.create(request);
 
     assertThat(response.getWarehouseId()).isEqualTo(warehouseId);
-    verify(productService).createEntity(any(ProductRequest.class), any());
+    verify(productService).createEntity(
+        argThat(productRequest -> Boolean.TRUE.equals(productRequest.getHasExpiration())),
+        any());
     verify(batchRepository, atLeastOnce()).save(argThat(batch -> {
       return batch.getCostPrice().equals(1290L)
           && batch.getSellingPrice().equals(2490L)

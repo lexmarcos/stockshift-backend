@@ -96,9 +96,9 @@ public class BatchService {
         // Validate warehouse
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, request.getWarehouseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", request.getWarehouseId()));
-        // Validate expiration date if product has expiration
-        if (product.getHasExpiration() && request.getExpirationDate() == null) {
-            throw new BusinessException("Expiration date is required for products with expiration tracking");
+        if (request.getExpirationDate() != null && !Boolean.TRUE.equals(product.getHasExpiration())) {
+            product.setHasExpiration(true);
+            productRepository.save(product);
         }
 
         Batch batch = new Batch();
@@ -256,6 +256,11 @@ public class BatchService {
             batch.setWarehouse(warehouse);
         }
 
+        if (request.getExpirationDate() != null && !Boolean.TRUE.equals(batch.getProduct().getHasExpiration())) {
+            batch.getProduct().setHasExpiration(true);
+            productRepository.save(batch.getProduct());
+        }
+
         batch.setBatchCode(request.getBatchCode());
         batch.setQuantity(request.getQuantity());
         batch.setManufacturedDate(request.getManufacturedDate());
@@ -375,11 +380,6 @@ public class BatchService {
                     });
         }
 
-        // Validate date logic
-        if (request.getHasExpiration() && request.getExpirationDate() == null) {
-            throw new BusinessException("Expiration date is required for products with expiration");
-        }
-
         if (request.getManufacturedDate() != null && request.getExpirationDate() != null) {
             if (request.getExpirationDate().isBefore(request.getManufacturedDate())) {
                 throw new BusinessException("Expiration date must be after manufactured date");
@@ -397,7 +397,7 @@ public class BatchService {
                 .sku(request.getSku())
                 .isKit(request.getIsKit())
                 .attributes(request.getAttributes())
-                .hasExpiration(request.getHasExpiration())
+                .hasExpiration(request.getExpirationDate() != null)
                 .active(true)
                 .build();
 

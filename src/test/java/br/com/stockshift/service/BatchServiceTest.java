@@ -4,6 +4,7 @@ import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
 import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
 import br.com.stockshift.dto.warehouse.BatchRequest;
+import br.com.stockshift.dto.warehouse.BatchResponse;
 import br.com.stockshift.dto.warehouse.ProductBatchRequest;
 import br.com.stockshift.dto.warehouse.ProductBatchResponse;
 import br.com.stockshift.exception.BusinessException;
@@ -222,8 +223,7 @@ class BatchServiceTest {
         }
 
         @Test
-        void shouldThrowExceptionWhenExpirationDateMissingForProductWithExpiration() {
-                // Arrange
+        void shouldCreateProductWithoutExpirationWhenExpirationDateIsMissing() {
                 request.setHasExpiration(true);
                 request.setExpirationDate(null);
 
@@ -235,11 +235,70 @@ class BatchServiceTest {
                                 .thenReturn(Optional.of(warehouse));
                 when(batchRepository.findByTenantIdAndBatchCode(any(), any()))
                                 .thenReturn(Optional.empty());
+                when(productService.create(any(ProductRequest.class), any()))
+                                .thenReturn(ProductResponse.builder().id(productId).name("Test Product").build());
+                when(productRepository.findByTenantIdAndId(tenantId, productId))
+                                .thenReturn(Optional.of(product));
+                when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+                        Batch batch = invocation.getArgument(0);
+                        batch.setId(UUID.randomUUID());
+                        return batch;
+                });
 
-                // Act & Assert
-                assertThatThrownBy(() -> batchService.createWithProduct(request, null))
-                                .isInstanceOf(BusinessException.class)
-                                .hasMessageContaining("Expiration date is required for products with expiration");
+                batchService.createWithProduct(request, null);
+
+                verify(productService).create(argThat(productRequest ->
+                                Boolean.FALSE.equals(productRequest.getHasExpiration())), any());
+        }
+
+        @Test
+        void shouldCreateBatchWithoutExpirationForProductWithExpirationTracking() {
+                BatchRequest batchRequest = BatchRequest.builder()
+                                .productId(productId)
+                                .warehouseId(warehouseId)
+                                .quantity(new BigDecimal("5"))
+                                .build();
+                product.setHasExpiration(true);
+                warehouse.setName("Main");
+                when(batchRepository.findByTenantIdAndBatchCode(any(), any())).thenReturn(Optional.empty());
+                when(productRepository.findByTenantIdAndId(tenantId, productId)).thenReturn(Optional.of(product));
+                when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)).thenReturn(Optional.of(warehouse));
+                when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+                        Batch batch = invocation.getArgument(0);
+                        batch.setId(UUID.randomUUID());
+                        return batch;
+                });
+
+                BatchResponse response = batchService.create(batchRequest);
+
+                assertThat(response.getExpirationDate()).isNull();
+                verify(batchRepository).save(any(Batch.class));
+        }
+
+        @Test
+        void shouldMarkExistingProductAsExpiringWhenBatchUsesExpirationDate() {
+                BatchRequest batchRequest = BatchRequest.builder()
+                                .productId(productId)
+                                .warehouseId(warehouseId)
+                                .quantity(new BigDecimal("5"))
+                                .expirationDate(LocalDate.now().plusDays(30))
+                                .build();
+                product.setHasExpiration(false);
+                warehouse.setName("Main");
+                when(batchRepository.findByTenantIdAndBatchCode(any(), any())).thenReturn(Optional.empty());
+                when(productRepository.findByTenantIdAndId(tenantId, productId)).thenReturn(Optional.of(product));
+                when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)).thenReturn(Optional.of(warehouse));
+                when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+                        Batch batch = invocation.getArgument(0);
+                        batch.setId(UUID.randomUUID());
+                        return batch;
+                });
+
+                batchService.create(batchRequest);
+
+                assertThat(product.getHasExpiration()).isTrue();
+                verify(productRepository).save(product);
         }
 
         @Test
