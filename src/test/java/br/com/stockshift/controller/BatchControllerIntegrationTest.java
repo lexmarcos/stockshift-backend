@@ -1,6 +1,7 @@
 package br.com.stockshift.controller;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -125,6 +126,39 @@ class BatchControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(jsonPath("$.data.batchCode").exists())
                                 .andExpect(jsonPath("$.data.batchCode")
                                                 .value(org.hamcrest.Matchers.matchesPattern("BATCH-\\d{8}-\\d{3}")));
+        }
+
+        @Test
+        @WithMockUser(username = "batch@test.com", authorities = { "ROLE_ADMIN" })
+        void shouldAllowReusingBatchCodeAfterSoftDelete() throws Exception {
+                Batch batch = TestDataFactory.createBatch(
+                                batchRepository,
+                                testTenant.getId(),
+                                testProduct,
+                                testWarehouse,
+                                "BATCH-REUSE-001",
+                                25);
+
+                mockMvc.perform(delete("/api/batches/{id}", batch.getId()))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true));
+
+                TenantContext.setTenantId(testTenant.getId());
+
+                BatchRequest request = BatchRequest.builder()
+                                .productId(testProduct.getId())
+                                .warehouseId(testWarehouse.getId())
+                                .batchCode("BATCH-REUSE-001")
+                                .quantity(new BigDecimal("15"))
+                                .build();
+
+                mockMvc.perform(post("/api/batches")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data.batchCode").value("BATCH-REUSE-001"))
+                                .andExpect(jsonPath("$.data.quantity").value(15));
         }
 
         @Test

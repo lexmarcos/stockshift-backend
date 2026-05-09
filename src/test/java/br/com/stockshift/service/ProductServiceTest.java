@@ -7,6 +7,7 @@ import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.enums.BarcodeType;
+import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.ProductRepository;
@@ -45,6 +46,8 @@ class ProductServiceTest {
     @Mock
     private ProductRepository productRepository;
     @Mock
+    private BatchRepository batchRepository;
+    @Mock
     private CategoryRepository categoryRepository;
     @Mock
     private BrandRepository brandRepository;
@@ -64,6 +67,7 @@ class ProductServiceTest {
         TenantContext.setTenantId(tenantId);
         productService = new ProductService(
                 productRepository,
+                batchRepository,
                 categoryRepository,
                 brandRepository,
                 auditService,
@@ -254,6 +258,7 @@ class ProductServiceTest {
 
         assertThat(product.getDeletedAt()).isNotNull();
         verify(storageService).deleteImage("https://cdn.example.com/product.png");
+        verify(batchRepository).softDeleteByProduct(product.getId(), tenantId);
         verify(productRepository).save(product);
         verify(auditService).record(any());
     }

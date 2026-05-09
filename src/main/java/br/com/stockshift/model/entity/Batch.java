@@ -17,9 +17,7 @@ import java.time.LocalDateTime;
 @SQLDelete(sql = "UPDATE batches SET deleted_at = current_timestamp WHERE id = ? AND version = ?")
 @SQLRestriction("deleted_at IS NULL")
 @Entity
-@Table(name = "batches", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"tenant_id", "batch_code"})
-})
+@Table(name = "batches")
 @Data
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor

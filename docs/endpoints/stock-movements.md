@@ -74,6 +74,8 @@ Request:
     {
       "productId": "660e8400-e29b-41d4-a716-446655440001",
       "quantity": 2.5,
+      "manufacturedDate": "2026-04-01",
+      "expirationDate": "2026-12-31",
       "costPrice": 500,
       "sellingPrice": 800
     }
@@ -88,10 +90,11 @@ Regras:
 - `items` obrigatorio e nao vazio.
 - Cada item precisa possuir **obrigatoriamente** `productId` (UUID) ou `newProduct` (objeto `ProductRequest` com os dados do novo produto a ser salvo), mas nao ambos simultaneamente. Retorna validação se colocar ambos ou nenhum.
 - `quantity` (positivo) obrigatorio para todos os itens.
-- Para movimentos `IN` (`PURCHASE_IN`, `ADJUSTMENT_IN`), valores opcionais `costPrice` e `sellingPrice` podem ser repassados no item.
+- Para movimentos `IN` (`PURCHASE_IN`, `ADJUSTMENT_IN`), valores opcionais `manufacturedDate`, `expirationDate`, `costPrice` e `sellingPrice` podem ser repassados no item, tanto para `productId` quanto para `newProduct`.
 - Para movimentos `OUT`, o sistema deduz automaticamente dos batches usando FIFO (batch mais antigo primeiro).
 - Se a quantidade total disponivel no warehouse for insuficiente, retorna `400` com mensagem de estoque insuficiente.
-- Para movimentos `IN`, o sistema cria um novo batch ou adiciona ao batch existente do produto. Se passado um `newProduct`, o sistema antes ira cadastrar tal produto no BD para em seguida criar o seu batch com as premissas deste estoque de entrada.
+- Para movimentos `IN` com `productId`, se qualquer data/preco de lote for informado, o sistema cria um novo batch com esses dados; se nenhum dado for informado, adiciona a quantidade ao primeiro batch existente do produto ou cria o primeiro batch se ainda nao houver lote.
+- Se passado um `newProduct`, o sistema antes ira cadastrar tal produto no BD para em seguida criar o seu batch com as premissas deste estoque de entrada.
 - O `warehouseId` e determinado automaticamente pelo warehouse do usuario logado.
 - Um codigo unico e gerado automaticamente (ex: `MOV-2026-0001`).
 

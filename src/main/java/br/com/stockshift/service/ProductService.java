@@ -8,6 +8,7 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.ProductRepository;
@@ -35,6 +36,7 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final BatchRepository batchRepository;
     private final CategoryRepository categoryRepository;
     private final BrandRepository brandRepository;
     private final AuditService auditService;
@@ -319,17 +321,17 @@ public class ProductService {
         var before = auditSnapshotService.snapshot(product);
 
         // Delete image if exists
-        if (product.getImageUrl() != null) {
+        if (product.getImageUrl() != null && storageService != null) {
             storageService.deleteImage(product.getImageUrl());
         }
 
-        // Soft delete
+        int deletedBatches = batchRepository.softDeleteByProduct(id, tenantId);
         product.setDeletedAt(LocalDateTime.now());
         Product deleted = productRepository.save(product);
         var after = auditSnapshotService.snapshot(deleted);
         recordProductAudit("PRODUCT_DELETED", before, after, id);
 
-        log.info("Soft deleted product {} for tenant {}", id, tenantId);
+        log.info("Soft deleted product {} and {} batches for tenant {}", id, deletedBatches, tenantId);
     }
 
     private void recordProductAudit(

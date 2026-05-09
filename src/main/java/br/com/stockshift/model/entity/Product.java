@@ -10,10 +10,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 @Entity
-@Table(name = "products", uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "tenant_id", "barcode" }),
-        @UniqueConstraint(columnNames = { "tenant_id", "sku" })
-})
+@Table(name = "products")
 @Data
 @EqualsAndHashCode(callSuper = true)
 @NoArgsConstructor

@@ -209,19 +209,13 @@ public class StockMovementService {
     Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
         .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", warehouseId));
 
-    // For IN movements, create a new batch or add to first existing batch
     List<Batch> existingBatches = batchRepository.findByProductIdAndWarehouseIdAndTenantId(
         product.getId(), warehouseId, tenantId);
 
     Batch batch;
-    boolean createdBatch = false;
-    if (!existingBatches.isEmpty()) {
-      batch = existingBatches.get(0);
-      batch.setQuantity(batch.getQuantity().add(quantity));
-      batchRepository.save(batch);
-    } else {
-      createdBatch = true;
-      String batchCode = "MOV-" + LocalDate.now() + "-" + product.getSku();
+    boolean createdBatch = existingBatches.isEmpty() || hasIncomingBatchDetails(itemReq);
+    if (createdBatch) {
+      String batchCode = buildMovementBatchCode(movement, product);
       batch = Batch.builder()
           .product(product)
           .warehouse(warehouse)
@@ -235,6 +229,10 @@ public class StockMovementService {
           .build();
       batch.setTenantId(tenantId);
       batch = batchRepository.save(batch);
+    } else {
+      batch = existingBatches.get(0);
+      batch.setQuantity(batch.getQuantity().add(quantity));
+      batchRepository.save(batch);
     }
 
     StockMovementItem item = StockMovementItem.builder()
@@ -267,6 +265,21 @@ public class StockMovementService {
         .createdBy(userId)
         .build();
     ledgerRepository.save(ledger);
+  }
+
+  private boolean hasIncomingBatchDetails(CreateStockMovementItemRequest itemReq) {
+    return itemReq.getCostPrice() != null
+        || itemReq.getSellingPrice() != null
+        || itemReq.getManufacturedDate() != null
+        || itemReq.getExpirationDate() != null;
+  }
+
+  private String buildMovementBatchCode(StockMovement movement, Product product) {
+    String productCode = product.getSku() != null
+        ? product.getSku()
+        : product.getId().toString().substring(0, 8);
+    int itemSequence = movement.getItems().size() + 1;
+    return movement.getCode() + "-" + String.format("%03d", itemSequence) + "-" + productCode;
   }
 
   // ── Transfer integration (called by TransferService) ───────────────────

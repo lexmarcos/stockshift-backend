@@ -24,7 +24,9 @@ import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
+import br.com.stockshift.model.entity.Warehouse;
 import br.com.stockshift.model.enums.BarcodeType;
+import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
 import static org.mockito.Mockito.when;
@@ -35,12 +37,16 @@ import br.com.stockshift.service.OpenAiService;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
+import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.util.TestDataFactory;
 
 class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Autowired
+    private BatchRepository batchRepository;
 
     @Autowired
     private ProductRepository productRepository;
@@ -50,6 +56,9 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private BrandRepository brandRepository;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
 
     @Autowired
     private TenantRepository tenantRepository;
@@ -70,9 +79,11 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUpTestData() {
         // Clear any existing data
+        batchRepository.deleteAll();
         productRepository.deleteAll();
         categoryRepository.deleteAll();
         brandRepository.deleteAll();
+        warehouseRepository.deleteAll();
         userRepository.deleteAll();
         tenantRepository.deleteAll();
 
@@ -199,6 +210,56 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
         // Verify soft delete
         Product deletedProduct = productRepository.findById(product.getId()).orElseThrow();
         assert deletedProduct.getDeletedAt() != null;
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void shouldSoftDeleteProductBatchesAndAllowSkuReuse() throws Exception {
+        Product product = createTestProduct("Reusable Product", "BARCODE-REUSE", "SKU-REUSE");
+        Warehouse warehouse = TestDataFactory.createWarehouse(
+                warehouseRepository,
+                testTenant.getId(),
+                "Reusable Warehouse");
+        TestDataFactory.createBatch(
+                batchRepository,
+                testTenant.getId(),
+                product,
+                warehouse,
+                "BATCH-REUSE-PRODUCT",
+                10);
+
+        mockMvc.perform(delete("/api/products/{id}", product.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        Product deletedProduct = productRepository.findById(product.getId()).orElseThrow();
+        assert deletedProduct.getDeletedAt() != null;
+        assert batchRepository.findByProductIdAndTenantId(product.getId(), testTenant.getId()).isEmpty();
+
+        TenantContext.setTenantId(testTenant.getId());
+
+        ProductRequest request = ProductRequest.builder()
+                .name("Reusable Product Again")
+                .categoryId(testCategory.getId())
+                .barcode("BARCODE-REUSE")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("SKU-REUSE")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(productPart))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.sku").value("SKU-REUSE"))
+                .andExpect(jsonPath("$.data.barcode").value("BARCODE-REUSE"));
     }
 
     @Test

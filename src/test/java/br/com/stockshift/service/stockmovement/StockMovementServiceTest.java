@@ -199,6 +199,49 @@ class StockMovementServiceTest {
   }
 
   @Test
+  void shouldCreateNewBatchForExistingInMovementWhenBatchDetailsProvided() {
+    Product product = buildProduct("Existing");
+    Batch existing = buildBatch(product, new BigDecimal("3"));
+    Batch[] createdBatch = new Batch[1];
+    CreateStockMovementRequest request = buildExistingProductBatchDetailsRequest(
+        StockMovementType.PURCHASE_IN, product.getId(), new BigDecimal("4"));
+    stubExistingProductMovement(product);
+    when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)).thenReturn(Optional.of(buildWarehouse()));
+    when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(product.getId(), warehouseId, tenantId))
+        .thenReturn(List.of(existing));
+    when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+      Batch batch = invocation.getArgument(0);
+      if (batch.getId() == null) {
+        batch.setId(UUID.randomUUID());
+      }
+      if (batch.getCostPrice() != null) {
+        createdBatch[0] = batch;
+      }
+      return batch;
+    });
+    when(movementItemRepository.saveAndFlush(any(StockMovementItem.class))).thenAnswer(invocation -> {
+      StockMovementItem item = invocation.getArgument(0);
+      item.setId(UUID.randomUUID());
+      return item;
+    });
+    when(mapper.toResponse(any(StockMovement.class), any()))
+        .thenReturn(StockMovementResponse.builder().warehouseId(warehouseId).build());
+
+    service.create(request);
+
+    assertThat(existing.getQuantity()).isEqualByComparingTo("3");
+    assertThat(createdBatch[0].getQuantity()).isEqualByComparingTo("4");
+    assertThat(createdBatch[0].getCostPrice()).isEqualTo(100L);
+    assertThat(createdBatch[0].getSellingPrice()).isEqualTo(200L);
+    assertThat(createdBatch[0].getManufacturedDate()).isEqualTo(LocalDate.of(2026, 4, 1));
+    assertThat(createdBatch[0].getExpirationDate()).isEqualTo(LocalDate.of(2026, 12, 31));
+    verify(movementItemRepository).saveAndFlush(argThat(item ->
+        createdBatch[0].getId().equals(item.getBatchId())));
+    verify(ledgerRepository).save(argThat(ledger ->
+        createdBatch[0].getId().equals(ledger.getBatchId())));
+  }
+
+  @Test
   void shouldCreateTransferMovementAndReadMovementViews() {
     Product product = buildProduct("Existing");
     Warehouse warehouse = buildWarehouse();
@@ -262,7 +305,13 @@ class StockMovementServiceTest {
         .thenReturn(Optional.of(warehouse));
     when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(
         product.getId(), warehouseId, tenantId)).thenReturn(List.of());
-    when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+      Batch batch = invocation.getArgument(0);
+      if (batch.getId() == null) {
+        batch.setId(UUID.randomUUID());
+      }
+      return batch;
+    });
     when(movementItemRepository.saveAndFlush(any(StockMovementItem.class))).thenAnswer(invocation -> {
       StockMovementItem item = invocation.getArgument(0);
       item.setId(UUID.randomUUID());
@@ -299,7 +348,13 @@ class StockMovementServiceTest {
       }
       return movement;
     });
-    when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(batchRepository.save(any(Batch.class))).thenAnswer(invocation -> {
+      Batch batch = invocation.getArgument(0);
+      if (batch.getId() == null) {
+        batch.setId(UUID.randomUUID());
+      }
+      return batch;
+    });
     when(ledgerRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     when(warehouseRepository.findById(warehouseId)).thenReturn(Optional.of(warehouse));
   }
@@ -339,8 +394,23 @@ class StockMovementServiceTest {
     CreateStockMovementItemRequest item = CreateStockMovementItemRequest.builder()
         .productId(productId)
         .quantity(quantity)
+        .build();
+    return CreateStockMovementRequest.builder()
+        .type(type)
+        .items(List.of(item))
+        .notes("notes")
+        .build();
+  }
+
+  private CreateStockMovementRequest buildExistingProductBatchDetailsRequest(
+      StockMovementType type, UUID productId, BigDecimal quantity) {
+    CreateStockMovementItemRequest item = CreateStockMovementItemRequest.builder()
+        .productId(productId)
+        .quantity(quantity)
         .costPrice(100L)
         .sellingPrice(200L)
+        .manufacturedDate(LocalDate.of(2026, 4, 1))
+        .expirationDate(LocalDate.of(2026, 12, 31))
         .build();
     return CreateStockMovementRequest.builder()
         .type(type)
