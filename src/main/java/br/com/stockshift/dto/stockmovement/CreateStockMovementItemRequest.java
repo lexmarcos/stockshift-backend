@@ -26,6 +26,8 @@ public class CreateStockMovementItemRequest {
   @Valid
   private ProductRequest newProduct;
 
+  private UUID imageUploadId;
+
   @NotNull(message = "Quantity is required")
   @Positive(message = "Quantity must be positive")
   private BigDecimal quantity;
@@ -45,5 +47,10 @@ public class CreateStockMovementItemRequest {
     boolean hasProductId = productId != null;
     boolean hasNewProduct = newProduct != null;
     return hasProductId != hasNewProduct;
+  }
+
+  @AssertTrue(message = "imageUploadId can only be used with newProduct")
+  public boolean isImageUploadReferenceValid() {
+    return imageUploadId == null || newProduct != null;
   }
 }

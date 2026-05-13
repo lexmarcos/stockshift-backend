@@ -25,6 +25,8 @@ import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.ProductService;
 import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.upload.ProductImageUploadClaim;
+import br.com.stockshift.service.upload.ProductImageUploadService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,6 +82,8 @@ class StockMovementServiceTest {
   private ProductService productService;
   @Mock
   private AuditService auditService;
+  @Mock
+  private ProductImageUploadService productImageUploadService;
 
   @InjectMocks
   private StockMovementService service;
@@ -112,8 +116,7 @@ class StockMovementServiceTest {
 
     assertThat(response.getWarehouseId()).isEqualTo(warehouseId);
     verify(productService).createEntity(
-        argThat(productRequest -> Boolean.TRUE.equals(productRequest.getHasExpiration())),
-        any());
+        argThat(productRequest -> Boolean.TRUE.equals(productRequest.getHasExpiration())));
     verify(batchRepository, atLeastOnce()).save(argThat(batch -> {
       return batch.getCostPrice().equals(1290L)
           && batch.getSellingPrice().equals(2490L)
@@ -139,8 +142,31 @@ class StockMovementServiceTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("New products can only be used in IN stock movements");
 
-    verify(productService, never()).createEntity(any(ProductRequest.class), any());
+    verify(productService, never()).createEntity(any(ProductRequest.class));
     verify(movementRepository, never()).save(any(StockMovement.class));
+  }
+
+  @Test
+  void shouldPromoteTemporaryImageForInlineProduct() {
+    UUID uploadId = UUID.randomUUID();
+    Product product = buildProduct("Inline Product");
+    Warehouse warehouse = buildWarehouse();
+    ProductImageUploadClaim claim = new ProductImageUploadClaim(
+        uploadId,
+        "temp/key.webp",
+        "products/key.webp",
+        "https://cdn.test/products/key.webp");
+    CreateStockMovementRequest request = buildInlineRequest(StockMovementType.PURCHASE_IN);
+    request.getItems().get(0).setImageUploadId(uploadId);
+    stubInlineInMovement(product, warehouse);
+    when(productImageUploadService.promotePendingUpload(uploadId)).thenReturn(claim);
+
+    service.create(request);
+
+    verify(productService).createEntity(argThat(productRequest ->
+        claim.finalImageUrl().equals(productRequest.getImageUrl())));
+    verify(productImageUploadService).markConsumed(claim);
+    verify(productImageUploadService).registerStorageCleanup(List.of(claim));
   }
 
   @Test
@@ -300,7 +326,7 @@ class StockMovementServiceTest {
     when(securityUtils.getCurrentUserId()).thenReturn(userId);
     when(movementRepository.findLatestCodeByTenantIdAndCodePrefix(any(), any()))
         .thenReturn(null);
-    when(productService.createEntity(any(ProductRequest.class), any())).thenReturn(product);
+    when(productService.createEntity(any(ProductRequest.class))).thenReturn(product);
     when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId))
         .thenReturn(Optional.of(warehouse));
     when(batchRepository.findByProductIdAndWarehouseIdAndTenantId(

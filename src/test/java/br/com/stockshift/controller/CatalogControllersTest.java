@@ -5,9 +5,11 @@ import br.com.stockshift.dto.product.CategoryRequest;
 import br.com.stockshift.dto.product.CategoryResponse;
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
+import br.com.stockshift.dto.upload.TemporaryProductImageUploadResponse;
 import br.com.stockshift.service.CategoryService;
 import br.com.stockshift.service.OpenAiService;
 import br.com.stockshift.service.ProductService;
+import br.com.stockshift.service.upload.ProductImageUploadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -34,6 +36,8 @@ class CatalogControllersTest {
     private ProductService productService;
     @Mock
     private OpenAiService openAiService;
+    @Mock
+    private ProductImageUploadService productImageUploadService;
 
     @Test
     void categoryControllerShouldWrapCrudResponses() {
@@ -99,6 +103,24 @@ class CatalogControllersTest {
         assertThat(controller.delete(id).getBody().getSuccess()).isTrue();
         assertThat(controller.analyzeImage(image).getBody().getData().getDetectedBrand()).isEqualTo("Marca");
         verify(productService).delete(id);
+    }
+
+    @Test
+    void uploadControllerShouldWrapTemporaryProductImageResponse() {
+        UploadController controller = new UploadController(productImageUploadService);
+        UUID uploadId = UUID.randomUUID();
+        MockMultipartFile image = new MockMultipartFile("image", "p.png", "image/png", new byte[]{1});
+        TemporaryProductImageUploadResponse response = TemporaryProductImageUploadResponse.builder()
+                .uploadId(uploadId)
+                .fileName("p.png")
+                .contentType("image/png")
+                .sizeBytes(1L)
+                .build();
+        when(productImageUploadService.uploadTemporaryProductImage(image)).thenReturn(response);
+
+        assertThat(controller.uploadTemporaryProductImage(image).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(controller.uploadTemporaryProductImage(image).getBody().getData().getUploadId())
+                .isEqualTo(uploadId);
     }
 
     private CategoryRequest categoryRequest(UUID parentId) {

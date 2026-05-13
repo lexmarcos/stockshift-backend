@@ -15,6 +15,8 @@ import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.ProductService;
 import br.com.stockshift.service.audit.AuditEventCreateRequest;
 import br.com.stockshift.service.audit.AuditService;
+import br.com.stockshift.service.upload.ProductImageUploadClaim;
+import br.com.stockshift.service.upload.ProductImageUploadService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +24,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -49,16 +50,12 @@ public class StockMovementService {
   private final SecurityUtils securityUtils;
   private final ProductService productService;
   private final AuditService auditService;
+  private final ProductImageUploadService productImageUploadService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
   @Transactional
   public StockMovementResponse create(CreateStockMovementRequest request) {
-    return create(request, List.of());
-  }
-
-  @Transactional
-  public StockMovementResponse create(CreateStockMovementRequest request, List<MultipartFile> inlineProductImages) {
     UUID tenantId = TenantContext.getTenantId();
     UUID warehouseId = securityUtils.getCurrentWarehouseId();
     UUID userId = securityUtils.getCurrentUserId();
@@ -82,14 +79,12 @@ public class StockMovementService {
         .build();
     movement.setTenantId(tenantId);
     StockMovement saved = movementRepository.save(movement);
-    Deque<MultipartFile> productImages = new ArrayDeque<>(
-        inlineProductImages != null ? inlineProductImages : List.of());
     List<Product> createdInlineProducts = new ArrayList<>();
+    List<ProductImageUploadClaim> promotedImageClaims = new ArrayList<>();
 
     try {
       for (CreateStockMovementItemRequest itemReq : request.getItems()) {
-        MultipartFile image = pollInlineProductImage(itemReq, productImages);
-        Product product = resolveMovementProduct(itemReq, tenantId, image);
+        Product product = resolveMovementProduct(itemReq, tenantId, promotedImageClaims);
         if (itemReq.getNewProduct() != null) {
           createdInlineProducts.add(product);
         }
@@ -100,13 +95,16 @@ public class StockMovementService {
           processInItem(saved, product, itemReq, warehouseId, tenantId, userId, request.getType());
         }
       }
+      promotedImageClaims.forEach(productImageUploadService::markConsumed);
+      saved = movementRepository.save(saved);
+      productImageUploadService.registerStorageCleanup(promotedImageClaims);
+      recordStockMovementCreated(saved, null);
     } catch (RuntimeException exception) {
       cleanupInlineProductImages(createdInlineProducts);
+      productImageUploadService.deleteFinalImagesQuietly(promotedImageClaims);
       throw exception;
     }
 
-    saved = movementRepository.save(saved);
-    recordStockMovementCreated(saved, null);
     log.info("StockMovement {} ({}) created by user {} in warehouse {}",
         saved.getCode(), saved.getType(), userId, warehouseId);
 
@@ -124,21 +122,29 @@ public class StockMovementService {
     }
   }
 
-  private MultipartFile pollInlineProductImage(CreateStockMovementItemRequest itemReq, Deque<MultipartFile> images) {
-    if (itemReq.getNewProduct() == null || images.isEmpty()) {
-      return null;
-    }
-    return images.removeFirst();
-  }
-
-  private Product resolveMovementProduct(CreateStockMovementItemRequest itemReq, UUID tenantId, MultipartFile image) {
+  private Product resolveMovementProduct(
+      CreateStockMovementItemRequest itemReq,
+      UUID tenantId,
+      List<ProductImageUploadClaim> promotedImageClaims) {
     if (itemReq.getProductId() != null) {
       return productRepository.findByTenantIdAndId(tenantId, itemReq.getProductId())
           .orElseThrow(() -> new ResourceNotFoundException("Product", "id", itemReq.getProductId()));
     }
 
     itemReq.getNewProduct().setHasExpiration(itemReq.getExpirationDate() != null);
-    return productService.createEntity(itemReq.getNewProduct(), image);
+    itemReq.getNewProduct().setImageUrl(resolveInlineProductImageUrl(itemReq, promotedImageClaims));
+    return productService.createEntity(itemReq.getNewProduct());
+  }
+
+  private String resolveInlineProductImageUrl(
+      CreateStockMovementItemRequest itemReq,
+      List<ProductImageUploadClaim> promotedImageClaims) {
+    if (itemReq.getImageUploadId() == null) {
+      return null;
+    }
+    ProductImageUploadClaim claim = productImageUploadService.promotePendingUpload(itemReq.getImageUploadId());
+    promotedImageClaims.add(claim);
+    return claim.finalImageUrl();
   }
 
   private void cleanupInlineProductImages(List<Product> products) {

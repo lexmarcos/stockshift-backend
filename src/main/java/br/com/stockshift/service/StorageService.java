@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -37,10 +38,31 @@ public class StorageService {
     private static final long COMPANY_LOGO_MAX_SIZE = 2 * 1024 * 1024;
     private static final String PRODUCT_FOLDER = "products/";
     private static final String COMPANY_LOGO_FOLDER = "company-logos/";
+    private static final String TEMP_PRODUCT_FOLDER = "temp/product-images/";
+
+    public record StoredImageObject(String key, String publicUrl) {
+    }
 
     public String uploadImage(MultipartFile file) {
         validateFileType(file, PRODUCT_IMAGE_TYPES, "Only PNG, JPG, JPEG and WEBP images are allowed");
         return uploadFile(file, PRODUCT_FOLDER);
+    }
+
+    public StoredImageObject uploadTemporaryProductImage(
+            MultipartFile file,
+            UUID tenantId,
+            UUID uploadId) {
+        validateFileType(file, PRODUCT_IMAGE_TYPES, "Only PNG, JPG, JPEG and WEBP images are allowed");
+        String folder = TEMP_PRODUCT_FOLDER + tenantId + "/";
+        return uploadFileObject(file, folder, uploadId.toString());
+    }
+
+    public StoredImageObject copyTemporaryProductImageToProductImage(
+            String temporaryKey,
+            String originalName) {
+        String destinationKey = PRODUCT_FOLDER + generateUniqueFileName(originalName);
+        copyObject(temporaryKey, destinationKey);
+        return new StoredImageObject(destinationKey, buildPublicUrl(destinationKey));
     }
 
     public String uploadCompanyLogo(MultipartFile file) {
@@ -49,8 +71,12 @@ public class StorageService {
     }
 
     private String uploadFile(MultipartFile file, String folder) {
+        return uploadFileObject(file, folder, null).publicUrl();
+    }
+
+    private StoredImageObject uploadFileObject(MultipartFile file, String folder, String fileNamePrefix) {
         try {
-            String fileName = generateUniqueFileName(file.getOriginalFilename());
+            String fileName = generateUniqueFileName(file.getOriginalFilename(), fileNamePrefix);
             String key = folder + fileName;
 
             PutObjectRequest request = PutObjectRequest.builder()
@@ -62,9 +88,9 @@ public class StorageService {
             s3Client.putObject(request,
                 RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
 
-            String imageUrl = properties.getPublicUrl() + "/" + key;
+            String imageUrl = buildPublicUrl(key);
             log.info("Image uploaded successfully: {}", imageUrl);
-            return imageUrl;
+            return new StoredImageObject(key, imageUrl);
 
         } catch (IOException e) {
             log.error("Failed to read image file", e);
@@ -75,25 +101,55 @@ public class StorageService {
         }
     }
 
+    private void copyObject(String sourceKey, String destinationKey) {
+        try {
+            CopyObjectRequest request = CopyObjectRequest.builder()
+                    .sourceBucket(properties.getBucketName())
+                    .sourceKey(sourceKey)
+                    .destinationBucket(properties.getBucketName())
+                    .destinationKey(destinationKey)
+                    .build();
+            s3Client.copyObject(request);
+        } catch (S3Exception e) {
+            log.error("Failed to copy image from {} to {}", sourceKey, destinationKey, e);
+            throw new StorageException("Failed to copy image in storage", e);
+        }
+    }
+
     public void deleteImage(String imageUrl) {
         if (imageUrl == null || !imageUrl.startsWith(properties.getPublicUrl())) {
             return;
         }
 
+        deleteKey(extractKeyFromUrl(imageUrl), imageUrl);
+    }
+
+    public void deleteStorageKeyQuietly(String storageKey) {
+        if (storageKey == null || storageKey.isBlank()) {
+            return;
+        }
+
         try {
-            String key = extractKeyFromUrl(imageUrl);
+            deleteKey(storageKey, storageKey);
+        } catch (RuntimeException exception) {
+            log.warn("Failed to delete storage object: {}", storageKey, exception);
+        }
+    }
+
+    private void deleteKey(String storageKey, String logTarget) {
+        try {
             DeleteObjectRequest request = DeleteObjectRequest.builder()
                 .bucket(properties.getBucketName())
-                .key(key)
+                .key(storageKey)
                 .build();
 
             s3Client.deleteObject(request);
-            log.info("Image deleted successfully: {}", imageUrl);
+            log.info("Image deleted successfully: {}", logTarget);
 
         } catch (NoSuchKeyException e) {
-            log.warn("Image not found in storage (already deleted?): {}", imageUrl);
+            log.warn("Image not found in storage (already deleted?): {}", logTarget);
         } catch (S3Exception e) {
-            log.error("Failed to delete image from storage: {}", imageUrl, e);
+            log.error("Failed to delete image from storage: {}", logTarget, e);
             throw new StorageException("Failed to delete image from storage", e);
         }
     }
@@ -121,8 +177,13 @@ public class StorageService {
     }
 
     private String generateUniqueFileName(String originalName) {
+        return generateUniqueFileName(originalName, null);
+    }
+
+    private String generateUniqueFileName(String originalName, String fileNamePrefix) {
         String extension = getFileExtension(originalName);
-        return UUID.randomUUID().toString() + extension;
+        String prefix = fileNamePrefix == null ? UUID.randomUUID().toString() : fileNamePrefix;
+        return prefix + extension;
     }
 
     private String getFileExtension(String filename) {
@@ -138,5 +199,9 @@ public class StorageService {
             return imageUrl.substring(publicUrl.length() + 1);
         }
         throw new IllegalArgumentException("Invalid image URL: " + imageUrl);
+    }
+
+    private String buildPublicUrl(String key) {
+        return properties.getPublicUrl() + "/" + key;
     }
 }
