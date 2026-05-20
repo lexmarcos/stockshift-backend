@@ -16,7 +16,11 @@ jwt:
     same-site: Strict
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS}
+  allowed-origins: ${ALLOWED_ORIGINS:https://test.beatwave.fun}
+
+app:
+  frontend-url: ${FRONTEND_URL:https://test.beatwave.fun}
+  api-base-url: ${API_BASE_URL:https://test.beatwave.fun/stockshift}
 
 logging:
   level:
@@ -38,7 +42,7 @@ storage:
   endpoint: ${STORAGE_ENDPOINT}
   access-key: ${STORAGE_ACCESS_KEY}
   secret-key: ${STORAGE_SECRET_KEY}
-  bucket-name: ${STORAGE_BUCKET:stockshift}
+  bucket-name: ${STORAGE_BUCKET_NAME:${STORAGE_BUCKET:stockshift}}
   region: ${STORAGE_REGION:auto}
   public-url: ${STORAGE_PUBLIC_URL}
 

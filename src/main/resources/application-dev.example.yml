@@ -15,7 +15,7 @@ spring:
       password: ${REDIS_PASSWORD:}
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://test.beatwave.fun}
 
 jwt:
   secret: ${JWT_SECRET:dev-secret-key-change-in-production-must-be-at-least-256-bits-long}
@@ -36,7 +36,7 @@ storage:
   endpoint: ${STORAGE_ENDPOINT:}
   access-key: ${STORAGE_ACCESS_KEY:}
   secret-key: ${STORAGE_SECRET_KEY:}
-  bucket-name: ${STORAGE_BUCKET:stockshift}
+  bucket-name: ${STORAGE_BUCKET_NAME:${STORAGE_BUCKET:stockshift}}
   region: ${STORAGE_REGION:auto}
   public-url: ${STORAGE_PUBLIC_URL:}
 
@@ -49,5 +49,5 @@ openai:
   model: ${OPENAI_MODEL:gpt-4.1-nano}
 
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:3000}
-  api-base-url: ${API_BASE_URL:http://localhost:8080/stockshift}
+  frontend-url: ${FRONTEND_URL:https://test.beatwave.fun}
+  api-base-url: ${API_BASE_URL:https://test.beatwave.fun/stockshift}

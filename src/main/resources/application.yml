@@ -43,7 +43,7 @@ jwt:
     http-only: true
 
 cors:
-  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:9000,https://test.beatwave.fun}
 
 management:
   endpoints:
@@ -68,6 +68,14 @@ rate-limit:
 security:
   ip:
     trusted-proxies: ${TRUSTED_PROXY_IPS:127.0.0.1,0:0:0:0:0:0:0:1,::1}
+
+storage:
+  endpoint: ${STORAGE_ENDPOINT:}
+  access-key: ${STORAGE_ACCESS_KEY:}
+  secret-key: ${STORAGE_SECRET_KEY:}
+  bucket-name: ${STORAGE_BUCKET_NAME:${STORAGE_BUCKET:stockshift}}
+  region: ${STORAGE_REGION:auto}
+  public-url: ${STORAGE_PUBLIC_URL:}
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}

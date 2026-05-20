@@ -82,7 +82,9 @@ JWT_COOKIE_SAME_SITE=Lax
 JWT_COOKIE_DOMAIN=
 
 # CORS
-ALLOWED_ORIGINS=http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:9000,https://test.beatwave.fun
+FRONTEND_URL=https://test.beatwave.fun
+API_BASE_URL=https://test.beatwave.fun/stockshift
 ```
 
 ## Testes
