@@ -30,6 +30,11 @@ public final class PermissionCodes {
     public static final String PRODUCTS_DELETE = "products:delete";
     public static final String PRODUCTS_ANALYZE_IMAGE = "products:analyze_image";
 
+    public static final String PRODUCT_PROMPTS_READ = "product_prompts:read";
+    public static final String PRODUCT_PROMPTS_CREATE = "product_prompts:create";
+    public static final String PRODUCT_PROMPTS_UPDATE = "product_prompts:update";
+    public static final String PRODUCT_PROMPTS_DELETE = "product_prompts:delete";
+
     public static final String WAREHOUSES_READ = "warehouses:read";
     public static final String WAREHOUSES_CREATE = "warehouses:create";
     public static final String WAREHOUSES_UPDATE = "warehouses:update";
@@ -80,6 +85,10 @@ public final class PermissionCodes {
             PRODUCTS_UPDATE,
             PRODUCTS_DELETE,
             PRODUCTS_ANALYZE_IMAGE,
+            PRODUCT_PROMPTS_READ,
+            PRODUCT_PROMPTS_CREATE,
+            PRODUCT_PROMPTS_UPDATE,
+            PRODUCT_PROMPTS_DELETE,
             WAREHOUSES_READ,
             WAREHOUSES_CREATE,
             WAREHOUSES_UPDATE,

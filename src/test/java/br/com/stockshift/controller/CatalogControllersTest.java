@@ -5,9 +5,13 @@ import br.com.stockshift.dto.product.CategoryRequest;
 import br.com.stockshift.dto.product.CategoryResponse;
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.dto.product.ProductResponse;
+import br.com.stockshift.dto.productprompt.ProductPromptCompanyAssetsResponse;
+import br.com.stockshift.dto.productprompt.ProductPromptRequest;
+import br.com.stockshift.dto.productprompt.ProductPromptResponse;
 import br.com.stockshift.dto.upload.TemporaryProductImageUploadResponse;
 import br.com.stockshift.service.CategoryService;
 import br.com.stockshift.service.OpenAiService;
+import br.com.stockshift.service.ProductPromptService;
 import br.com.stockshift.service.ProductService;
 import br.com.stockshift.service.upload.ProductImageUploadService;
 import org.junit.jupiter.api.Test;
@@ -38,6 +42,8 @@ class CatalogControllersTest {
     private OpenAiService openAiService;
     @Mock
     private ProductImageUploadService productImageUploadService;
+    @Mock
+    private ProductPromptService productPromptService;
 
     @Test
     void categoryControllerShouldWrapCrudResponses() {
@@ -121,6 +127,40 @@ class CatalogControllersTest {
         assertThat(controller.uploadTemporaryProductImage(image).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(controller.uploadTemporaryProductImage(image).getBody().getData().getUploadId())
                 .isEqualTo(uploadId);
+    }
+
+    @Test
+    void productPromptControllerShouldWrapCrudResponses() {
+        ProductPromptController controller = new ProductPromptController(productPromptService);
+        UUID id = UUID.randomUUID();
+        ProductPromptRequest request = ProductPromptRequest.builder()
+                .name("Oferta")
+                .prompt("Prompt")
+                .build();
+        ProductPromptResponse response = ProductPromptResponse.builder()
+                .id(id)
+                .name("Oferta")
+                .prompt("Prompt")
+                .imageUrl("https://cdn.example.com/prompt.png")
+                .build();
+        MockMultipartFile image = new MockMultipartFile("image", "prompt.png", "image/png", new byte[]{1});
+        when(productPromptService.create(request, image)).thenReturn(response);
+        when(productPromptService.findAll()).thenReturn(List.of(response));
+        when(productPromptService.findById(id)).thenReturn(response);
+        when(productPromptService.update(id, request, image)).thenReturn(response);
+        when(productPromptService.getCompanyAssets()).thenReturn(
+                ProductPromptCompanyAssetsResponse.builder()
+                        .logoUrl("https://cdn.example.com/logo.png")
+                        .build());
+
+        assertThat(controller.create(request, image).getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(controller.findAll().getBody().getData()).singleElement().extracting("id").isEqualTo(id);
+        assertThat(controller.getCompanyAssets().getBody().getData().getLogoUrl())
+                .isEqualTo("https://cdn.example.com/logo.png");
+        assertThat(controller.findById(id).getBody().getData().getName()).isEqualTo("Oferta");
+        assertThat(controller.update(id, request, image).getBody().getSuccess()).isTrue();
+        assertThat(controller.delete(id).getBody().getSuccess()).isTrue();
+        verify(productPromptService).delete(id);
     }
 
     private CategoryRequest categoryRequest(UUID parentId) {

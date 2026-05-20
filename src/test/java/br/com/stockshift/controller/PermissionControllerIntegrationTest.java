@@ -22,6 +22,7 @@ class PermissionControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data").isArray())
                 .andExpect(jsonPath("$.data").isNotEmpty())
                 .andExpect(jsonPath("$.data[*].code").isArray())
-                .andExpect(jsonPath("$.data[*].code").value(org.hamcrest.Matchers.hasItem("products:read")));
+                .andExpect(jsonPath("$.data[*].code").value(org.hamcrest.Matchers.hasItem("products:read")))
+                .andExpect(jsonPath("$.data[*].code").value(org.hamcrest.Matchers.hasItem("product_prompts:read")));
     }
 }
