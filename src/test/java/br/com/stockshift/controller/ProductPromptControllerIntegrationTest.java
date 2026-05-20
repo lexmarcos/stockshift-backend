@@ -90,10 +90,12 @@ class ProductPromptControllerIntegrationTest extends BaseIntegrationTest {
                 .getResponse()
                 .getContentAsString()).path("data").path("id").asText();
 
+        TenantContext.setTenantId(tenant.getId());
         mockMvc.perform(get("/api/product-prompts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data", hasSize(1)));
 
+        TenantContext.setTenantId(tenant.getId());
         mockMvc.perform(multipart(HttpMethod.PUT, "/api/product-prompts/{id}", UUID.fromString(createdId))
                         .file(promptPart(ProductPromptRequest.builder()
                                 .name("Oferta atualizada")
@@ -103,6 +105,7 @@ class ProductPromptControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.name").value("Oferta atualizada"))
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.example.com/prompt.png"));
 
+        TenantContext.setTenantId(tenant.getId());
         mockMvc.perform(delete("/api/product-prompts/{id}", UUID.fromString(createdId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
@@ -125,6 +128,7 @@ class ProductPromptControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].name").value("Tenant atual"));
 
+        TenantContext.setTenantId(tenant.getId());
         mockMvc.perform(get("/api/product-prompts/company-assets"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.logoUrl")
