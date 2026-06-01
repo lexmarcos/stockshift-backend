@@ -264,3 +264,7 @@ The `Dockerfile` builds the Spring Boot jar with the Gradle wrapper, then runs i
 - Provide production PostgreSQL, Redis, storage, hCaptcha, OpenAI, and payment-related settings.
 - Keep Flyway migrations immutable after release.
 - Swagger and OpenAPI are disabled by the production profile.
+
+## License
+
+This project is licensed under the [PolyForm Internal Use License 1.0.0](LICENSE).
