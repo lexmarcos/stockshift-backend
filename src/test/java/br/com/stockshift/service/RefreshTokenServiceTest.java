@@ -8,6 +8,7 @@ import br.com.stockshift.repository.RefreshTokenRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -119,8 +121,26 @@ class RefreshTokenServiceTest {
         verify(refreshTokenRepository, never()).deleteByUser(any());
     }
 
+    // Abandoned siblings (unrotated tokens left over from a concurrent refresh)
+    // must be purged on the next refresh instead of lingering for the full lifetime.
+    @Test
+    void rotateRefreshTokenPurgesAbandonedSiblingsOlderThanGrace() {
+        when(refreshTokenRepository.save(any())).then(returnsFirstArg());
+        RefreshToken current = activeToken();
+
+        refreshTokenService.rotateRefreshToken(current, UUID.randomUUID());
+
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(refreshTokenRepository)
+                .deleteAbandonedSiblings(eq(user), eq(current.getId()), cutoff.capture());
+        assertThat(cutoff.getValue())
+                .isBefore(LocalDateTime.now().minusSeconds((GRACE_MS / 1000) - 5))
+                .isAfter(LocalDateTime.now().minusSeconds((GRACE_MS / 1000) + 5));
+    }
+
     private RefreshToken activeToken() {
         RefreshToken token = new RefreshToken();
+        token.setId(UUID.randomUUID());
         token.setToken(UUID.randomUUID().toString());
         token.setUser(user);
         token.setExpiresAt(LocalDateTime.now().plusDays(7));

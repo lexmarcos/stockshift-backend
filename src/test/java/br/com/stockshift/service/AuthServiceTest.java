@@ -169,14 +169,17 @@ class AuthServiceTest {
     }
 
     @Test
-    void logoutShouldRevokeRefreshTokenDenylistAccessTokenAndAudit() {
+    void logoutShouldRevokeAllSessionTokensDenylistAccessTokenAndAudit() {
+        when(refreshTokenService.findOwnerId("refresh")).thenReturn(Optional.of(userId));
         when(jwtTokenProvider.getJtiFromToken("access")).thenReturn("jti");
         when(jwtTokenProvider.getRemainingTtl("access")).thenReturn(1000L);
 
         service.logout("access", "refresh");
         service.logout("broken", null);
 
-        verify(refreshTokenService).revokeRefreshToken("refresh");
+        // Whole session is revoked, not just the presented refresh token, so
+        // concurrent-refresh siblings can't survive logout.
+        verify(refreshTokenService).revokeAllUserTokens(userId);
         verify(tokenDenylistService).addToDenylist("jti", 1000L);
         verify(auditService, atLeastOnce()).record(any());
     }

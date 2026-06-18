@@ -166,29 +166,56 @@ public class AuthService {
 
     @Transactional
     public void logout(String accessToken, String refreshTokenValue) {
-        // Revoke refresh token in database
-        if (refreshTokenValue != null) {
-            refreshTokenService.revokeRefreshToken(refreshTokenValue);
-        }
-
-        // Add access token to denylist
-        if (accessToken != null) {
-            try {
-                String jti = jwtTokenProvider.getJtiFromToken(accessToken);
-                long ttl = jwtTokenProvider.getRemainingTtl(accessToken);
-                if (ttl > 0) {
-                    tokenDenylistService.addToDenylist(jti, ttl);
-                    log.debug("Access token added to denylist: {}", jti);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to add access token to denylist: {}", e.getMessage());
-            }
-        }
+        revokeSessionRefreshTokens(refreshTokenValue, accessToken);
+        denylistAccessToken(accessToken);
         auditService.record(AuditEventCreateRequest.builder()
                 .operation(AuditService.OPERATION_SECURITY)
                 .action("LOGOUT")
                 .outcome(AuditService.OUTCOME_SUCCESS)
                 .build());
+    }
+
+    // Revoke EVERY refresh token of the session owner, not just the presented one,
+    // so concurrent-refresh siblings (see RefreshTokenService.rotateRefreshToken)
+    // can't survive logout and silently restore the session.
+    private void revokeSessionRefreshTokens(String refreshTokenValue, String accessToken) {
+        UUID userId = resolveSessionUserId(refreshTokenValue, accessToken);
+        if (userId != null) {
+            refreshTokenService.revokeAllUserTokens(userId);
+        }
+    }
+
+    private UUID resolveSessionUserId(String refreshTokenValue, String accessToken) {
+        if (refreshTokenValue != null) {
+            UUID ownerId = refreshTokenService.findOwnerId(refreshTokenValue).orElse(null);
+            if (ownerId != null) {
+                return ownerId;
+            }
+        }
+        if (accessToken != null) {
+            try {
+                return jwtTokenProvider.getUserIdFromToken(accessToken);
+            } catch (Exception e) {
+                log.warn("Logout could not resolve user from access token: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private void denylistAccessToken(String accessToken) {
+        if (accessToken == null) {
+            return;
+        }
+        try {
+            String jti = jwtTokenProvider.getJtiFromToken(accessToken);
+            long ttl = jwtTokenProvider.getRemainingTtl(accessToken);
+            if (ttl > 0) {
+                tokenDenylistService.addToDenylist(jti, ttl);
+                log.debug("Access token added to denylist: {}", jti);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to add access token to denylist: {}", e.getMessage());
+        }
     }
 
     @Transactional

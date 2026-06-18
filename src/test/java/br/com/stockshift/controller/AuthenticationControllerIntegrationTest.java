@@ -20,6 +20,7 @@ import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.SwitchWarehouseRequest;
 import br.com.stockshift.model.entity.Permission;
+import br.com.stockshift.model.entity.RefreshToken;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
@@ -36,6 +37,7 @@ import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.JwtTokenProvider;
 import br.com.stockshift.util.TestDataFactory;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -202,6 +204,47 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(status().isOk());
         }
 
+        // Regression for the codex review: logout must revoke the WHOLE session, not
+        // just the presented refresh token. Otherwise a concurrent-refresh sibling
+        // stays valid and could silently restore the session after logout.
+        @Test
+        void shouldRevokeEveryRefreshTokenOfTheSessionOnLogout() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie accessTokenCookie = loginResult.getResponse().getCookie("accessToken");
+                Cookie refreshTokenCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(accessTokenCookie);
+                assertNotNull(refreshTokenCookie);
+
+                // A still-valid sibling left over from a concurrent refresh.
+                RefreshToken sibling = persistSiblingToken(LocalDateTime.now());
+                assertTrue(refreshTokenRepository.findByToken(sibling.getToken()).isPresent());
+
+                mockMvc.perform(post("/api/auth/logout")
+                                .cookie(accessTokenCookie)
+                                .cookie(refreshTokenCookie))
+                                .andExpect(status().isOk());
+
+                assertTrue(refreshTokenRepository.findByToken(sibling.getToken()).isEmpty());
+                assertTrue(refreshTokenRepository.findByToken(refreshTokenCookie.getValue()).isEmpty());
+        }
+
+        // Abandoned siblings (unrotated, older than the grace window) must be purged
+        // on the next refresh instead of lingering for the full refresh-token lifetime.
+        @Test
+        void shouldPurgeAbandonedSiblingsOlderThanGraceOnRefresh() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie refreshTokenCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(refreshTokenCookie);
+
+                RefreshToken stale = persistSiblingToken(LocalDateTime.now().minusMinutes(5));
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(refreshTokenCookie))
+                                .andExpect(status().isOk());
+
+                assertTrue(refreshTokenRepository.findByToken(stale.getToken()).isEmpty());
+        }
+
         @Test
         void shouldLogoutSuccessfully() throws Exception {
                 // First, login to get cookies
@@ -305,5 +348,28 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(forbiddenRequest)))
                                 .andExpect(status().isForbidden());
+        }
+
+        private MvcResult performLogin() throws Exception {
+                LoginRequest loginRequest = new LoginRequest();
+                loginRequest.setEmail("auth@test.com");
+                loginRequest.setPassword("password123");
+                return mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andReturn();
+        }
+
+        // Persists an extra valid refresh token for the test user, simulating a token
+        // left behind by a concurrent refresh. saveAndFlush so it hits the DB before
+        // the endpoint under test runs its bulk cleanup/revocation queries.
+        private RefreshToken persistSiblingToken(LocalDateTime createdAt) {
+                RefreshToken sibling = new RefreshToken();
+                sibling.setToken(UUID.randomUUID().toString());
+                sibling.setUser(testUser);
+                sibling.setWarehouseId(primaryWarehouse.getId());
+                sibling.setExpiresAt(LocalDateTime.now().plusDays(7));
+                sibling.setCreatedAt(createdAt);
+                return refreshTokenRepository.saveAndFlush(sibling);
         }
 }

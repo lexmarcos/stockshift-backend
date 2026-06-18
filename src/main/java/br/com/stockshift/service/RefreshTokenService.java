@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -41,8 +42,9 @@ public class RefreshTokenService {
     @Transactional
     public RefreshToken rotateRefreshToken(RefreshToken current, UUID warehouseId) {
         User user = current.getUser();
-        markRotated(current);
+        cleanupAbandonedSiblings(user, current.getId());
         cleanupStaleTokens(user);
+        markRotated(current);
         return refreshTokenRepository.save(buildToken(user, warehouseId));
     }
 
@@ -86,18 +88,29 @@ public class RefreshTokenService {
         refreshTokenRepository.deleteRotatedBefore(user, graceCutoff);
     }
 
+    // The presented token is the proven-active one, so any other still-unrotated
+    // token older than the grace window is a leftover from a concurrent refresh
+    // (its in-flight Set-Cookie has long landed) and would otherwise stay valid
+    // until the 7-day refresh expiry.
+    private void cleanupAbandonedSiblings(User user, UUID currentTokenId) {
+        LocalDateTime graceCutoff = LocalDateTime.now().minusSeconds(graceSeconds());
+        refreshTokenRepository.deleteAbandonedSiblings(user, currentTokenId, graceCutoff);
+    }
+
     private long graceSeconds() {
         return jwtProperties.getRefreshRotationGracePeriod() / 1000;
     }
 
-    @Transactional
-    public void revokeRefreshToken(String token) {
-        refreshTokenRepository.findByToken(token)
-                .ifPresent(refreshTokenRepository::delete);
+    @Transactional(readOnly = true)
+    public Optional<UUID> findOwnerId(String token) {
+        return refreshTokenRepository.findByToken(token).map(rt -> rt.getUser().getId());
     }
 
+    // Revokes the whole session on logout: every token of the user, not just the
+    // presented one, so concurrent-refresh siblings can't outlive the logout and
+    // silently restore the session.
     @Transactional
-    public void revokeAllUserTokens(User user) {
-        refreshTokenRepository.deleteByUser(user);
+    public void revokeAllUserTokens(UUID userId) {
+        refreshTokenRepository.deleteByUserId(userId);
     }
 }
