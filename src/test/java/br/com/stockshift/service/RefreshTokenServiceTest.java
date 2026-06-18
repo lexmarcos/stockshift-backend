@@ -137,6 +137,27 @@ class RefreshTokenServiceTest {
         verify(refreshTokenRepository, never()).claimRotation(any(), any(), any());
     }
 
+    // Codex review: a slow replay of A after A -> B -> C must resolve THROUGH the chain
+    // to the latest unrotated successor (C), not hand back the already-rotated B, which
+    // would regress the client's cookie and 401 it once B's grace expires.
+    @Test
+    void rotatedTokenResolvesThroughChainToLatestUnrotatedSuccessor() {
+        RefreshToken a = activeToken();
+        RefreshToken b = activeToken();
+        RefreshToken c = activeToken();
+        a.setRotatedAt(LocalDateTime.now());
+        a.setReplacedById(b.getId());
+        b.setRotatedAt(LocalDateTime.now());
+        b.setReplacedById(c.getId());
+        when(refreshTokenRepository.findById(b.getId())).thenReturn(Optional.of(b));
+        when(refreshTokenRepository.findById(c.getId())).thenReturn(Optional.of(c));
+
+        RefreshToken result = refreshTokenService.rotateRefreshToken(a, UUID.randomUUID());
+
+        assertThat(result).isSameAs(c);
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
     // Concurrent-rotation race (codex review): if another refresh wins the atomic claim
     // first, this one must discard its freshly minted orphan and return the winner's
     // successor instead of leaving an extra valid token behind.

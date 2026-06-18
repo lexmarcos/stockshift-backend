@@ -18,6 +18,10 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
+    // Safety bound for walking the rotation chain; real chains are a handful of hops
+    // (rotations within one grace window), so this only guards against corrupt data.
+    private static final int MAX_ROTATION_CHAIN = 100;
+
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
 
@@ -68,10 +72,26 @@ public class RefreshTokenService {
         return findSuccessorOrThrow(successorId);
     }
 
+    // Follows the rotation chain to the latest unrotated token. A slow replay of an
+    // old token (A -> B -> C all within A's grace) must resolve through to C, not hand
+    // back the already-rotated B, which would regress the client's cookie to a token on
+    // a shorter grace clock and 401 it once B's grace expires. The chain is finite
+    // (each rotation links to a brand-new token) and bounded as a corruption guard.
     private RefreshToken findSuccessorOrThrow(UUID successorId) {
-        return refreshTokenRepository.findById(successorId)
-                .orElseThrow(() -> new UnauthorizedException(
-                        "Refresh token successor missing: " + successorId));
+        RefreshToken successor = loadTokenOrThrow(successorId);
+        int hops = 0;
+        while (successor.getReplacedById() != null) {
+            if (++hops > MAX_ROTATION_CHAIN) {
+                throw new UnauthorizedException("Refresh token rotation chain too long from " + successorId);
+            }
+            successor = loadTokenOrThrow(successor.getReplacedById());
+        }
+        return successor;
+    }
+
+    private RefreshToken loadTokenOrThrow(UUID id) {
+        return refreshTokenRepository.findById(id)
+                .orElseThrow(() -> new UnauthorizedException("Refresh token successor missing: " + id));
     }
 
     @Transactional(readOnly = true)

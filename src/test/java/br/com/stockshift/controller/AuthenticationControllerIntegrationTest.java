@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,13 @@ import java.util.UUID;
 class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
 
         private ObjectMapper objectMapper = new ObjectMapper();
+
+        // The test runs in a single transaction, so all MockMvc calls share one
+        // persistence context; bulk rotation UPDATEs leave managed entities stale.
+        // Clearing between simulated requests makes reads hit the DB as they do in
+        // production, where each request is its own transaction.
+        @PersistenceContext
+        private EntityManager entityManager;
 
         @Autowired
         private TenantRepository tenantRepository;
@@ -273,6 +282,38 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                 // Same successor handed back, and no extra token minted.
                 assertEquals(successorCookie.getValue(), replayCookie.getValue());
                 assertEquals(tokensAfterFirstRefresh, refreshTokenRepository.count());
+        }
+
+        // Codex review: when A -> B -> C have all rotated within A's grace, a slow replay
+        // of A must resolve through the chain to the latest unrotated token C, not regress
+        // the cookie back to the already-rotated B.
+        @Test
+        void shouldResolveReplayThroughChainToLatestSuccessor() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie tokenA = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(tokenA);
+
+                Cookie tokenB = mockMvc.perform(post("/api/auth/refresh").cookie(tokenA))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getCookie("refreshToken");
+                assertNotNull(tokenB);
+                Cookie tokenC = mockMvc.perform(post("/api/auth/refresh").cookie(tokenB))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getCookie("refreshToken");
+                assertNotNull(tokenC);
+
+                // Simulate a fresh request: drop the shared persistence context so the
+                // replay reads the committed rotation chain instead of stale managed state.
+                entityManager.flush();
+                entityManager.clear();
+
+                // Slow replay of the original A, after A -> B -> C.
+                Cookie replayCookie = mockMvc.perform(post("/api/auth/refresh").cookie(tokenA))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getCookie("refreshToken");
+                assertNotNull(replayCookie);
+
+                assertEquals(tokenC.getValue(), replayCookie.getValue());
         }
 
         // Security regression (codex review): logout must revoke the AUTHENTICATED user,
