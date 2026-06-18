@@ -77,6 +77,17 @@ public class RefreshTokenService {
     // back the already-rotated B, which would regress the client's cookie to a token on
     // a shorter grace clock and 401 it once B's grace expires. The chain is finite
     // (each rotation links to a brand-new token) and bounded as a corruption guard.
+    //
+    // Known residual (accepted, not fixed): this is a best-effort read of the latest
+    // *committed* successor. A successor rotated concurrently after this walk, plus a
+    // slow response arriving after a newer one, can still momentarily regress the
+    // client's cookie. A locking read would only narrow this, not close it, because
+    // the root cause is asynchronous response ordering on the client, not read
+    // visibility on the server. It is self-healing: the next refresh (within the access
+    // token's lifetime) resolves the regressed token forward again as long as it is
+    // still within its grace window. If this ever becomes observable, widen
+    // jwt.refresh-rotation-grace-period to >= the access-token TTL so every regression
+    // self-heals on the next scheduled refresh.
     private RefreshToken findSuccessorOrThrow(UUID successorId) {
         RefreshToken successor = loadTokenOrThrow(successorId);
         int hops = 0;
