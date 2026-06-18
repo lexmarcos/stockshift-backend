@@ -21,6 +21,7 @@ jwt:
   secret: ${JWT_SECRET:dev-secret-key-change-in-production-must-be-at-least-256-bits-long}
   access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  refresh-rotation-grace-period: ${JWT_REFRESH_ROTATION_GRACE_PERIOD:60000}
   cookie:
     secure: ${JWT_COOKIE_SECURE:false}
     same-site: ${JWT_COOKIE_SAME_SITE:Lax}

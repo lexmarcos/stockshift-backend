@@ -35,7 +35,26 @@ public class RefreshToken {
     @Column(name = "warehouse_id")
     private UUID warehouseId;
 
+    // Set when this token is replaced by a newer one. A non-null value means the
+    // token is being phased out but stays usable until its grace window closes,
+    // so concurrent refreshes sharing the same cookie don't kill the session.
+    @Column(name = "rotated_at")
+    private LocalDateTime rotatedAt;
+
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt);
+    }
+
+    public boolean isRotated() {
+        return rotatedAt != null;
+    }
+
+    /**
+     * Whether this token was rotated and its grace window has already elapsed.
+     * Example: {@code isRotationGraceExpired(60)} rejects a token rotated more
+     * than 60 seconds ago, while accepting one rotated 5 seconds ago.
+     */
+    public boolean isRotationGraceExpired(long graceSeconds) {
+        return rotatedAt != null && LocalDateTime.now().isAfter(rotatedAt.plusSeconds(graceSeconds));
     }
 }

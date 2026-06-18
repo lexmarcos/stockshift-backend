@@ -19,4 +19,29 @@ class RefreshTokenTest {
         assertThat(expired.isExpired()).isTrue();
         assertThat(active.isExpired()).isFalse();
     }
+
+    @Test
+    void freshTokenIsNotRotatedAndNeverGraceExpired() {
+        RefreshToken fresh = new RefreshToken();
+
+        assertThat(fresh.isRotated()).isFalse();
+        assertThat(fresh.isRotationGraceExpired(60)).isFalse();
+    }
+
+    @Test
+    void rotatedTokenStaysUsableWithinGraceWindow() {
+        RefreshToken token = new RefreshToken();
+        token.setRotatedAt(LocalDateTime.now().minusSeconds(5));
+
+        assertThat(token.isRotated()).isTrue();
+        assertThat(token.isRotationGraceExpired(60)).isFalse();
+    }
+
+    @Test
+    void rotatedTokenIsRejectedAfterGraceWindow() {
+        RefreshToken token = new RefreshToken();
+        token.setRotatedAt(LocalDateTime.now().minusSeconds(120));
+
+        assertThat(token.isRotationGraceExpired(60)).isTrue();
+    }
 }

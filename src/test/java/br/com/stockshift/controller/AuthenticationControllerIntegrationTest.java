@@ -160,6 +160,48 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(cookie().exists("refreshToken"));
         }
 
+        // Regression for the concurrent-refresh logout: on mobile, several requests
+        // fire after the access token expires and each carries the same refresh cookie.
+        // The second one still holds the pre-rotation token; it must stay valid within
+        // the grace window instead of returning 401 and forcing a re-login.
+        @Test
+        void shouldKeepSessionAliveWhenSameRefreshTokenIsUsedConcurrently() throws Exception {
+                LoginRequest loginRequest = new LoginRequest();
+                loginRequest.setEmail("auth@test.com");
+                loginRequest.setPassword("password123");
+
+                MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andReturn();
+
+                Cookie originalRefreshCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(originalRefreshCookie);
+
+                // First refresh rotates the original token.
+                MvcResult firstRefresh = mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                Cookie rotatedRefreshCookie = firstRefresh.getResponse().getCookie("refreshToken");
+                assertNotNull(rotatedRefreshCookie);
+                assertNotEquals(originalRefreshCookie.getValue(), rotatedRefreshCookie.getValue());
+
+                // Second (concurrent) refresh still presents the ORIGINAL cookie.
+                // Before the grace-period fix this returned 401 and logged the user out.
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(cookie().exists("accessToken"))
+                                .andExpect(cookie().exists("refreshToken"));
+
+                // The token issued by the first refresh must remain usable too.
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(rotatedRefreshCookie))
+                                .andExpect(status().isOk());
+        }
+
         @Test
         void shouldLogoutSuccessfully() throws Exception {
                 // First, login to get cookies

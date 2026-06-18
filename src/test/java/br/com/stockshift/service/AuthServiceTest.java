@@ -98,6 +98,8 @@ class AuthServiceTest {
                 .thenReturn("access");
         when(refreshTokenService.createRefreshToken(any(User.class), any())).thenReturn(refreshToken("refresh", warehouseId));
         when(refreshTokenService.createRefreshToken(any(User.class))).thenReturn(refreshToken("refresh", null));
+        when(refreshTokenService.rotateRefreshToken(any(RefreshToken.class), any()))
+                .thenReturn(refreshToken("refresh", warehouseId));
     }
 
     @AfterEach

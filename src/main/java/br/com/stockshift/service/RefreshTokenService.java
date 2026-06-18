@@ -26,17 +26,24 @@ public class RefreshTokenService {
 
     @Transactional
     public RefreshToken createRefreshToken(User user, UUID warehouseId) {
-        // Revoke existing refresh tokens for this user
+        // Clean-slate creation (login / warehouse switch): drop every existing token.
         refreshTokenRepository.deleteByUser(user);
+        return refreshTokenRepository.save(buildToken(user, warehouseId));
+    }
 
-        RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setToken(UUID.randomUUID().toString());
-        refreshToken.setUser(user);
-        refreshToken.setWarehouseId(warehouseId);
-        refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshExpiration() / 1000));
-        refreshToken.setCreatedAt(LocalDateTime.now());
-
-        return refreshTokenRepository.save(refreshToken);
+    /**
+     * Rotates a refresh token without destroying tokens issued by concurrent
+     * refreshes. The current token is marked rotated (kept valid until its grace
+     * window closes) and a brand-new token is issued. This is what prevents the
+     * concurrent-refresh logout: two requests sharing the same cookie both
+     * succeed instead of one deleting the other's token.
+     */
+    @Transactional
+    public RefreshToken rotateRefreshToken(RefreshToken current, UUID warehouseId) {
+        User user = current.getUser();
+        markRotated(current);
+        cleanupStaleTokens(user);
+        return refreshTokenRepository.save(buildToken(user, warehouseId));
     }
 
     @Transactional(readOnly = true)
@@ -48,7 +55,39 @@ public class RefreshTokenService {
             throw new UnauthorizedException("Refresh token expired");
         }
 
+        if (refreshToken.isRotationGraceExpired(graceSeconds())) {
+            throw new UnauthorizedException("Refresh token already rotated");
+        }
+
         return refreshToken;
+    }
+
+    private RefreshToken buildToken(User user, UUID warehouseId) {
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setToken(UUID.randomUUID().toString());
+        refreshToken.setUser(user);
+        refreshToken.setWarehouseId(warehouseId);
+        refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshExpiration() / 1000));
+        refreshToken.setCreatedAt(LocalDateTime.now());
+        return refreshToken;
+    }
+
+    // Stamp rotation only once so repeated refreshes can't extend the grace window
+    // indefinitely (which would defeat rotation as a token-theft mitigation).
+    private void markRotated(RefreshToken token) {
+        if (token.getRotatedAt() == null) {
+            token.setRotatedAt(LocalDateTime.now());
+            refreshTokenRepository.save(token);
+        }
+    }
+
+    private void cleanupStaleTokens(User user) {
+        LocalDateTime graceCutoff = LocalDateTime.now().minusSeconds(graceSeconds());
+        refreshTokenRepository.deleteRotatedBefore(user, graceCutoff);
+    }
+
+    private long graceSeconds() {
+        return jwtProperties.getRefreshRotationGracePeriod() / 1000;
     }
 
     @Transactional

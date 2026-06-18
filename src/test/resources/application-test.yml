@@ -15,6 +15,7 @@ jwt:
   secret: test-secret-key-for-integration-tests-minimum-256-bits
   access-expiration: 900000
   refresh-expiration: 604800000
+  refresh-rotation-grace-period: 60000
   cookie:
     secure: false
     same-site: Lax

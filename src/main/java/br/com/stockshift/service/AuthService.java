@@ -153,7 +153,7 @@ public class AuthService {
                 roles,
                 permissions);
 
-        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user, warehouseId);
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshToken, warehouseId);
         recordAuth("TOKEN_REFRESHED", AuditService.OUTCOME_SUCCESS, user, warehouseId, null, null);
 
         return RefreshTokenResponse.builder()
