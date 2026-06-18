@@ -160,4 +160,12 @@ public class RefreshTokenService {
     public void revokeAllUserTokens(UUID userId) {
         refreshTokenRepository.deleteByUserId(userId);
     }
+
+    // Deletes hard-expired tokens. Rotation/logout prune most rows eagerly, but an
+    // abandoned session that never refreshes nor logs out would otherwise leak its
+    // last token until... never. Driven by RefreshTokenCleanupJob. Returns the count.
+    @Transactional
+    public int purgeExpiredTokens() {
+        return refreshTokenRepository.deleteExpiredTokens(LocalDateTime.now());
+    }
 }

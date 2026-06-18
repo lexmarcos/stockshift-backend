@@ -25,7 +25,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     @Modifying
     @Query("DELETE FROM RefreshToken rt WHERE rt.expiresAt < :now")
-    void deleteExpiredTokens(LocalDateTime now);
+    int deleteExpiredTokens(LocalDateTime now);
 
     // Removes a user's tokens whose rotation grace window already closed, keeping
     // the table bounded without touching active or still-in-grace tokens.

@@ -97,7 +97,6 @@ class AuthServiceTest {
         when(jwtTokenProvider.generateAccessToken(any(), any(), any(), any(), anyList(), anyList()))
                 .thenReturn("access");
         when(refreshTokenService.createRefreshToken(any(User.class), any())).thenReturn(refreshToken("refresh", warehouseId));
-        when(refreshTokenService.createRefreshToken(any(User.class))).thenReturn(refreshToken("refresh", null));
         when(refreshTokenService.rotateRefreshToken(any(RefreshToken.class), any()))
                 .thenReturn(refreshToken("refresh", warehouseId));
     }
