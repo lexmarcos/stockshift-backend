@@ -275,6 +275,30 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                 assertEquals(tokensAfterFirstRefresh, refreshTokenRepository.count());
         }
 
+        // Security regression (codex review): logout must revoke the AUTHENTICATED user,
+        // not whoever owns the refresh cookie. A request authenticated as one user but
+        // carrying another user's refresh-token value must not force that user out.
+        @Test
+        void shouldNotRevokeAnotherUsersTokensWhenForeignRefreshCookieIsPresented() throws Exception {
+                User victim = TestDataFactory.createUser(userRepository, passwordEncoder,
+                                testTenant.getId(), "victim@test.com");
+                RefreshToken victimToken = persistTokenFor(victim, LocalDateTime.now());
+
+                // Caller authenticates as the test user but plants the victim's refresh cookie.
+                MvcResult loginResult = performLogin();
+                Cookie callerAccessToken = loginResult.getResponse().getCookie("accessToken");
+                assertNotNull(callerAccessToken);
+                Cookie foreignRefreshToken = new Cookie("refreshToken", victimToken.getToken());
+
+                mockMvc.perform(post("/api/auth/logout")
+                                .cookie(callerAccessToken)
+                                .cookie(foreignRefreshToken))
+                                .andExpect(status().isOk());
+
+                // The victim's token is untouched; only the caller's own session is revoked.
+                assertTrue(refreshTokenRepository.findByToken(victimToken.getToken()).isPresent());
+        }
+
         @Test
         void shouldLogoutSuccessfully() throws Exception {
                 // First, login to get cookies
@@ -394,12 +418,16 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
         // left behind by a concurrent refresh. saveAndFlush so it hits the DB before
         // the endpoint under test runs its bulk cleanup/revocation queries.
         private RefreshToken persistSiblingToken(LocalDateTime createdAt) {
-                RefreshToken sibling = new RefreshToken();
-                sibling.setToken(UUID.randomUUID().toString());
-                sibling.setUser(testUser);
-                sibling.setWarehouseId(primaryWarehouse.getId());
-                sibling.setExpiresAt(LocalDateTime.now().plusDays(7));
-                sibling.setCreatedAt(createdAt);
-                return refreshTokenRepository.saveAndFlush(sibling);
+                return persistTokenFor(testUser, createdAt);
+        }
+
+        private RefreshToken persistTokenFor(User owner, LocalDateTime createdAt) {
+                RefreshToken token = new RefreshToken();
+                token.setToken(UUID.randomUUID().toString());
+                token.setUser(owner);
+                token.setWarehouseId(primaryWarehouse.getId());
+                token.setExpiresAt(LocalDateTime.now().plusDays(7));
+                token.setCreatedAt(createdAt);
+                return refreshTokenRepository.saveAndFlush(token);
         }
 }

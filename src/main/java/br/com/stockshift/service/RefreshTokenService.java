@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -82,7 +83,7 @@ public class RefreshTokenService {
             throw new UnauthorizedException("Refresh token expired");
         }
 
-        if (refreshToken.isRotationGraceExpired(graceSeconds())) {
+        if (refreshToken.isRotationGraceExpired(grace())) {
             throw new UnauthorizedException("Refresh token already rotated");
         }
 
@@ -100,8 +101,7 @@ public class RefreshTokenService {
     }
 
     private void cleanupStaleTokens(User user) {
-        LocalDateTime graceCutoff = LocalDateTime.now().minusSeconds(graceSeconds());
-        refreshTokenRepository.deleteRotatedBefore(user, graceCutoff);
+        refreshTokenRepository.deleteRotatedBefore(user, graceCutoff());
     }
 
     // The presented token is the proven-active one, so any other still-unrotated
@@ -109,17 +109,17 @@ public class RefreshTokenService {
     // (its in-flight Set-Cookie has long landed) and would otherwise stay valid
     // until the 7-day refresh expiry.
     private void cleanupAbandonedSiblings(User user, UUID currentTokenId) {
-        LocalDateTime graceCutoff = LocalDateTime.now().minusSeconds(graceSeconds());
-        refreshTokenRepository.deleteAbandonedSiblings(user, currentTokenId, graceCutoff);
+        refreshTokenRepository.deleteAbandonedSiblings(user, currentTokenId, graceCutoff());
     }
 
-    private long graceSeconds() {
-        return jwtProperties.getRefreshRotationGracePeriod() / 1000;
+    // Kept in milliseconds (not truncated to whole seconds) so a sub-second grace
+    // window keeps its precision instead of collapsing to zero.
+    private Duration grace() {
+        return Duration.ofMillis(jwtProperties.getRefreshRotationGracePeriod());
     }
 
-    @Transactional(readOnly = true)
-    public Optional<UUID> findOwnerId(String token) {
-        return refreshTokenRepository.findByToken(token).map(rt -> rt.getUser().getId());
+    private LocalDateTime graceCutoff() {
+        return LocalDateTime.now().minus(grace());
     }
 
     // Revokes the whole session on logout: every token of the user, not just the

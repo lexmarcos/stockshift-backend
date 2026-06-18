@@ -165,8 +165,8 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String accessToken, String refreshTokenValue) {
-        revokeSessionRefreshTokens(refreshTokenValue, accessToken);
+    public void logout(String accessToken) {
+        revokeAuthenticatedUserTokens();
         denylistAccessToken(accessToken);
         auditService.record(AuditEventCreateRequest.builder()
                 .operation(AuditService.OPERATION_SECURITY)
@@ -175,31 +175,17 @@ public class AuthService {
                 .build());
     }
 
-    // Revoke EVERY refresh token of the session owner, not just the presented one,
-    // so concurrent-refresh siblings (see RefreshTokenService.rotateRefreshToken)
-    // can't survive logout and silently restore the session.
-    private void revokeSessionRefreshTokens(String refreshTokenValue, String accessToken) {
-        UUID userId = resolveSessionUserId(refreshTokenValue, accessToken);
-        if (userId != null) {
-            refreshTokenService.revokeAllUserTokens(userId);
+    // Revoke EVERY refresh token of the AUTHENTICATED user (resolved from the
+    // security context, which the JWT filter populated from the validated access
+    // token), never a user inferred from the request-supplied refresh cookie:
+    // otherwise a request carrying someone else's refresh-token value could force
+    // that user out. This also wipes concurrent-refresh siblings so logout can't
+    // be silently undone (see RefreshTokenService.rotateRefreshToken).
+    private void revokeAuthenticatedUserTokens() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
+            refreshTokenService.revokeAllUserTokens(principal.getId());
         }
-    }
-
-    private UUID resolveSessionUserId(String refreshTokenValue, String accessToken) {
-        if (refreshTokenValue != null) {
-            UUID ownerId = refreshTokenService.findOwnerId(refreshTokenValue).orElse(null);
-            if (ownerId != null) {
-                return ownerId;
-            }
-        }
-        if (accessToken != null) {
-            try {
-                return jwtTokenProvider.getUserIdFromToken(accessToken);
-            } catch (Exception e) {
-                log.warn("Logout could not resolve user from access token: {}", e.getMessage());
-            }
-        }
-        return null;
     }
 
     private void denylistAccessToken(String accessToken) {

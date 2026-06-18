@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -57,10 +58,11 @@ public class RefreshToken {
 
     /**
      * Whether this token was rotated and its grace window has already elapsed.
-     * Example: {@code isRotationGraceExpired(60)} rejects a token rotated more
-     * than 60 seconds ago, while accepting one rotated 5 seconds ago.
+     * Takes a {@link Duration} so sub-second windows keep their precision. Example:
+     * {@code isRotationGraceExpired(Duration.ofSeconds(60))} rejects a token rotated
+     * more than 60 seconds ago, while accepting one rotated 5 seconds ago.
      */
-    public boolean isRotationGraceExpired(long graceSeconds) {
-        return rotatedAt != null && LocalDateTime.now().isAfter(rotatedAt.plusSeconds(graceSeconds));
+    public boolean isRotationGraceExpired(Duration grace) {
+        return rotatedAt != null && LocalDateTime.now().isAfter(rotatedAt.plus(grace));
     }
 }

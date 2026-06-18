@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -65,6 +66,22 @@ class RefreshTokenServiceTest {
         assertThatThrownBy(() -> refreshTokenService.validateRefreshToken("rt"))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("already rotated");
+    }
+
+    // P3 (codex review): a sub-second grace must not be truncated to 0 seconds, which
+    // would treat a refresh arriving milliseconds after rotation as outside the window.
+    @Test
+    void validateRefreshTokenHonorsSubSecondGraceWindow() {
+        JwtProperties subSecondGrace = new JwtProperties();
+        subSecondGrace.setRefreshExpiration(604_800_000L);
+        subSecondGrace.setRefreshRotationGracePeriod(500L);
+        RefreshTokenService service = new RefreshTokenService(refreshTokenRepository, subSecondGrace);
+        RefreshToken rotated = activeToken();
+        rotated.setRotatedAt(LocalDateTime.now().minus(Duration.ofMillis(100)));
+        when(refreshTokenRepository.findByToken("rt")).thenReturn(Optional.of(rotated));
+
+        // 100ms < 500ms grace, so it must still be accepted (was rejected when 500ms -> 0s).
+        assertThat(service.validateRefreshToken("rt")).isSameAs(rotated);
     }
 
     @Test

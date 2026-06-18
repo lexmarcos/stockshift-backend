@@ -101,12 +101,10 @@ public class AuthController {
             HttpServletRequest request,
             HttpServletResponse response) {
 
-        // Read tokens from cookies
+        // Revoke the authenticated user's session (the refresh cookie is untrusted
+        // for identity, so it is not used to decide whose tokens to revoke).
         String accessToken = cookieUtil.getAccessTokenFromCookie(request.getCookies());
-        String refreshTokenValue = cookieUtil.getRefreshTokenFromCookie(request.getCookies());
-
-        // Revoke tokens
-        authService.logout(accessToken, refreshTokenValue);
+        authService.logout(accessToken);
 
         // Remove cookies
         cookieUtil.removeAccessTokenCookie(response);
