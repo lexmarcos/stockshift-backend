@@ -41,6 +41,12 @@ public class RefreshToken {
     @Column(name = "rotated_at")
     private LocalDateTime rotatedAt;
 
+    // The single token that replaced this one on rotation. Set together with
+    // rotatedAt. Lets a rotated-but-in-grace token return its tracked successor
+    // instead of minting a new long-lived token (see RefreshTokenService).
+    @Column(name = "replaced_by_id")
+    private UUID replacedById;
+
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt);
     }

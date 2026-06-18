@@ -33,19 +33,34 @@ public class RefreshTokenService {
     }
 
     /**
-     * Rotates a refresh token without destroying tokens issued by concurrent
-     * refreshes. The current token is marked rotated (kept valid until its grace
-     * window closes) and a brand-new token is issued. This is what prevents the
-     * concurrent-refresh logout: two requests sharing the same cookie both
-     * succeed instead of one deleting the other's token.
+     * Rotates a refresh token. Only an unrotated token mints a successor; a token
+     * already rotated within its grace window (concurrent refresh, retry, or replay
+     * of the pre-rotation cookie) returns its single tracked successor instead of
+     * minting a new long-lived token. This both lets concurrent refreshes converge
+     * on the same token and stops a phased-out cookie from bootstrapping a fresh
+     * session. Example: refresh(rt) -> rt2; a second refresh(rt) within grace -> rt2.
      */
     @Transactional
     public RefreshToken rotateRefreshToken(RefreshToken current, UUID warehouseId) {
+        if (current.getReplacedById() != null) {
+            return findSuccessorOrThrow(current);
+        }
+
         User user = current.getUser();
         cleanupAbandonedSiblings(user, current.getId());
         cleanupStaleTokens(user);
-        markRotated(current);
-        return refreshTokenRepository.save(buildToken(user, warehouseId));
+
+        RefreshToken successor = refreshTokenRepository.save(buildToken(user, warehouseId));
+        current.setRotatedAt(LocalDateTime.now());
+        current.setReplacedById(successor.getId());
+        refreshTokenRepository.save(current);
+        return successor;
+    }
+
+    private RefreshToken findSuccessorOrThrow(RefreshToken rotated) {
+        return refreshTokenRepository.findById(rotated.getReplacedById())
+                .orElseThrow(() -> new UnauthorizedException(
+                        "Rotated refresh token has no successor: " + rotated.getId()));
     }
 
     @Transactional(readOnly = true)
@@ -72,15 +87,6 @@ public class RefreshTokenService {
         refreshToken.setExpiresAt(LocalDateTime.now().plusSeconds(jwtProperties.getRefreshExpiration() / 1000));
         refreshToken.setCreatedAt(LocalDateTime.now());
         return refreshToken;
-    }
-
-    // Stamp rotation only once so repeated refreshes can't extend the grace window
-    // indefinitely (which would defeat rotation as a token-theft mitigation).
-    private void markRotated(RefreshToken token) {
-        if (token.getRotatedAt() == null) {
-            token.setRotatedAt(LocalDateTime.now());
-            refreshTokenRepository.save(token);
-        }
     }
 
     private void cleanupStaleTokens(User user) {

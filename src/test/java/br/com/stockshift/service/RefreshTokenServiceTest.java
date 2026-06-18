@@ -22,6 +22,7 @@ import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -78,46 +79,45 @@ class RefreshTokenServiceTest {
                 .hasMessageContaining("expired");
     }
 
-    // Regression: rotation must NOT wipe the user's tokens. The old createRefreshToken
-    // path called deleteByUser, which deleted the token a concurrent refresh had just
-    // issued, forcing a logout right after a successful login (see audit trail bug).
+    // Regression: rotation must NOT wipe the user's tokens (the old createRefreshToken
+    // path called deleteByUser, forcing a logout right after login). An unrotated token
+    // mints a successor and records it as its replacement.
     @Test
-    void rotateRefreshTokenStampsCurrentAndIssuesNewTokenWithoutDeletingAll() {
-        when(refreshTokenRepository.save(any())).then(returnsFirstArg());
+    void rotateMintsAndTracksSuccessorWhenCurrentNotYetRotated() {
+        stubSaveAssigningIds();
         RefreshToken current = activeToken();
         UUID warehouseId = UUID.randomUUID();
 
-        RefreshToken issued = refreshTokenService.rotateRefreshToken(current, warehouseId);
+        RefreshToken successor = refreshTokenService.rotateRefreshToken(current, warehouseId);
 
         verify(refreshTokenRepository, never()).deleteByUser(any());
         assertThat(current.getRotatedAt()).isNotNull();
-        assertThat(issued.getToken()).isNotEqualTo(current.getToken());
-        assertThat(issued.getRotatedAt()).isNull();
-        assertThat(issued.getWarehouseId()).isEqualTo(warehouseId);
+        assertThat(current.getReplacedById()).isEqualTo(successor.getId());
+        assertThat(successor.getToken()).isNotEqualTo(current.getToken());
+        assertThat(successor.getRotatedAt()).isNull();
+        assertThat(successor.getWarehouseId()).isEqualTo(warehouseId);
     }
 
-    // Regression: two concurrent refreshes carrying the same original cookie must both
-    // succeed, and the original must remain valid throughout its grace window instead
-    // of being invalidated by the first rotation.
+    // Security + convergence (codex review): a token rotated within its grace window
+    // must return the SAME tracked successor instead of minting a fresh long-lived
+    // token, so a replayed pre-rotation cookie can't bootstrap a new session and
+    // concurrent refreshes converge on one token.
     @Test
-    void concurrentRefreshesOfSameTokenBothSucceedAndKeepOriginalValid() {
-        when(refreshTokenRepository.save(any())).then(returnsFirstArg());
-        RefreshToken original = activeToken();
-        when(refreshTokenRepository.findByToken("rt")).thenReturn(Optional.of(original));
+    void rotatedTokenWithinGraceReturnsTrackedSuccessorWithoutMintingNew() {
+        stubSaveAssigningIds();
+        RefreshToken current = activeToken();
         UUID warehouseId = UUID.randomUUID();
 
-        RefreshToken validatedA = refreshTokenService.validateRefreshToken("rt");
-        RefreshToken issuedA = refreshTokenService.rotateRefreshToken(validatedA, warehouseId);
-        LocalDateTime rotatedAtAfterFirst = original.getRotatedAt();
+        RefreshToken successor = refreshTokenService.rotateRefreshToken(current, warehouseId);
+        when(refreshTokenRepository.findById(successor.getId())).thenReturn(Optional.of(successor));
 
-        // Second request still holds the original token (cookie not yet updated).
-        RefreshToken validatedB = refreshTokenService.validateRefreshToken("rt");
-        RefreshToken issuedB = refreshTokenService.rotateRefreshToken(validatedB, warehouseId);
+        // Replay of the now-rotated token, still inside the grace window.
+        RefreshToken replay = refreshTokenService.rotateRefreshToken(current, warehouseId);
 
-        assertThat(validatedB).isSameAs(original);
-        assertThat(issuedA.getToken()).isNotEqualTo(issuedB.getToken());
-        // Grace stamp is set once, so repeated refresh can't extend it indefinitely.
-        assertThat(original.getRotatedAt()).isEqualTo(rotatedAtAfterFirst);
+        assertThat(replay).isSameAs(successor);
+        verify(refreshTokenRepository).findById(successor.getId());
+        // Exactly one successor minted: only the first rotation saves (successor + current).
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
         verify(refreshTokenRepository, never()).deleteByUser(any());
     }
 
@@ -136,6 +136,17 @@ class RefreshTokenServiceTest {
         assertThat(cutoff.getValue())
                 .isBefore(LocalDateTime.now().minusSeconds((GRACE_MS / 1000) - 5))
                 .isAfter(LocalDateTime.now().minusSeconds((GRACE_MS / 1000) + 5));
+    }
+
+    // Mimics the DB assigning a primary key on insert, so replacedById tracking works.
+    private void stubSaveAssigningIds() {
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> {
+            RefreshToken saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(UUID.randomUUID());
+            }
+            return saved;
+        });
     }
 
     private RefreshToken activeToken() {

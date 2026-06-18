@@ -245,6 +245,36 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                 assertTrue(refreshTokenRepository.findByToken(stale.getToken()).isEmpty());
         }
 
+        // Security regression (codex review): replaying the pre-rotation cookie within
+        // the grace window must return the already-issued successor, never mint a fresh
+        // long-lived token, so a stolen/duplicated old cookie can't bootstrap a session.
+        @Test
+        void shouldReturnTrackedSuccessorWhenRotatedCookieIsReplayedWithinGrace() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie originalRefreshCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(originalRefreshCookie);
+
+                MvcResult firstRefresh = mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                Cookie successorCookie = firstRefresh.getResponse().getCookie("refreshToken");
+                assertNotNull(successorCookie);
+                long tokensAfterFirstRefresh = refreshTokenRepository.count();
+
+                // Replay the original (now-rotated) cookie while still inside the grace window.
+                MvcResult replay = mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                Cookie replayCookie = replay.getResponse().getCookie("refreshToken");
+                assertNotNull(replayCookie);
+
+                // Same successor handed back, and no extra token minted.
+                assertEquals(successorCookie.getValue(), replayCookie.getValue());
+                assertEquals(tokensAfterFirstRefresh, refreshTokenRepository.count());
+        }
+
         @Test
         void shouldLogoutSuccessfully() throws Exception {
                 // First, login to get cookies
