@@ -22,7 +22,6 @@ import static org.mockito.AdditionalAnswers.returnsFirstArg;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -81,51 +80,74 @@ class RefreshTokenServiceTest {
 
     // Regression: rotation must NOT wipe the user's tokens (the old createRefreshToken
     // path called deleteByUser, forcing a logout right after login). An unrotated token
-    // mints a successor and records it as its replacement.
+    // mints a successor and atomically claims the rotation, tracking the successor.
     @Test
-    void rotateMintsAndTracksSuccessorWhenCurrentNotYetRotated() {
+    void rotateMintsSuccessorAndClaimsRotationWhenCurrentNotYetRotated() {
         stubSaveAssigningIds();
         RefreshToken current = activeToken();
+        when(refreshTokenRepository.claimRotation(eq(current.getId()), any(LocalDateTime.class), any(UUID.class)))
+                .thenReturn(1);
         UUID warehouseId = UUID.randomUUID();
 
         RefreshToken successor = refreshTokenService.rotateRefreshToken(current, warehouseId);
 
         verify(refreshTokenRepository, never()).deleteByUser(any());
-        assertThat(current.getRotatedAt()).isNotNull();
-        assertThat(current.getReplacedById()).isEqualTo(successor.getId());
+        ArgumentCaptor<UUID> successorId = ArgumentCaptor.forClass(UUID.class);
+        verify(refreshTokenRepository)
+                .claimRotation(eq(current.getId()), any(LocalDateTime.class), successorId.capture());
+        assertThat(successorId.getValue()).isEqualTo(successor.getId());
         assertThat(successor.getToken()).isNotEqualTo(current.getToken());
-        assertThat(successor.getRotatedAt()).isNull();
         assertThat(successor.getWarehouseId()).isEqualTo(warehouseId);
     }
 
-    // Security + convergence (codex review): a token rotated within its grace window
-    // must return the SAME tracked successor instead of minting a fresh long-lived
-    // token, so a replayed pre-rotation cookie can't bootstrap a new session and
-    // concurrent refreshes converge on one token.
+    // Security + convergence (codex review): a token already rotated within its grace
+    // window returns the SAME tracked successor instead of minting a fresh long-lived
+    // token, so a replayed pre-rotation cookie can't bootstrap a new session.
     @Test
-    void rotatedTokenWithinGraceReturnsTrackedSuccessorWithoutMintingNew() {
+    void rotatedTokenReturnsTrackedSuccessorWithoutMinting() {
+        RefreshToken current = activeToken();
+        UUID successorId = UUID.randomUUID();
+        current.setRotatedAt(LocalDateTime.now());
+        current.setReplacedById(successorId);
+        RefreshToken successor = activeToken();
+        successor.setId(successorId);
+        when(refreshTokenRepository.findById(successorId)).thenReturn(Optional.of(successor));
+
+        RefreshToken result = refreshTokenService.rotateRefreshToken(current, UUID.randomUUID());
+
+        assertThat(result).isSameAs(successor);
+        verify(refreshTokenRepository, never()).save(any());
+        verify(refreshTokenRepository, never()).claimRotation(any(), any(), any());
+    }
+
+    // Concurrent-rotation race (codex review): if another refresh wins the atomic claim
+    // first, this one must discard its freshly minted orphan and return the winner's
+    // successor instead of leaving an extra valid token behind.
+    @Test
+    void rotateDiscardsOrphanAndReturnsWinnerWhenConcurrentClaimLost() {
         stubSaveAssigningIds();
         RefreshToken current = activeToken();
-        UUID warehouseId = UUID.randomUUID();
+        when(refreshTokenRepository.claimRotation(any(UUID.class), any(LocalDateTime.class), any(UUID.class)))
+                .thenReturn(0);
+        UUID winnerSuccessorId = UUID.randomUUID();
+        RefreshToken winnerSuccessor = activeToken();
+        winnerSuccessor.setId(winnerSuccessorId);
+        when(refreshTokenRepository.findReplacedById(current.getId())).thenReturn(Optional.of(winnerSuccessorId));
+        when(refreshTokenRepository.findById(winnerSuccessorId)).thenReturn(Optional.of(winnerSuccessor));
 
-        RefreshToken successor = refreshTokenService.rotateRefreshToken(current, warehouseId);
-        when(refreshTokenRepository.findById(successor.getId())).thenReturn(Optional.of(successor));
+        RefreshToken result = refreshTokenService.rotateRefreshToken(current, UUID.randomUUID());
 
-        // Replay of the now-rotated token, still inside the grace window.
-        RefreshToken replay = refreshTokenService.rotateRefreshToken(current, warehouseId);
-
-        assertThat(replay).isSameAs(successor);
-        verify(refreshTokenRepository).findById(successor.getId());
-        // Exactly one successor minted: only the first rotation saves (successor + current).
-        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+        assertThat(result).isSameAs(winnerSuccessor);
+        verify(refreshTokenRepository).delete(any(RefreshToken.class));
         verify(refreshTokenRepository, never()).deleteByUser(any());
     }
 
-    // Abandoned siblings (unrotated tokens left over from a concurrent refresh)
-    // must be purged on the next refresh instead of lingering for the full lifetime.
+    // Abandoned siblings (unrotated leftovers from a pre-fix concurrent refresh)
+    // must still be purged on the next refresh instead of lingering for the lifetime.
     @Test
     void rotateRefreshTokenPurgesAbandonedSiblingsOlderThanGrace() {
         when(refreshTokenRepository.save(any())).then(returnsFirstArg());
+        when(refreshTokenRepository.claimRotation(any(), any(LocalDateTime.class), any())).thenReturn(1);
         RefreshToken current = activeToken();
 
         refreshTokenService.rotateRefreshToken(current, UUID.randomUUID());

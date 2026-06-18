@@ -33,17 +33,18 @@ public class RefreshTokenService {
     }
 
     /**
-     * Rotates a refresh token. Only an unrotated token mints a successor; a token
-     * already rotated within its grace window (concurrent refresh, retry, or replay
-     * of the pre-rotation cookie) returns its single tracked successor instead of
-     * minting a new long-lived token. This both lets concurrent refreshes converge
-     * on the same token and stops a phased-out cookie from bootstrapping a fresh
-     * session. Example: refresh(rt) -> rt2; a second refresh(rt) within grace -> rt2.
+     * Rotates a refresh token. Only an unrotated token mints a successor, and the
+     * rotation is claimed atomically (see {@link RefreshTokenRepository#claimRotation})
+     * so overlapping refreshes of the same token can't each mint a different one: the
+     * loser discards its orphan and returns the winner's successor. A token already
+     * rotated within its grace window (retry / replay of the pre-rotation cookie)
+     * likewise returns its single tracked successor instead of a new long-lived token.
+     * Example: refresh(rt) -> rt2; a second refresh(rt) within grace -> rt2.
      */
     @Transactional
     public RefreshToken rotateRefreshToken(RefreshToken current, UUID warehouseId) {
         if (current.getReplacedById() != null) {
-            return findSuccessorOrThrow(current);
+            return findSuccessorOrThrow(current.getReplacedById());
         }
 
         User user = current.getUser();
@@ -51,16 +52,25 @@ public class RefreshTokenService {
         cleanupStaleTokens(user);
 
         RefreshToken successor = refreshTokenRepository.save(buildToken(user, warehouseId));
-        current.setRotatedAt(LocalDateTime.now());
-        current.setReplacedById(successor.getId());
-        refreshTokenRepository.save(current);
-        return successor;
+        boolean claimed = refreshTokenRepository.claimRotation(
+                current.getId(), LocalDateTime.now(), successor.getId()) == 1;
+        return claimed ? successor : resolveConcurrentWinner(current, successor);
     }
 
-    private RefreshToken findSuccessorOrThrow(RefreshToken rotated) {
-        return refreshTokenRepository.findById(rotated.getReplacedById())
+    // Another refresh rotated this token first. Drop our orphan successor and hand
+    // back the winner's tracked successor so both responses converge on one token.
+    private RefreshToken resolveConcurrentWinner(RefreshToken current, RefreshToken orphan) {
+        refreshTokenRepository.delete(orphan);
+        UUID successorId = refreshTokenRepository.findReplacedById(current.getId())
                 .orElseThrow(() -> new UnauthorizedException(
-                        "Rotated refresh token has no successor: " + rotated.getId()));
+                        "Concurrent rotation left no successor for token " + current.getId()));
+        return findSuccessorOrThrow(successorId);
+    }
+
+    private RefreshToken findSuccessorOrThrow(UUID successorId) {
+        return refreshTokenRepository.findById(successorId)
+                .orElseThrow(() -> new UnauthorizedException(
+                        "Refresh token successor missing: " + successorId));
     }
 
     @Transactional(readOnly = true)
