@@ -153,7 +153,7 @@ public class AuthService {
                 roles,
                 permissions);
 
-        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(user, warehouseId);
+        RefreshToken newRefreshToken = refreshTokenService.rotateRefreshToken(refreshToken, warehouseId);
         recordAuth("TOKEN_REFRESHED", AuditService.OUTCOME_SUCCESS, user, warehouseId, null, null);
 
         return RefreshTokenResponse.builder()
@@ -165,30 +165,43 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(String accessToken, String refreshTokenValue) {
-        // Revoke refresh token in database
-        if (refreshTokenValue != null) {
-            refreshTokenService.revokeRefreshToken(refreshTokenValue);
-        }
-
-        // Add access token to denylist
-        if (accessToken != null) {
-            try {
-                String jti = jwtTokenProvider.getJtiFromToken(accessToken);
-                long ttl = jwtTokenProvider.getRemainingTtl(accessToken);
-                if (ttl > 0) {
-                    tokenDenylistService.addToDenylist(jti, ttl);
-                    log.debug("Access token added to denylist: {}", jti);
-                }
-            } catch (Exception e) {
-                log.warn("Failed to add access token to denylist: {}", e.getMessage());
-            }
-        }
+    public void logout(String accessToken) {
+        revokeAuthenticatedUserTokens();
+        denylistAccessToken(accessToken);
         auditService.record(AuditEventCreateRequest.builder()
                 .operation(AuditService.OPERATION_SECURITY)
                 .action("LOGOUT")
                 .outcome(AuditService.OUTCOME_SUCCESS)
                 .build());
+    }
+
+    // Revoke EVERY refresh token of the AUTHENTICATED user (resolved from the
+    // security context, which the JWT filter populated from the validated access
+    // token), never a user inferred from the request-supplied refresh cookie:
+    // otherwise a request carrying someone else's refresh-token value could force
+    // that user out. This also wipes concurrent-refresh siblings so logout can't
+    // be silently undone (see RefreshTokenService.rotateRefreshToken).
+    private void revokeAuthenticatedUserTokens() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof UserPrincipal principal) {
+            refreshTokenService.revokeAllUserTokens(principal.getId());
+        }
+    }
+
+    private void denylistAccessToken(String accessToken) {
+        if (accessToken == null) {
+            return;
+        }
+        try {
+            String jti = jwtTokenProvider.getJtiFromToken(accessToken);
+            long ttl = jwtTokenProvider.getRemainingTtl(accessToken);
+            if (ttl > 0) {
+                tokenDenylistService.addToDenylist(jti, ttl);
+                log.debug("Access token added to denylist: {}", jti);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to add access token to denylist: {}", e.getMessage());
+        }
     }
 
     @Transactional

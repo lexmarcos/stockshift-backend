@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.auth.LoginRequest;
 import br.com.stockshift.dto.auth.SwitchWarehouseRequest;
 import br.com.stockshift.model.entity.Permission;
+import br.com.stockshift.model.entity.RefreshToken;
 import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
@@ -36,6 +39,7 @@ import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.JwtTokenProvider;
 import br.com.stockshift.util.TestDataFactory;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +47,13 @@ import java.util.UUID;
 class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
 
         private ObjectMapper objectMapper = new ObjectMapper();
+
+        // The test runs in a single transaction, so all MockMvc calls share one
+        // persistence context; bulk rotation UPDATEs leave managed entities stale.
+        // Clearing between simulated requests makes reads hit the DB as they do in
+        // production, where each request is its own transaction.
+        @PersistenceContext
+        private EntityManager entityManager;
 
         @Autowired
         private TenantRepository tenantRepository;
@@ -160,6 +171,175 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(cookie().exists("refreshToken"));
         }
 
+        // Regression for the concurrent-refresh logout: on mobile, several requests
+        // fire after the access token expires and each carries the same refresh cookie.
+        // The second one still holds the pre-rotation token; it must stay valid within
+        // the grace window instead of returning 401 and forcing a re-login.
+        @Test
+        void shouldKeepSessionAliveWhenSameRefreshTokenIsUsedConcurrently() throws Exception {
+                LoginRequest loginRequest = new LoginRequest();
+                loginRequest.setEmail("auth@test.com");
+                loginRequest.setPassword("password123");
+
+                MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andReturn();
+
+                Cookie originalRefreshCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(originalRefreshCookie);
+
+                // First refresh rotates the original token.
+                MvcResult firstRefresh = mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                Cookie rotatedRefreshCookie = firstRefresh.getResponse().getCookie("refreshToken");
+                assertNotNull(rotatedRefreshCookie);
+                assertNotEquals(originalRefreshCookie.getValue(), rotatedRefreshCookie.getValue());
+
+                // Second (concurrent) refresh still presents the ORIGINAL cookie.
+                // Before the grace-period fix this returned 401 and logged the user out.
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(cookie().exists("accessToken"))
+                                .andExpect(cookie().exists("refreshToken"));
+
+                // The token issued by the first refresh must remain usable too.
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(rotatedRefreshCookie))
+                                .andExpect(status().isOk());
+        }
+
+        // Regression for the codex review: logout must revoke the WHOLE session, not
+        // just the presented refresh token. Otherwise a concurrent-refresh sibling
+        // stays valid and could silently restore the session after logout.
+        @Test
+        void shouldRevokeEveryRefreshTokenOfTheSessionOnLogout() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie accessTokenCookie = loginResult.getResponse().getCookie("accessToken");
+                Cookie refreshTokenCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(accessTokenCookie);
+                assertNotNull(refreshTokenCookie);
+
+                // A still-valid sibling left over from a concurrent refresh.
+                RefreshToken sibling = persistSiblingToken(LocalDateTime.now());
+                assertTrue(refreshTokenRepository.findByToken(sibling.getToken()).isPresent());
+
+                mockMvc.perform(post("/api/auth/logout")
+                                .cookie(accessTokenCookie)
+                                .cookie(refreshTokenCookie))
+                                .andExpect(status().isOk());
+
+                assertTrue(refreshTokenRepository.findByToken(sibling.getToken()).isEmpty());
+                assertTrue(refreshTokenRepository.findByToken(refreshTokenCookie.getValue()).isEmpty());
+        }
+
+        // Abandoned siblings (unrotated, older than the grace window) must be purged
+        // on the next refresh instead of lingering for the full refresh-token lifetime.
+        @Test
+        void shouldPurgeAbandonedSiblingsOlderThanGraceOnRefresh() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie refreshTokenCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(refreshTokenCookie);
+
+                RefreshToken stale = persistSiblingToken(LocalDateTime.now().minusMinutes(5));
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(refreshTokenCookie))
+                                .andExpect(status().isOk());
+
+                assertTrue(refreshTokenRepository.findByToken(stale.getToken()).isEmpty());
+        }
+
+        // Security regression (codex review): replaying the pre-rotation cookie within
+        // the grace window must return the already-issued successor, never mint a fresh
+        // long-lived token, so a stolen/duplicated old cookie can't bootstrap a session.
+        @Test
+        void shouldReturnTrackedSuccessorWhenRotatedCookieIsReplayedWithinGrace() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie originalRefreshCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(originalRefreshCookie);
+
+                MvcResult firstRefresh = mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                Cookie successorCookie = firstRefresh.getResponse().getCookie("refreshToken");
+                assertNotNull(successorCookie);
+                long tokensAfterFirstRefresh = refreshTokenRepository.count();
+
+                // Replay the original (now-rotated) cookie while still inside the grace window.
+                MvcResult replay = mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk())
+                                .andReturn();
+                Cookie replayCookie = replay.getResponse().getCookie("refreshToken");
+                assertNotNull(replayCookie);
+
+                // Same successor handed back, and no extra token minted.
+                assertEquals(successorCookie.getValue(), replayCookie.getValue());
+                assertEquals(tokensAfterFirstRefresh, refreshTokenRepository.count());
+        }
+
+        // Codex review: when A -> B -> C have all rotated within A's grace, a slow replay
+        // of A must resolve through the chain to the latest unrotated token C, not regress
+        // the cookie back to the already-rotated B.
+        @Test
+        void shouldResolveReplayThroughChainToLatestSuccessor() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie tokenA = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(tokenA);
+
+                Cookie tokenB = mockMvc.perform(post("/api/auth/refresh").cookie(tokenA))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getCookie("refreshToken");
+                assertNotNull(tokenB);
+                Cookie tokenC = mockMvc.perform(post("/api/auth/refresh").cookie(tokenB))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getCookie("refreshToken");
+                assertNotNull(tokenC);
+
+                // Simulate a fresh request: drop the shared persistence context so the
+                // replay reads the committed rotation chain instead of stale managed state.
+                entityManager.flush();
+                entityManager.clear();
+
+                // Slow replay of the original A, after A -> B -> C.
+                Cookie replayCookie = mockMvc.perform(post("/api/auth/refresh").cookie(tokenA))
+                                .andExpect(status().isOk())
+                                .andReturn().getResponse().getCookie("refreshToken");
+                assertNotNull(replayCookie);
+
+                assertEquals(tokenC.getValue(), replayCookie.getValue());
+        }
+
+        // Security regression (codex review): logout must revoke the AUTHENTICATED user,
+        // not whoever owns the refresh cookie. A request authenticated as one user but
+        // carrying another user's refresh-token value must not force that user out.
+        @Test
+        void shouldNotRevokeAnotherUsersTokensWhenForeignRefreshCookieIsPresented() throws Exception {
+                User victim = TestDataFactory.createUser(userRepository, passwordEncoder,
+                                testTenant.getId(), "victim@test.com");
+                RefreshToken victimToken = persistTokenFor(victim, LocalDateTime.now());
+
+                // Caller authenticates as the test user but plants the victim's refresh cookie.
+                MvcResult loginResult = performLogin();
+                Cookie callerAccessToken = loginResult.getResponse().getCookie("accessToken");
+                assertNotNull(callerAccessToken);
+                Cookie foreignRefreshToken = new Cookie("refreshToken", victimToken.getToken());
+
+                mockMvc.perform(post("/api/auth/logout")
+                                .cookie(callerAccessToken)
+                                .cookie(foreignRefreshToken))
+                                .andExpect(status().isOk());
+
+                // The victim's token is untouched; only the caller's own session is revoked.
+                assertTrue(refreshTokenRepository.findByToken(victimToken.getToken()).isPresent());
+        }
+
         @Test
         void shouldLogoutSuccessfully() throws Exception {
                 // First, login to get cookies
@@ -263,5 +443,32 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(forbiddenRequest)))
                                 .andExpect(status().isForbidden());
+        }
+
+        private MvcResult performLogin() throws Exception {
+                LoginRequest loginRequest = new LoginRequest();
+                loginRequest.setEmail("auth@test.com");
+                loginRequest.setPassword("password123");
+                return mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(loginRequest)))
+                                .andReturn();
+        }
+
+        // Persists an extra valid refresh token for the test user, simulating a token
+        // left behind by a concurrent refresh. saveAndFlush so it hits the DB before
+        // the endpoint under test runs its bulk cleanup/revocation queries.
+        private RefreshToken persistSiblingToken(LocalDateTime createdAt) {
+                return persistTokenFor(testUser, createdAt);
+        }
+
+        private RefreshToken persistTokenFor(User owner, LocalDateTime createdAt) {
+                RefreshToken token = new RefreshToken();
+                token.setToken(UUID.randomUUID().toString());
+                token.setUser(owner);
+                token.setWarehouseId(primaryWarehouse.getId());
+                token.setExpiresAt(LocalDateTime.now().plusDays(7));
+                token.setCreatedAt(createdAt);
+                return refreshTokenRepository.saveAndFlush(token);
         }
 }

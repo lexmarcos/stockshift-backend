@@ -97,7 +97,8 @@ class AuthServiceTest {
         when(jwtTokenProvider.generateAccessToken(any(), any(), any(), any(), anyList(), anyList()))
                 .thenReturn("access");
         when(refreshTokenService.createRefreshToken(any(User.class), any())).thenReturn(refreshToken("refresh", warehouseId));
-        when(refreshTokenService.createRefreshToken(any(User.class))).thenReturn(refreshToken("refresh", null));
+        when(refreshTokenService.rotateRefreshToken(any(RefreshToken.class), any()))
+                .thenReturn(refreshToken("refresh", warehouseId));
     }
 
     @AfterEach
@@ -167,14 +168,16 @@ class AuthServiceTest {
     }
 
     @Test
-    void logoutShouldRevokeRefreshTokenDenylistAccessTokenAndAudit() {
+    void logoutShouldRevokeAuthenticatedUserTokensDenylistAccessTokenAndAudit() {
+        setPrincipal();
         when(jwtTokenProvider.getJtiFromToken("access")).thenReturn("jti");
         when(jwtTokenProvider.getRemainingTtl("access")).thenReturn(1000L);
 
-        service.logout("access", "refresh");
-        service.logout("broken", null);
+        service.logout("access");
 
-        verify(refreshTokenService).revokeRefreshToken("refresh");
+        // Revokes the AUTHENTICATED user's whole session (security context), never a
+        // user inferred from the request-supplied refresh cookie.
+        verify(refreshTokenService).revokeAllUserTokens(userId);
         verify(tokenDenylistService).addToDenylist("jti", 1000L);
         verify(auditService, atLeastOnce()).record(any());
     }
