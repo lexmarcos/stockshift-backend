@@ -1,5 +1,6 @@
 package br.com.stockshift.config;
 
+import br.com.stockshift.security.BotAuthenticationFilter;
 import br.com.stockshift.security.JwtAuthenticationFilter;
 import br.com.stockshift.security.audit.AuditContextFilter;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final BotAuthenticationFilter botAuthenticationFilter;
   private final AuditContextFilter auditContextFilter;
   private final CorsConfigurationSource corsConfigurationSource;
 
@@ -59,10 +61,13 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/register").permitAll()
             // InfinitePay sends approved payment notifications to this tokenized public endpoint.
             .requestMatchers(HttpMethod.POST, "/api/sales/infinitepay/webhook/*").permitAll()
+            // Internal bot endpoints require bot authority set by the bot authentication filter.
+            .requestMatchers("/api/internal/bot/**").hasAuthority(BotAuthenticationFilter.BOT_AUTHORITY)
             // All other requests require authentication
             .anyRequest().authenticated())
         .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-        .addFilterAfter(auditContextFilter, JwtAuthenticationFilter.class);
+        .addFilterAfter(botAuthenticationFilter, JwtAuthenticationFilter.class)
+        .addFilterAfter(auditContextFilter, BotAuthenticationFilter.class);
 
     return http.build();
   }

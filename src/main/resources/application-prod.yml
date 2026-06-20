@@ -52,3 +52,8 @@ hcaptcha:
 openai:
   api-key: ${OPENAI_API_KEY}
   model: ${OPENAI_MODEL:gpt-4.1-nano}
+
+stockshift:
+  bot:
+    api-key: ${STOCKSHIFT_BOT_API_KEY}
+    tenant-id: ${STOCKSHIFT_BOT_TENANT_ID}
