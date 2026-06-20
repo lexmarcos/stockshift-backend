@@ -50,3 +50,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+stockshift:
+  bot:
+    api-key: test-bot-key
+    tenant-id: aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa

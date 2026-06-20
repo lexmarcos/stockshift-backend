@@ -80,3 +80,8 @@ storage:
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
   api-base-url: ${API_BASE_URL:http://localhost:8080/stockshift}
+
+stockshift:
+  bot:
+    api-key: ${STOCKSHIFT_BOT_API_KEY:}
+    tenant-id: ${STOCKSHIFT_BOT_TENANT_ID:}
