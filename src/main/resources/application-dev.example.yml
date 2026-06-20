@@ -51,3 +51,8 @@ openai:
 app:
   frontend-url: ${FRONTEND_URL:https://test.beatwave.fun}
   api-base-url: ${API_BASE_URL:https://test.beatwave.fun/stockshift}
+
+stockshift:
+  bot:
+    api-key: ${STOCKSHIFT_BOT_API_KEY:dev-bot-key-change-me}
+    tenant-id: ${STOCKSHIFT_BOT_TENANT_ID:00000000-0000-0000-0000-000000000000}
