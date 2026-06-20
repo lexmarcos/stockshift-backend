@@ -26,4 +26,17 @@ public interface WarehouseRepository extends JpaRepository<Warehouse, UUID> {
 
     @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.code = :code")
     Optional<Warehouse> findByTenantIdAndCode(UUID tenantId, String code);
+
+    @Query("SELECT w FROM Warehouse w WHERE w.tenantId = :tenantId AND w.isActive = true ORDER BY w.name ASC")
+    List<Warehouse> findActiveByTenantId(UUID tenantId);
+
+    @Query("""
+            SELECT w FROM Warehouse w
+            WHERE w.tenantId = :tenantId
+              AND w.isActive = true
+              AND (LOWER(w.name) LIKE LOWER(CONCAT('%', :query, '%'))
+                   OR LOWER(w.code) LIKE LOWER(CONCAT('%', :query, '%')))
+            ORDER BY w.name ASC
+            """)
+    List<Warehouse> searchActiveByTenantId(UUID tenantId, String query);
 }
