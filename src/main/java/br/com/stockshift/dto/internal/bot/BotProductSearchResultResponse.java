@@ -16,6 +16,7 @@ import java.util.UUID;
 public class BotProductSearchResultResponse {
     private UUID productId;
     private String name;
+    private String categoryName;
     private String imageUrl;
     private String barcode;
     private String sku;

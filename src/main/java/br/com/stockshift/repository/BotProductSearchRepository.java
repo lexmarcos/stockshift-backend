@@ -16,6 +16,7 @@ public interface BotProductSearchRepository extends JpaRepository<Batch, UUID> {
     @Query(value = """
             SELECT p.id AS "productId",
                    p.name AS "name",
+                   c.name AS "categoryName",
                    p.image_url AS "imageUrl",
                    p.barcode AS "barcode",
                    p.sku AS "sku",
@@ -26,6 +27,7 @@ public interface BotProductSearchRepository extends JpaRepository<Batch, UUID> {
                    latest.batch_code AS "latestBatchCode",
                    latest.created_at AS "latestBatchCreatedAt"
             FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id AND c.tenant_id = :tenantId
             JOIN batches b ON b.product_id = p.id
                           AND b.warehouse_id = :warehouseId
                           AND b.tenant_id = :tenantId
@@ -48,7 +50,7 @@ public interface BotProductSearchRepository extends JpaRepository<Batch, UUID> {
               AND (LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:query AS text), '%'))
                    OR LOWER(p.sku) LIKE LOWER(CONCAT('%', CAST(:query AS text), '%'))
                    OR LOWER(p.barcode) LIKE LOWER(CONCAT('%', CAST(:query AS text), '%')))
-            GROUP BY p.id, p.name, p.image_url, p.barcode, p.sku,
+            GROUP BY p.id, p.name, c.name, p.image_url, p.barcode, p.sku,
                      w.id, w.name,
                      latest.selling_price, latest.batch_code, latest.created_at
             ORDER BY p.name ASC, p.id ASC
@@ -58,5 +60,99 @@ public interface BotProductSearchRepository extends JpaRepository<Batch, UUID> {
             @Param("tenantId") UUID tenantId,
             @Param("warehouseId") UUID warehouseId,
             @Param("query") String query,
+            @Param("limitPlusOne") int limitPlusOne);
+
+    @Query(value = """
+            SELECT p.id AS "productId",
+                   p.name AS "name",
+                   c.name AS "categoryName",
+                   p.image_url AS "imageUrl",
+                   p.barcode AS "barcode",
+                   p.sku AS "sku",
+                   w.id AS "warehouseId",
+                   w.name AS "warehouseName",
+                   COALESCE(SUM(b.quantity), 0) AS "totalQuantity",
+                   latest.selling_price AS "latestBatchSellingPrice",
+                   latest.batch_code AS "latestBatchCode",
+                   latest.created_at AS "latestBatchCreatedAt"
+            FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id AND c.tenant_id = :tenantId
+            JOIN batches b ON b.product_id = p.id
+                          AND b.warehouse_id = :warehouseId
+                          AND b.tenant_id = :tenantId
+                          AND b.deleted_at IS NULL
+            JOIN warehouses w ON w.id = b.warehouse_id
+                             AND w.tenant_id = :tenantId
+                             AND w.is_active = true
+            LEFT JOIN LATERAL (
+                SELECT lb.selling_price, lb.batch_code, lb.created_at
+                FROM batches lb
+                WHERE lb.product_id = p.id
+                  AND lb.warehouse_id = :warehouseId
+                  AND lb.tenant_id = :tenantId
+                  AND lb.deleted_at IS NULL
+                ORDER BY lb.created_at DESC, lb.id DESC
+                LIMIT 1
+            ) latest ON true
+            WHERE p.tenant_id = :tenantId
+              AND p.deleted_at IS NULL
+              AND word_similarity(LOWER(CAST(:query AS text)), LOWER(p.name)) > 0.3
+            GROUP BY p.id, p.name, c.name, p.image_url, p.barcode, p.sku,
+                     w.id, w.name,
+                     latest.selling_price, latest.batch_code, latest.created_at
+            ORDER BY word_similarity(LOWER(CAST(:query AS text)), LOWER(p.name)) DESC, p.name ASC
+            LIMIT :limitPlusOne
+            """, nativeQuery = true)
+    List<BotProductSearchProjection> searchProductsFuzzyForBot(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("query") String query,
+            @Param("limitPlusOne") int limitPlusOne);
+
+    @Query(value = """
+            SELECT p.id AS "productId",
+                   p.name AS "name",
+                   c.name AS "categoryName",
+                   p.image_url AS "imageUrl",
+                   p.barcode AS "barcode",
+                   p.sku AS "sku",
+                   w.id AS "warehouseId",
+                   w.name AS "warehouseName",
+                   COALESCE(SUM(b.quantity), 0) AS "totalQuantity",
+                   latest.selling_price AS "latestBatchSellingPrice",
+                   latest.batch_code AS "latestBatchCode",
+                   latest.created_at AS "latestBatchCreatedAt"
+            FROM products p
+            LEFT JOIN categories c ON c.id = p.category_id AND c.tenant_id = :tenantId
+            JOIN batches b ON b.product_id = p.id
+                          AND b.warehouse_id = :warehouseId
+                          AND b.tenant_id = :tenantId
+                          AND b.deleted_at IS NULL
+            JOIN warehouses w ON w.id = b.warehouse_id
+                             AND w.tenant_id = :tenantId
+                             AND w.is_active = true
+            LEFT JOIN LATERAL (
+                SELECT lb.selling_price, lb.batch_code, lb.created_at
+                FROM batches lb
+                WHERE lb.product_id = p.id
+                  AND lb.warehouse_id = :warehouseId
+                  AND lb.tenant_id = :tenantId
+                  AND lb.deleted_at IS NULL
+                ORDER BY lb.created_at DESC, lb.id DESC
+                LIMIT 1
+            ) latest ON true
+            WHERE p.tenant_id = :tenantId
+              AND p.deleted_at IS NULL
+              AND word_similarity(LOWER(CAST(:token AS text)), LOWER(p.name)) > 0.3
+            GROUP BY p.id, p.name, c.name, p.image_url, p.barcode, p.sku,
+                     w.id, w.name,
+                     latest.selling_price, latest.batch_code, latest.created_at
+            ORDER BY word_similarity(LOWER(CAST(:token AS text)), LOWER(p.name)) DESC, p.name ASC
+            LIMIT :limitPlusOne
+            """, nativeQuery = true)
+    List<BotProductSearchProjection> searchProductsFuzzyTokenForBot(
+            @Param("tenantId") UUID tenantId,
+            @Param("warehouseId") UUID warehouseId,
+            @Param("token") String token,
             @Param("limitPlusOne") int limitPlusOne);
 }

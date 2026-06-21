@@ -63,6 +63,38 @@ class BotProductControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldReturnCategoryNameInSearchResults() throws Exception {
+        Product product = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category, "Perfume Gold", "SKU-GOLD");
+        productRepository.save(product);
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, product, warehouse, "GOLD", 5);
+
+        mockMvc.perform(get("/api/internal/bot/products/search")
+                        .param("query", "gold")
+                        .param("warehouseId", warehouse.getId().toString())
+                        .header("X-StockShift-Bot-Key", BOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results[0].categoryName").value("Perfumes"));
+    }
+
+    @Test
+    void shouldReturnDifferentProductsWhenSameNameDifferentCategories() throws Exception {
+        Category hidratantes = TestDataFactory.createCategory(categoryRepository, BOT_TENANT_ID, "Hidratantes");
+        Product hidratanteLily = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, hidratantes, "Lily", "SKU-HID-LILY");
+        Product perfumeLily = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category, "Lily", "SKU-PERF-LILY");
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, hidratanteLily, warehouse, "HID-LILY", 3);
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, perfumeLily, warehouse, "PERF-LILY", 5);
+
+        mockMvc.perform(get("/api/internal/bot/products/search")
+                        .param("query", "lily")
+                        .param("warehouseId", warehouse.getId().toString())
+                        .header("X-StockShift-Bot-Key", BOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results.length()").value(2))
+                .andExpect(jsonPath("$.data.results[0].categoryName").isNotEmpty())
+                .andExpect(jsonPath("$.data.results[1].categoryName").isNotEmpty());
+    }
+
+    @Test
     void shouldSearchProductByNameAndReturnStockAndLatestBatchPrice() throws Exception {
         Product product = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category, "Perfume Gold", "SKU-GOLD");
         product.setImageUrl("https://cdn.example.com/products/gold.png");
@@ -106,6 +138,55 @@ class BotProductControllerIntegrationTest extends BaseIntegrationTest {
                         .header("X-StockShift-Bot-Key", BOT_KEY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.results[0].sku").value("SKU-BODY"));
+    }
+
+    @Test
+    void shouldFallbackToWordSearchForTranscribedProductNames() throws Exception {
+        Product product = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category,
+                "214 Golden Gardênia", "SKU-GARDENIA");
+        productRepository.save(product);
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, product, warehouse, "GARDENIA", 4);
+
+        mockMvc.perform(get("/api/internal/bot/products/search")
+                        .param("query", "214 Golden Garden")
+                        .param("warehouseId", warehouse.getId().toString())
+                        .header("X-StockShift-Bot-Key", BOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results.length()").value(1))
+                .andExpect(jsonPath("$.data.results[0].name").value("214 Golden Gardênia"));
+    }
+
+    @Test
+    void shouldFindProductByFuzzyMatchWhenExactSubstringFails() throws Exception {
+        Product product = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category, "Lily", "SKU-LILY");
+        productRepository.save(product);
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, product, warehouse, "LILY", 5);
+
+        mockMvc.perform(get("/api/internal/bot/products/search")
+                        .param("query", "Lili")
+                        .param("warehouseId", warehouse.getId().toString())
+                        .header("X-StockShift-Bot-Key", BOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results.length()").value(1))
+                .andExpect(jsonPath("$.data.results[0].name").value("Lily"));
+    }
+
+    @Test
+    void shouldReturnAllAmbiguousProductsWhenQueryIsTranscribedWithTypo() throws Exception {
+        Category hidratantes = TestDataFactory.createCategory(categoryRepository, BOT_TENANT_ID, "Hidratantes");
+        Product perfumeBlanche = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category, "Lily Blanche", "SKU-LILY-BLANCHE");
+        Product perfumeParfum = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, category, "Lily Eau de Parfum", "SKU-LILY-PARFUM");
+        Product hidratanteRefil = TestDataFactory.createProduct(productRepository, BOT_TENANT_ID, hidratantes, "Refil Lily Hidratante", "SKU-LILY-REFIL");
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, perfumeBlanche, warehouse, "LILY-BLANCHE", 5);
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, perfumeParfum, warehouse, "LILY-PARFUM", 3);
+        TestDataFactory.createBatch(batchRepository, BOT_TENANT_ID, hidratanteRefil, warehouse, "LILY-REFIL", 7);
+
+        mockMvc.perform(get("/api/internal/bot/products/search")
+                        .param("query", "Lili")
+                        .param("warehouseId", warehouse.getId().toString())
+                        .header("X-StockShift-Bot-Key", BOT_KEY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.results.length()").value(3));
     }
 
     @Test

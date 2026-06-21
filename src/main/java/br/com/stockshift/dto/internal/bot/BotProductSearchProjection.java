@@ -7,6 +7,7 @@ import java.util.UUID;
 public interface BotProductSearchProjection {
     UUID getProductId();
     String getName();
+    String getCategoryName();
     String getImageUrl();
     String getBarcode();
     String getSku();
