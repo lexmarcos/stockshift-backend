@@ -162,6 +162,8 @@ Important environment variables:
 | `OPENAI_API_KEY` | OpenAI API key for image classification | empty |
 | `OPENAI_API_URL` | OpenAI API base URL | `https://api.openai.com` |
 | `OPENAI_MODEL` | OpenAI model used by the classifier | `gpt-4.1-nano` |
+| `STOCKSHIFT_BOT_API_KEY` | Shared secret accepted by internal Telegram bot endpoints | empty |
+| `STOCKSHIFT_BOT_TENANT_ID` | Tenant UUID used for internal Telegram bot queries | empty |
 
 Production uses `SPRING_PROFILES_ACTIVE=prod`, requires real secrets, enables secure JWT cookies, disables Swagger/OpenAPI, and expects all required database, storage, hCaptcha, and OpenAI variables to be provided by the runtime environment.
 
