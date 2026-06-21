@@ -18,8 +18,11 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class OpenAiService {
@@ -52,9 +55,8 @@ public class OpenAiService {
                 .map(Brand::getName)
                 .toList();
 
-        List<String> categories = categoryRepository.findByTenantIdAndDeletedAtIsNull(tenantId).stream()
-                .map(Category::getName)
-                .toList();
+        List<String> categories = leafCategoryNames(
+                categoryRepository.findByTenantIdAndDeletedAtIsNull(tenantId));
 
         String prompt = buildPrompt(brands, categories);
         Map<String, Object> requestBody = buildRequestBody(base64Image, prompt);
@@ -70,18 +72,59 @@ public class OpenAiService {
         return parseResponse(responseBody, tenantId);
     }
 
+    // Only offer leaf categories to the AI: a category that has children is an abstract
+    // bucket (e.g. "Perfumaria"), so we send its children ("Perfume Masculino", ...) instead
+    // to push the model toward the most specific match.
+    private List<String> leafCategoryNames(List<Category> categories) {
+        Set<UUID> parentIds = categories.stream()
+                .map(Category::getParentCategory)
+                .filter(Objects::nonNull)
+                .map(Category::getId)
+                .collect(Collectors.toSet());
+
+        return categories.stream()
+                .filter(category -> !parentIds.contains(category.getId()))
+                .map(Category::getName)
+                .toList();
+    }
+
     private String buildPrompt(List<String> brands, List<String> categories) {
         return String.format("""
-                Analyze this product image. Identify the product name, brand, category, and volume (if applicable).
+                You are a product cataloging assistant for a Brazilian retail store.
+                Analyze the product image (usually the FRONT of the box/bottle) and extract structured data.
+
+                On the front, most products show:
+                - MARCA (manufacturer/brand): e.g. "O Boticário", "Natura", "Mahogany".
+                - SUBMARCA (product line / sub-brand): e.g. "Arbo", "Cecita", "Cuide-se Bem", "Malbec".
+                - FRAGRÂNCIA / ATRIBUTO (fragrance or variant): e.g. "Atlântica", "Amoruda". May be ABSENT.
+                - PESO / VOLUME: e.g. "100 ml", "200 ml", "150 g".
+
+                HOW TO BUILD THE PRODUCT NAME:
+                - If a fragrance/variant exists:   name = SUBMARCA + " " + FRAGRÂNCIA
+                - If there is NO fragrance/variant: name = SUBMARCA
+                - NEVER include the MARCA (manufacturer) in the name.
+                - If you cannot find a SUBMARCA, fall back to the most prominent product line visible
+                  (plus the fragrance/variant when present).
+
+                Examples:
+                - Marca "O Boticário", Submarca "Arbo", Fragrância "Atlântica"       -> name "Arbo Atlântica"
+                - Marca "O Boticário", Submarca "Cecita", no fragrance               -> name "Cecita"
+                - Marca "O Boticário", Submarca "Cuide-se Bem", Fragrância "Amoruda" -> name "Cuide-se Bem Amoruda"
+
+                CATEGORY:
+                Pick the SINGLE best-matching category from "Known Categories" based on what you see
+                (product type, gender cues, packaging). Examples: a men's perfume box -> "Perfume Masculino";
+                a women's body splash -> "Body Splash Feminino". Match a known category EXACTLY when one fits;
+                otherwise return your best free-text guess.
 
                 Known Brands: %s
                 Known Categories: %s
 
-                Return ONLY a JSON object with this structure (no markdown formatting):
+                Return ONLY a JSON object (no markdown), exactly this structure:
                 {
-                  "name": "Product Name",
-                  "brand": "Brand Name" (try to match known brands exactly if possible),
-                  "category": "Category Name" (try to match known categories exactly if possible),
+                  "name": "<composed product name (submarca + fragrância)>",
+                  "brand": "<MARCA / manufacturer; match a known brand exactly when possible>",
+                  "category": "<category; match a known category exactly when possible>",
                   "volume": {
                     "value": number,
                     "unit": "ml/g/kg/l"

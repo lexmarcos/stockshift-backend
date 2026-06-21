@@ -8,6 +8,7 @@ import br.com.stockshift.repository.CategoryRepository;
 
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -120,5 +121,63 @@ class OpenAiServiceTest {
     assertThat(response.getBrandId()).isNotNull();
     assertThat(response.getCategoryName()).isEqualTo("Perfumes");
     assertThat(response.getCategoryId()).isNotNull();
+  }
+
+  @Test
+  void shouldSendPromptWithNamingAndCategoryGuidance() throws IOException, InterruptedException {
+    // Arrange
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    br.com.stockshift.security.TenantContext.setTenantId(UUID.randomUUID());
+
+    when(brandRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of());
+    when(categoryRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of());
+
+    mockWebServer.enqueue(new MockResponse()
+        .setBody("{\"choices\":[{\"message\":{\"content\":\"{\\\"name\\\":\\\"Arbo Atlântica\\\"}\"}}]}")
+        .addHeader("Content-Type", "application/json"));
+
+    // Act
+    openAiService.analyzeImage(image);
+
+    // Assert: the prompt carries the new sub-brand naming rule, the few-shot composition
+    // example, and the category guidance section.
+    RecordedRequest sent = mockWebServer.takeRequest();
+    String body = sent.getBody().readUtf8();
+    assertThat(body).contains("SUBMARCA");
+    assertThat(body).contains("Arbo Atlântica");
+    assertThat(body).contains("Known Categories");
+  }
+
+  @Test
+  void shouldSendOnlyLeafCategoriesToAi() throws IOException, InterruptedException {
+    // Arrange: a parent category ("Perfumaria") with one child leaf ("Perfume Masculino").
+    MockMultipartFile image = new MockMultipartFile("image", "test.jpg", "image/jpeg", "content".getBytes());
+    br.com.stockshift.security.TenantContext.setTenantId(UUID.randomUUID());
+
+    Category perfumaria = new Category();
+    perfumaria.setId(UUID.randomUUID());
+    perfumaria.setName("Perfumaria");
+
+    Category perfumeMasculino = new Category();
+    perfumeMasculino.setId(UUID.randomUUID());
+    perfumeMasculino.setName("Perfume Masculino");
+    perfumeMasculino.setParentCategory(perfumaria);
+
+    when(brandRepository.findByTenantIdAndDeletedAtIsNull(any())).thenReturn(List.of());
+    when(categoryRepository.findByTenantIdAndDeletedAtIsNull(any()))
+        .thenReturn(List.of(perfumaria, perfumeMasculino));
+
+    mockWebServer.enqueue(new MockResponse()
+        .setBody("{\"choices\":[{\"message\":{\"content\":\"{\\\"name\\\":\\\"X\\\"}\"}}]}")
+        .addHeader("Content-Type", "application/json"));
+
+    // Act
+    openAiService.analyzeImage(image);
+
+    // Assert: the leaf child is offered, the parent bucket is not.
+    RecordedRequest sent = mockWebServer.takeRequest();
+    String body = sent.getBody().readUtf8();
+    assertThat(body).contains("Perfume Masculino");
+    assertThat(body).doesNotContain("Perfumaria");
   }
 }
