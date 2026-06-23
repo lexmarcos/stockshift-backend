@@ -2,6 +2,8 @@ package br.com.stockshift.controller;
 
 import br.com.stockshift.dto.ApiResponse;
 import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
+import br.com.stockshift.dto.warehouse.BatchSellingPriceUpdateRequest;
+import br.com.stockshift.dto.warehouse.BatchSellingPriceUpdateResponse;
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
 import br.com.stockshift.dto.warehouse.ProductBatchRequest;
@@ -143,5 +145,18 @@ public class BatchController {
             warehouseId, productId);
 
         return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/warehouses/{warehouseId}/products/{productId}/batches/selling-price")
+    @PreAuthorize("@permissionGuard.has('batches:update') and @warehouseGuard.isCurrent(#warehouseId)")
+    @Operation(summary = "Update selling price for all batches of a product in a warehouse")
+    public ResponseEntity<ApiResponse<BatchSellingPriceUpdateResponse>> updateSellingPrice(
+        @PathVariable UUID warehouseId,
+        @PathVariable UUID productId,
+        @Valid @RequestBody BatchSellingPriceUpdateRequest request
+    ) {
+        BatchSellingPriceUpdateResponse response = batchService
+            .updateSellingPriceByProductAndWarehouse(warehouseId, productId, request.getSellingPrice());
+        return ResponseEntity.ok(ApiResponse.success(response.message(), response));
     }
 }
