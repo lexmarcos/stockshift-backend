@@ -131,6 +131,18 @@ public interface BatchRepository extends JpaRepository<Batch, UUID> {
       @Param("productId") UUID productId,
       @Param("tenantId") UUID tenantId);
 
+  @Modifying
+  @Query("UPDATE Batch b SET b.sellingPrice = :sellingPrice " +
+      "WHERE b.product.id = :productId " +
+      "AND b.warehouse.id = :warehouseId " +
+      "AND b.tenantId = :tenantId " +
+      "AND b.deletedAt IS NULL")
+  int updateSellingPriceByProductAndWarehouse(
+      @Param("productId") UUID productId,
+      @Param("warehouseId") UUID warehouseId,
+      @Param("tenantId") UUID tenantId,
+      @Param("sellingPrice") Long sellingPrice);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT b FROM Batch b WHERE b.product.id = :productId AND b.warehouse.id = :warehouseId " +
       "AND b.tenantId = :tenantId AND b.quantity > 0 ORDER BY b.createdAt ASC")

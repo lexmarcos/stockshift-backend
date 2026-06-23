@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import br.com.stockshift.dto.warehouse.BatchDeletionResponse;
+import br.com.stockshift.dto.warehouse.BatchSellingPriceUpdateResponse;
 import br.com.stockshift.dto.warehouse.BatchRequest;
 import br.com.stockshift.dto.warehouse.BatchResponse;
 import br.com.stockshift.dto.warehouse.ProductBatchRequest;
@@ -427,6 +428,51 @@ public class BatchService {
                 .product(productResponse)
                 .batch(mapToResponse(savedBatch))
                 .build();
+    }
+
+    @Transactional
+    public BatchSellingPriceUpdateResponse updateSellingPriceByProductAndWarehouse(
+        UUID warehouseId,
+        UUID productId,
+        Long sellingPrice
+    ) {
+        UUID tenantId = TenantContext.getTenantId();
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
+
+        // Validate warehouse exists and belongs to tenant
+        warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Warehouse", "id", warehouseId));
+
+        // Validate product exists and belongs to tenant
+        productRepository.findByTenantIdAndId(tenantId, productId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Product", "id", productId));
+
+        int affectedCount = batchRepository.updateSellingPriceByProductAndWarehouse(
+            productId, warehouseId, tenantId, sellingPrice);
+
+        auditService.record(AuditEventCreateRequest.builder()
+            .operation(AuditService.OPERATION_TECHNICAL)
+            .action("BATCHES_SELLING_PRICE_UPDATED")
+            .outcome(AuditService.OUTCOME_SUCCESS)
+            .resourceType("BATCH")
+            .resourceId(productId + ":" + warehouseId)
+            .metadata(Map.of(
+                "affectedCount", affectedCount,
+                "newSellingPrice", sellingPrice,
+                "productId", productId.toString(),
+                "warehouseId", warehouseId.toString()))
+            .build());
+
+        log.info("Updated selling price to {} for {} batches of product {} in warehouse {} for tenant {}",
+            sellingPrice, affectedCount, productId, warehouseId, tenantId);
+
+        return new BatchSellingPriceUpdateResponse(
+            "Selling price updated for " + affectedCount + " batches",
+            affectedCount,
+            productId,
+            warehouseId);
     }
 
     private BatchResponse mapToResponse(Batch batch) {
