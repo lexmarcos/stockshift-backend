@@ -38,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -220,6 +221,28 @@ class ProductServiceTest {
     }
 
     @Test
+    void updateWithoutImageShouldPreserveExistingThumbnails() {
+        Product product = product("Produto com imagem");
+        product.setImageUrl("https://cdn.example.com/old.png");
+        ProductRequest request = fullRequest(null, null);
+        request.setName("Nome atualizado");
+        request.setSku("SKU-NEW");
+        request.setBarcode("888");
+        when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
+                .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId()))
+                .thenReturn(thumbEntities());
+
+        var response = productService.update(product.getId(), request, null);
+
+        assertThat(response.getThumbnails()).isNotEmpty();
+        assertThat(response.getThumbnails()).containsKeys("sm", "md", "lg");
+        // Verify old image was NOT deleted
+        verify(storageService, never()).deleteImage(any());
+        verify(storageService, never()).deleteProductImages(any(), any());
+    }
+
+    @Test
     void updateShouldRejectMissingCategoryAndDeletedBrand() {
         Product product = product("Produto");
         UUID categoryId = UUID.randomUUID();
@@ -247,7 +270,7 @@ class ProductServiceTest {
         Product product = product("Produto");
         product.setCategory(category("Categoria"));
         product.setBrand(brand("Marca", null));
-        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
+        when(thumbnailRepository.findByProductIdIn(any())).thenReturn(List.of());
         when(productRepository.findAllByTenantId(tenantId)).thenReturn(List.of(product));
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));

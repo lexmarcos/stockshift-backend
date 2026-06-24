@@ -155,7 +155,8 @@ public class ProductService {
                 .storageKey(stored.key())
                 .publicUrl(stored.publicUrl())
                 .widthPx(width)
-                .sizeBytes(0L)
+                .heightPx(stored.heightPx() > 0 ? stored.heightPx() : null)
+                .sizeBytes(stored.sizeBytes())
                 .contentType("image/jpeg")
                 .createdAt(java.time.LocalDateTime.now())
                 .build();
@@ -250,8 +251,10 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> findAll() {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.findAllByTenantId(tenantId).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.findAllByTenantId(tenantId);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
@@ -266,24 +269,30 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> findByCategory(UUID categoryId) {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.findByTenantIdAndCategoryId(tenantId, categoryId).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.findByTenantIdAndCategoryId(tenantId, categoryId);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> findActive(Boolean active) {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.findByTenantIdAndActive(tenantId, active).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.findByTenantIdAndActive(tenantId, active);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> search(String searchTerm) {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.searchByTenantId(tenantId, searchTerm).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.searchByTenantId(tenantId, searchTerm);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
@@ -419,6 +428,10 @@ public class ProductService {
     }
 
     private ProductResponse mapToResponse(Product product) {
+        return mapToResponse(product, buildThumbnailMap(product.getId()));
+    }
+
+    private ProductResponse mapToResponse(Product product, Map<String, String> thumbnailMap) {
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -434,7 +447,7 @@ public class ProductService {
                 .hasExpiration(product.getHasExpiration())
                 .active(product.getActive())
                 .imageUrl(product.getImageUrl())
-                .thumbnails(buildThumbnailMap(product.getId()))
+                .thumbnails(thumbnailMap)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
@@ -450,6 +463,27 @@ public class ProductService {
             map.put(t.getSize(), t.getPublicUrl());
         }
         return map;
+    }
+
+    private Map<UUID, Map<String, String>> buildThumbnailMapForProducts(List<Product> products) {
+        if (products.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> productIds = products.stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+        List<ProductImageThumbnail> allThumbnails = thumbnailRepository.findByProductIdIn(productIds);
+
+        Map<UUID, Map<String, String>> result = new HashMap<>();
+        for (ProductImageThumbnail t : allThumbnails) {
+            result.computeIfAbsent(t.getProductId(), k -> new HashMap<>())
+                    .put(t.getSize(), t.getPublicUrl());
+        }
+        // Ensure every product has at least an empty map
+        for (Product product : products) {
+            result.putIfAbsent(product.getId(), Map.of());
+        }
+        return result;
     }
 
     private BrandResponse mapBrandToResponse(Brand brand) {
