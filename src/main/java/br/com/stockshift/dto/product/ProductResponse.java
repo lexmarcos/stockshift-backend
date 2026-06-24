@@ -30,6 +30,7 @@ public class ProductResponse {
     private Boolean hasExpiration;
     private Boolean active;
     private String imageUrl;
+    private Map<String, String> thumbnails;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

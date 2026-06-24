@@ -10,6 +10,7 @@ import br.com.stockshift.model.enums.BarcodeType;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.ProductImageThumbnailRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.audit.AuditService;
@@ -57,6 +58,8 @@ class ProductServiceTest {
     private AuditSnapshotService auditSnapshotService;
     @Mock
     private StorageService storageService;
+    @Mock
+    private ProductImageThumbnailRepository thumbnailRepository;
 
     private ProductService productService;
     private UUID tenantId;
@@ -71,7 +74,8 @@ class ProductServiceTest {
                 categoryRepository,
                 brandRepository,
                 auditService,
-                auditSnapshotService
+                auditSnapshotService,
+                thumbnailRepository
         );
         ReflectionTestUtils.setField(productService, "storageService", storageService);
         when(auditSnapshotService.snapshot(any())).thenReturn(Map.of("id", "value"));
@@ -105,7 +109,8 @@ class ProductServiceTest {
                 .thenReturn(Optional.of(category));
         when(brandRepository.findByTenantIdAndId(tenantId, brand.getId()))
                 .thenReturn(Optional.of(brand));
-        when(storageService.uploadImage(image)).thenReturn("https://cdn.example.com/product.png");
+        when(storageService.uploadProductImageWithThumbnails(image))
+                .thenReturn(thumbnails("https://cdn.example.com/product.png"));
 
         var response = productService.create(fullRequest(category.getId(), brand.getId()), image);
 
@@ -157,7 +162,8 @@ class ProductServiceTest {
     void createShouldDeleteUploadedImageWhenImagePersistenceFails() {
         ProductRequest request = fullRequest(null, null);
         MockMultipartFile image = image();
-        when(storageService.uploadImage(image)).thenReturn("https://cdn.example.com/rollback.png");
+        when(storageService.uploadProductImageWithThumbnails(image))
+                .thenReturn(thumbnails("https://cdn.example.com/rollback.png"));
         when(productRepository.save(any(Product.class)))
                 .thenAnswer(invocation -> {
                     Product product = invocation.getArgument(0);
@@ -185,7 +191,9 @@ class ProductServiceTest {
         MockMultipartFile image = image();
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
-        when(storageService.uploadImage(image)).thenReturn("https://cdn.example.com/new.png");
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
+        when(storageService.uploadProductImageWithThumbnails(image))
+                .thenReturn(thumbnails("https://cdn.example.com/new.png"));
 
         var response = productService.update(product.getId(), request, image);
 
@@ -193,7 +201,7 @@ class ProductServiceTest {
         assertThat(response.getCategoryId()).isNull();
         assertThat(response.getBrand()).isNull();
         assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/new.png");
-        verify(storageService).deleteImage("https://cdn.example.com/old.png");
+        verify(storageService).deleteProductImages("https://cdn.example.com/old.png", List.of());
         verify(auditService).record(any());
     }
 
@@ -225,6 +233,7 @@ class ProductServiceTest {
         Product product = product("Produto");
         product.setCategory(category("Categoria"));
         product.setBrand(brand("Marca", null));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
         when(productRepository.findAllByTenantId(tenantId)).thenReturn(List.of(product));
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
@@ -253,11 +262,12 @@ class ProductServiceTest {
         product.setImageUrl("https://cdn.example.com/product.png");
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
 
         productService.delete(product.getId());
 
         assertThat(product.getDeletedAt()).isNotNull();
-        verify(storageService).deleteImage("https://cdn.example.com/product.png");
+        verify(storageService).deleteProductImages("https://cdn.example.com/product.png", List.of());
         verify(batchRepository).softDeleteByProduct(product.getId(), tenantId);
         verify(productRepository).save(product);
         verify(auditService).record(any());
@@ -268,6 +278,7 @@ class ProductServiceTest {
         Product product = product("Produto");
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
         ArgumentCaptor<br.com.stockshift.service.audit.AuditEventCreateRequest> captor =
                 ArgumentCaptor.forClass(br.com.stockshift.service.audit.AuditEventCreateRequest.class);
 
@@ -334,5 +345,12 @@ class ProductServiceTest {
 
     private MockMultipartFile image() {
         return new MockMultipartFile("image", "product.png", "image/png", new byte[]{1});
+    }
+
+    private StorageService.Thumbnails thumbnails(String url) {
+        return new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("key-" + url, url),
+                null, null, null
+        );
     }
 }
