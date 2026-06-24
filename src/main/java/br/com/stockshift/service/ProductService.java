@@ -269,7 +269,11 @@ public class ProductService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                storageService.deleteProductImages(imageUrl, thumbnailKeys);
+                try {
+                    storageService.deleteProductImages(imageUrl, thumbnailKeys);
+                } catch (RuntimeException ex) {
+                    log.warn("Failed to delete old product images after commit: {}", imageUrl, ex);
+                }
             }
         });
     }
