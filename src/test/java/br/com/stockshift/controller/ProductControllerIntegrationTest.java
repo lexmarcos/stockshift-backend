@@ -35,6 +35,8 @@ import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.PermissionRepository;
 import br.com.stockshift.repository.RoleRepository;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import br.com.stockshift.dto.ai.ProductClassificationResponse;
@@ -532,6 +534,50 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                         objectMapper.writeValueAsBytes(updateRequest))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.example.com/existing.png"));
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void failedUpdateShouldNotDeleteOldImageFromStorage() throws Exception {
+        // PR #5 review: a rolled-back update must not physically delete the old
+        // image/thumbnails from storage, or the restored DB rows point at missing objects.
+        var target = createTestProduct("Old Image Product", "OLD-IMG-BARCODE", "OLD-IMG-SKU");
+        target.setImageUrl("https://cdn.example.com/old.png");
+        productRepository.save(target);
+
+        // Second product owns the SKU we collide with to force a post-image-swap failure.
+        createTestProduct("Sku Owner", "OWNER-BARCODE", "TAKEN-SKU");
+
+        StorageService.Thumbnails newThumbnails = new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("new_original", "https://cdn.test/new.png"),
+                new StorageService.StoredImageObject("new_sm", "https://cdn.test/new_sm.jpg"),
+                new StorageService.StoredImageObject("new_md", "https://cdn.test/new_md.jpg"),
+                new StorageService.StoredImageObject("new_lg", "https://cdn.test/new_lg.jpg"));
+        when(storageService.uploadProductImageWithThumbnails(any())).thenReturn(newThumbnails);
+
+        ProductRequest updateRequest = ProductRequest.builder()
+                .name("Renamed")
+                .barcode("OLD-IMG-BARCODE")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("TAKEN-SKU")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "new.png", MediaType.IMAGE_PNG_VALUE, new byte[100]);
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product", "", MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(updateRequest));
+
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/" + target.getId())
+                .file(image)
+                .file(productPart))
+                .andExpect(status().isBadRequest());
+
+        // The transaction never commits, so the deferred storage deletion must not run.
+        verify(storageService, never()).deleteProductImages(any(), any());
     }
 
     @Test

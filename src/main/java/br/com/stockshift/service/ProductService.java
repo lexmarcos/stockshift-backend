@@ -24,6 +24,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -224,6 +226,16 @@ public class ProductService {
         return saved;
     }
 
+    /**
+     * Removes a product's image + thumbnail DB rows now, but defers the irreversible
+     * storage deletion until the surrounding transaction commits.
+     *
+     * <p>Deleting storage eagerly (PR #5 review) could orphan a product: if the update
+     * transaction later rolled back (e.g. duplicate SKU validation or a thumbnail upload
+     * exception), the {@code thumbnailRepository.deleteAll} and {@code imageUrl} change
+     * were restored while the R2 objects were already gone, leaving the rows pointing at
+     * missing objects and breaking thumbnail URLs.
+     */
     private void deleteProductImages(Product product) {
         if (product.getImageUrl() == null || storageService == null) {
             return;
@@ -231,9 +243,22 @@ public class ProductService {
         List<ProductImageThumbnail> oldThumbnails = thumbnailRepository.findByProductId(product.getId());
         List<String> thumbnailKeys = oldThumbnails.stream()
                 .map(ProductImageThumbnail::getStorageKey)
-                .collect(java.util.stream.Collectors.toList());
-        storageService.deleteProductImages(product.getImageUrl(), thumbnailKeys);
+                .collect(Collectors.toList());
         thumbnailRepository.deleteAll(oldThumbnails);
+        scheduleStorageDeletion(product.getImageUrl(), thumbnailKeys);
+    }
+
+    private void scheduleStorageDeletion(String imageUrl, List<String> thumbnailKeys) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            storageService.deleteProductImages(imageUrl, thumbnailKeys);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                storageService.deleteProductImages(imageUrl, thumbnailKeys);
+            }
+        });
     }
 
     public void deleteUploadedImageQuietly(String imageUrl) {
