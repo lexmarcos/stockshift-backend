@@ -153,9 +153,14 @@ public class ProductImageProcessingService {
         // while processProducts still counted the product as processed.
         List<ProductImageThumbnail> replacements =
                 buildThumbnails(product.getId(), imageBytes, storageKey);
-        if (replacements.isEmpty()) {
+        if (replacements.size() != THUMBNAIL_SUFFIXES.length) {
+            // A per-size transient failure inside buildThumbnails would produce a
+            // partial set; retiring the old rows would turn a single-size failure into
+            // permanently missing thumbnail URLs (PR #5 review). Require all three.
             throw new IllegalStateException(
-                    "Thumbnail generation produced no images for product " + product.getId());
+                    "Thumbnail generation incomplete for product " + product.getId()
+                    + ": expected " + THUMBNAIL_SUFFIXES.length
+                    + " sizes, got " + replacements.size());
         }
         replaceThumbnailRows(existingThumbnails, replacements);
         deleteObsoleteThumbnailObjects(existingThumbnails, replacements);
