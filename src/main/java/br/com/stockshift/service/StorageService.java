@@ -20,7 +20,6 @@ import br.com.stockshift.service.imaging.ThumbnailGenerator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -117,14 +116,17 @@ public class StorageService {
                 THUMBNAIL_WIDTHS[sizeIndex], THUMBNAIL_QUALITIES[sizeIndex]);
 
             String thumbnailKey = deriveThumbnailKey(original.key(), THUMBNAIL_SUFFIXES[sizeIndex]);
-            InputStream originalStream = file.getInputStream();
-            ThumbnailGenerator.ThumbnailResult result =
-                thumbnailGenerator.generate(originalStream, file.getContentType(),
-                    file.getOriginalFilename(), spec);
-            originalStream.close();
 
-            byte[] bytes = result.inputStream().readAllBytes();
-            result.inputStream().close();
+            ThumbnailGenerator.ThumbnailResult result;
+            try (InputStream originalStream = file.getInputStream()) {
+                result = thumbnailGenerator.generate(originalStream, file.getContentType(),
+                    file.getOriginalFilename(), spec);
+            }
+
+            byte[] bytes;
+            try (InputStream thumbnailStream = result.inputStream()) {
+                bytes = thumbnailStream.readAllBytes();
+            }
 
             PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(properties.getBucketName())
