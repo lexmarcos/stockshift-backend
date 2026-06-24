@@ -34,6 +34,7 @@ import static org.mockito.ArgumentMatchers.any;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import br.com.stockshift.dto.ai.ProductClassificationResponse;
 import br.com.stockshift.service.OpenAiService;
+import br.com.stockshift.service.StorageService;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.repository.TenantRepository;
 import br.com.stockshift.repository.UserRepository;
@@ -71,6 +72,9 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     @MockitoBean
     private OpenAiService openAiService;
+
+    @MockitoBean
+    private StorageService storageService;
 
     private Tenant testTenant;
     private User testUser;
@@ -417,6 +421,59 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.name").value("Analyzed Product"))
                 .andExpect(jsonPath("$.data.detectedBrand").value("Analyzed Brand"))
                 .andExpect(jsonPath("$.data.detectedCategory").value("Analyzed Category"));
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void createProductWithImageShouldReturnThumbnailUrls() throws Exception {
+        StorageService.Thumbnails thumbnails = new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("key_original", "https://cdn.test/product.png"),
+                new StorageService.StoredImageObject("key_sm", "https://cdn.test/product_sm.jpg"),
+                new StorageService.StoredImageObject("key_md", "https://cdn.test/product_md.jpg"),
+                new StorageService.StoredImageObject("key_lg", "https://cdn.test/product_lg.jpg"));
+
+        when(storageService.uploadProductImageWithThumbnails(any())).thenReturn(thumbnails);
+
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "product.png", MediaType.IMAGE_PNG_VALUE, new byte[100]);
+
+        ProductRequest request = ProductRequest.builder()
+                .name("Product With Thumbnails")
+                .categoryId(testCategory.getId())
+                .barcode("THUMB-BARCODE-001")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("THUMB-SKU-001")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        MockMultipartFile productPart = new MockMultipartFile(
+                "product",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+
+        mockMvc.perform(multipart("/api/products")
+                .file(image)
+                .file(productPart))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Product With Thumbnails"))
+                .andExpect(jsonPath("$.data.thumbnails.sm").exists())
+                .andExpect(jsonPath("$.data.thumbnails.md").exists())
+                .andExpect(jsonPath("$.data.thumbnails.lg").exists());
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void getProductWithoutImageShouldReturnEmptyThumbnails() throws Exception {
+        Product product = createTestProduct("No Image Product", "NO-IMG-BARCODE", "NO-IMG-SKU");
+
+        mockMvc.perform(get("/api/products/{id}", product.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.thumbnails").isEmpty());
     }
 
     private Product createTestProduct(String name, String barcode, String sku) {
