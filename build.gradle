@@ -54,6 +54,7 @@ dependencies {
 
 	// Image thumbnails
 	implementation 'net.coobird:thumbnailator:0.4.20'
+	implementation 'org.sejda.imageio:webp-imageio:0.1.6'
 
 	// Report generation
 	implementation 'org.apache.poi:poi-ooxml:5.2.5'

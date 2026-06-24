@@ -39,6 +39,27 @@ class ThumbnailatorGeneratorTest {
         assertThat(result.widthPx()).isEqualTo(100); // no upscale
     }
 
+    @Test
+    void shouldDecodeWebPContentType() throws Exception {
+        // Generate a valid WebP via ImageIO.write (uses the webp-imageio plugin
+        // that was just added as a dependency), then decode it through the
+        // generator. Without the plugin ImageIO.read returns null and the test
+        // fails with "Thumbnail generation failed".
+        BufferedImage source = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream webpOut = new ByteArrayOutputStream();
+        ImageIO.write(source, "webp", webpOut);
+        InputStream original = new ByteArrayInputStream(webpOut.toByteArray());
+
+        ThumbnailGenerator.ThumbnailSpec spec = new ThumbnailGenerator.ThumbnailSpec(150, 0.80f);
+
+        ThumbnailGenerator.ThumbnailResult result = generator.generate(
+            original, "image/webp", "photo.webp", spec);
+
+        assertThat(result.formatName()).isEqualTo("jpg");
+        assertThat(result.sizeBytes()).isGreaterThan(0);
+        assertThat(result.widthPx()).isGreaterThan(0);
+    }
+
     private InputStream createTestImage(int width, int height) throws Exception {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
