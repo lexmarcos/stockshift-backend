@@ -112,11 +112,39 @@ class ProductImageProcessingServiceTest {
         }
         byte[] largeImage = baos.toByteArray();
         when(storageService.getObject("products/big.png")).thenReturn(largeImage);
+        when(thumbnailGenerator.generate(any(), anyString(), anyString(), any()))
+                .thenAnswer(inv -> new ThumbnailGenerator.ThumbnailResult(
+                        new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}), 150, 150, 3L, "jpg"));
 
         ProductImageProcessingResult result = service.processAll();
 
         assertThat(result.total()).isEqualTo(1);
         assertThat(result.compressed()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldKeepExistingThumbnailsWhenRegenerationFails() {
+        // PR #5 review: a product with working thumbnails being reprocessed must not lose them
+        // if regeneration fails — old rows/objects are retired only after replacements exist.
+        Product product = product("https://cdn.example.com/products/test.png");
+        when(productRepository.findAllByTenantId(tenantId)).thenReturn(List.of(product));
+        // Original > 700KB so the "already good" skip does not apply despite existing thumbnails.
+        when(storageService.headObject("products/test.png"))
+                .thenReturn(new StorageService.HeadObjectResult(800_000L, "image/png"));
+        ProductImageThumbnail existing = new ProductImageThumbnail();
+        existing.setProductId(product.getId());
+        existing.setSize("sm");
+        existing.setStorageKey("products/test_sm.jpg");
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of(existing));
+        // Small payload so compression is skipped; thumbnailGenerator is unstubbed -> all fail.
+        when(storageService.getObject("products/test.png")).thenReturn(new byte[]{1, 2, 3});
+
+        ProductImageProcessingResult result = service.processAll();
+
+        assertThat(result.failed()).isEqualTo(1);
+        assertThat(result.processed()).isZero();
+        verify(thumbnailRepository, never()).deleteAll(any());
+        verify(storageService, never()).deleteStorageKeyQuietly(any());
     }
 
     @Test

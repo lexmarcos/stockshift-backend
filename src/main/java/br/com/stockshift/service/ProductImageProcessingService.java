@@ -19,7 +19,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -127,9 +129,17 @@ public class ProductImageProcessingService {
             storageService.deleteStorageKeyQuietly(tempKey);
         }
 
-        // Generate and upload thumbnails
-        deleteExistingThumbnails(existingThumbnails);
-        generateAndUploadThumbnails(product.getId(), imageBytes, storageKey);
+        // Generate replacements BEFORE retiring the existing thumbnails (PR #5 review).
+        // Deleting first would discard working thumbnails if generation/upload then failed,
+        // while processProducts still counted the product as processed.
+        List<ProductImageThumbnail> replacements =
+                buildThumbnails(product.getId(), imageBytes, storageKey);
+        if (replacements.isEmpty()) {
+            throw new IllegalStateException(
+                    "Thumbnail generation produced no images for product " + product.getId());
+        }
+        replaceThumbnailRows(existingThumbnails, replacements);
+        deleteObsoleteThumbnailObjects(existingThumbnails, replacements);
 
         return wasCompressed ? ProcessOneResult.COMPRESSED : ProcessOneResult.PROCESSED;
     }
@@ -158,14 +168,38 @@ public class ProductImageProcessingService {
         storageService.uploadBytes(key, bytes, contentType);
     }
 
-    private void deleteExistingThumbnails(List<ProductImageThumbnail> thumbnails) {
-        for (ProductImageThumbnail t : thumbnails) {
-            storageService.deleteStorageKeyQuietly(t.getStorageKey());
+    /**
+     * Swaps the persisted thumbnail rows for a product. The old rows are deleted and flushed
+     * before the replacements are inserted because both share the composite (product_id, size)
+     * primary key, and Hibernate would otherwise order the INSERTs before the DELETEs.
+     */
+    private void replaceThumbnailRows(
+            List<ProductImageThumbnail> oldRows, List<ProductImageThumbnail> replacements) {
+        if (!oldRows.isEmpty()) {
+            thumbnailRepository.deleteAll(oldRows);
+            thumbnailRepository.flush();
         }
-        thumbnailRepository.deleteAll(thumbnails);
+        thumbnailRepository.saveAll(replacements);
     }
 
-    private void generateAndUploadThumbnails(UUID productId, byte[] sourceBytes, String originalKey) {
+    /**
+     * Deletes old storage objects that the replacements did not overwrite. Thumbnail keys are
+     * derived deterministically from the original key, so a reprocess usually reuses the same
+     * keys (nothing to delete); this only removes genuinely stale objects.
+     */
+    private void deleteObsoleteThumbnailObjects(
+            List<ProductImageThumbnail> oldRows, List<ProductImageThumbnail> replacements) {
+        Set<String> retainedKeys = replacements.stream()
+                .map(ProductImageThumbnail::getStorageKey)
+                .collect(Collectors.toSet());
+        for (ProductImageThumbnail old : oldRows) {
+            if (!retainedKeys.contains(old.getStorageKey())) {
+                storageService.deleteStorageKeyQuietly(old.getStorageKey());
+            }
+        }
+    }
+
+    private List<ProductImageThumbnail> buildThumbnails(UUID productId, byte[] sourceBytes, String originalKey) {
         List<ProductImageThumbnail> entities = new ArrayList<>();
         for (int i = 0; i < THUMBNAIL_WIDTHS.length; i++) {
             try {
@@ -200,9 +234,7 @@ public class ProductImageProcessingService {
                         THUMBNAIL_SUFFIXES[i], productId, e.getMessage());
             }
         }
-        if (!entities.isEmpty()) {
-            thumbnailRepository.saveAll(entities);
-        }
+        return entities;
     }
 
     private String sizeFromIndex(int i) {
