@@ -87,10 +87,9 @@ public class StorageService {
     }
 
     public byte[] getObject(String key) {
-        try {
-            var response = s3Client.getObject(b -> b
+        try (var response = s3Client.getObject(b -> b
                 .bucket(properties.getBucketName())
-                .key(key));
+                .key(key))) {
             return response.readAllBytes();
         } catch (NoSuchKeyException e) {
             throw e;
