@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 import java.awt.image.BufferedImage;
@@ -37,6 +38,7 @@ class ProductImageProcessingServiceTest {
     @Mock private ProductImageThumbnailRepository thumbnailRepository;
     @Mock private StorageService storageService;
     @Mock private ThumbnailGenerator thumbnailGenerator;
+    @Mock private TransactionTemplate transactionTemplate;
 
     private ProductImageProcessingService service;
     private UUID tenantId;
@@ -46,8 +48,14 @@ class ProductImageProcessingServiceTest {
         tenantId = UUID.randomUUID();
         TenantContext.setTenantId(tenantId);
         service = new ProductImageProcessingService(
-                productRepository, thumbnailRepository, storageService, thumbnailGenerator);
+                productRepository, thumbnailRepository, storageService, thumbnailGenerator,
+                transactionTemplate);
         lenient().when(storageService.getPublicUrl()).thenReturn("https://cdn.example.com");
+        lenient().doAnswer(inv -> {
+            java.util.function.Consumer<?> callback = inv.getArgument(0);
+            callback.accept(null);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
     }
 
     @AfterEach

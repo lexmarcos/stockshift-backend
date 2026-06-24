@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
+import org.springframework.transaction.support.TransactionTemplate;
+
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
@@ -42,16 +44,19 @@ public class ProductImageProcessingService {
     @Nullable
     private StorageService storageService;
     private final ThumbnailGenerator thumbnailGenerator;
+    private final TransactionTemplate transactionTemplate;
 
     public ProductImageProcessingService(
             ProductRepository productRepository,
             ProductImageThumbnailRepository thumbnailRepository,
             @Nullable StorageService storageService,
-            ThumbnailGenerator thumbnailGenerator) {
+            ThumbnailGenerator thumbnailGenerator,
+            TransactionTemplate transactionTemplate) {
         this.productRepository = productRepository;
         this.thumbnailRepository = thumbnailRepository;
         this.storageService = storageService;
         this.thumbnailGenerator = thumbnailGenerator;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public ProductImageProcessingResult processAll() {
@@ -162,7 +167,13 @@ public class ProductImageProcessingService {
                     + ": expected " + THUMBNAIL_SUFFIXES.length
                     + " sizes, got " + replacements.size());
         }
-        replaceThumbnailRows(existingThumbnails, replacements);
+        // Run the DB row swap in its own transaction so a saveAll failure does
+        // not leave the deleteAll auto-committed (PR #5 review). The obsolete-object
+        // cleanup stays outside the transaction: it targets different keys than the
+        // replacements just uploaded, so a stale-object delete after a rollback is
+        // harmless, while rolling back R2 deletes is impossible.
+        transactionTemplate.executeWithoutResult(
+                status -> replaceThumbnailRows(existingThumbnails, replacements));
         deleteObsoleteThumbnailObjects(existingThumbnails, replacements);
 
         return wasCompressed ? ProcessOneResult.COMPRESSED : ProcessOneResult.PROCESSED;
