@@ -162,6 +162,9 @@ public class ProductImageProcessingService {
             // A per-size transient failure inside buildThumbnails would produce a
             // partial set; retiring the old rows would turn a single-size failure into
             // permanently missing thumbnail URLs (PR #5 review). Require all three.
+            // Clean up the partial R2 uploads so they aren't orphaned.
+            replacements.forEach(
+                    t -> storageService.deleteStorageKeyQuietly(t.getStorageKey()));
             throw new IllegalStateException(
                     "Thumbnail generation incomplete for product " + product.getId()
                     + ": expected " + THUMBNAIL_SUFFIXES.length
