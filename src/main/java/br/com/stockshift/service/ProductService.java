@@ -257,6 +257,7 @@ public class ProductService {
                 .map(ProductImageThumbnail::getStorageKey)
                 .collect(Collectors.toList());
         thumbnailRepository.deleteAll(oldThumbnails);
+        thumbnailRepository.flush();
         scheduleStorageDeletion(product.getImageUrl(), thumbnailKeys);
     }
 
