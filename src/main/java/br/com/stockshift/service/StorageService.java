@@ -222,7 +222,7 @@ public class StorageService {
         }
     }
 
-    private void copyObject(String sourceKey, String destinationKey) {
+    public void copyObject(String sourceKey, String destinationKey) {
         try {
             CopyObjectRequest request = CopyObjectRequest.builder()
                     .sourceBucket(properties.getBucketName())
@@ -234,6 +234,21 @@ public class StorageService {
         } catch (S3Exception e) {
             log.error("Failed to copy image from {} to {}", sourceKey, destinationKey, e);
             throw new StorageException("Failed to copy image in storage", e);
+        }
+    }
+
+    public void uploadBytes(String key, byte[] bytes, String contentType) {
+        try {
+            PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(properties.getBucketName())
+                .key(key)
+                .contentType(contentType)
+                .contentLength((long) bytes.length)
+                .build();
+            s3Client.putObject(request, RequestBody.fromBytes(bytes));
+        } catch (S3Exception e) {
+            log.error("Failed to upload bytes to storage: {}", key, e);
+            throw new StorageException("Failed to upload to storage", e);
         }
     }
 
@@ -327,6 +342,10 @@ public class StorageService {
             return imageUrl.substring(publicUrl.length() + 1);
         }
         throw new IllegalArgumentException("Invalid image URL: " + imageUrl);
+    }
+
+    String getPublicUrl() {
+        return properties.getPublicUrl();
     }
 
     private String buildPublicUrl(String key) {
