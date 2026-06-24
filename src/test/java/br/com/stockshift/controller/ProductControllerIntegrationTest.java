@@ -3,6 +3,7 @@ package br.com.stockshift.controller;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,7 +22,9 @@ import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.product.ProductRequest;
 import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
+import br.com.stockshift.model.entity.Permission;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.Role;
 import br.com.stockshift.model.entity.Tenant;
 import br.com.stockshift.model.entity.User;
 import br.com.stockshift.model.entity.Warehouse;
@@ -29,10 +32,13 @@ import br.com.stockshift.model.enums.BarcodeType;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.PermissionRepository;
+import br.com.stockshift.repository.RoleRepository;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import br.com.stockshift.dto.ai.ProductClassificationResponse;
+import br.com.stockshift.security.JwtTokenProvider;
 import br.com.stockshift.service.OpenAiService;
 import br.com.stockshift.service.StorageService;
 import br.com.stockshift.repository.ProductRepository;
@@ -41,6 +47,10 @@ import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.util.TestDataFactory;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
@@ -69,6 +79,15 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PermissionRepository permissionRepository;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
 
     @MockitoBean
     private OpenAiService openAiService;
@@ -107,6 +126,20 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
         testUser.setFullName("Test User");
         testUser.setIsActive(true);
         testUser = userRepository.save(testUser);
+
+        // Create ADMIN role and assign to test user
+        Permission updatePermission = permissionRepository.findByCodeIgnoreCase("products:update")
+                .orElseThrow(() -> new IllegalStateException("products:update permission not found"));
+
+        Role adminRole = new Role();
+        adminRole.setTenantId(testTenant.getId());
+        adminRole.setName("ADMIN");
+        adminRole.setDescription("Admin role for integration tests");
+        adminRole.setPermissions(new HashSet<>(Set.of(updatePermission)));
+        adminRole = roleRepository.save(adminRole);
+
+        testUser.getRoles().add(adminRole);
+        userRepository.save(testUser);
 
         // Set tenant context for current test
         TenantContext.setTenantId(testTenant.getId());
@@ -474,6 +507,68 @@ class ProductControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.thumbnails").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "test@example.com", roles = { "ADMIN" })
+    void updateProductWithoutImageShouldPreserveExistingThumbnails() throws Exception {
+        var product = createTestProduct("Preserve Product", "PRESERVE-BARCODE", "PRESERVE-SKU");
+        product.setImageUrl("https://cdn.example.com/existing.png");
+        productRepository.save(product);
+
+        ProductRequest updateRequest = ProductRequest.builder()
+                .name("Preserve Updated")
+                .description(null)
+                .barcode("PRESERVE-BARCODE")
+                .barcodeType(BarcodeType.EXTERNAL)
+                .sku("PRESERVE-SKU")
+                .isKit(false)
+                .hasExpiration(false)
+                .active(true)
+                .build();
+
+        mockMvc.perform(multipart(HttpMethod.PUT, "/api/products/" + product.getId())
+                .file(new MockMultipartFile("product", "", MediaType.APPLICATION_JSON_VALUE,
+                        objectMapper.writeValueAsBytes(updateRequest))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.imageUrl").value("https://cdn.example.com/existing.png"));
+    }
+
+    @Test
+    void processImagesShouldRequireAuth() throws Exception {
+        mockMvc.perform(post("/api/admin/products/process-images"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void processImagesShouldReturnResultWithValidAuth() throws Exception {
+        mockMvc.perform(post("/api/admin/products/process-images")
+                .header("Authorization", "Bearer " + getValidToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").isNumber())
+                .andExpect(jsonPath("$.data.processed").isNumber())
+                .andExpect(jsonPath("$.data.skipped").isNumber())
+                .andExpect(jsonPath("$.data.compressed").isNumber())
+                .andExpect(jsonPath("$.data.failed").isNumber());
+    }
+
+    @Test
+    void processSingleImageWithProductId() throws Exception {
+        var product = createTestProduct("Target", "TGT-BARCODE", "TGT-SKU");
+
+        mockMvc.perform(post("/api/admin/products/process-images")
+                .param("productId", product.getId().toString())
+                .header("Authorization", "Bearer " + getValidToken()))
+                .andExpect(status().isOk());
+    }
+
+    private String getValidToken() {
+        return jwtTokenProvider.generateAccessToken(
+                testUser.getId(),
+                testTenant.getId(),
+                testUser.getEmail(),
+                List.of("ADMIN"),
+                List.of("products:update"));
     }
 
     private Product createTestProduct(String name, String barcode, String sku) {
