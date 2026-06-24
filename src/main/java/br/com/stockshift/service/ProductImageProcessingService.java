@@ -115,11 +115,15 @@ public class ProductImageProcessingService {
         // Check if already good
         List<ProductImageThumbnail> existingThumbnails =
                 thumbnailRepository.findByProductId(product.getId());
-        boolean hasThumbnails = !existingThumbnails.isEmpty();
+        boolean hasFullThumbnailSet = existingThumbnails.size() == THUMBNAIL_SUFFIXES.length
+                && existingThumbnails.stream()
+                        .map(ProductImageThumbnail::getSize)
+                        .collect(Collectors.toSet())
+                        .containsAll(Set.of("sm", "md", "lg"));
 
         try {
             StorageService.HeadObjectResult head = storageService.headObject(storageKey);
-            if (hasThumbnails && head.sizeBytes() <= MAX_ORIGINAL_BYTES) {
+            if (hasFullThumbnailSet && head.sizeBytes() <= MAX_ORIGINAL_BYTES) {
                 log.debug("Product {} already has thumbnails and original <= 700KB, skipping",
                         product.getId());
                 return ProcessOneResult.SKIPPED;

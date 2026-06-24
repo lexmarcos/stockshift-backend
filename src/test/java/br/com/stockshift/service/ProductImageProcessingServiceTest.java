@@ -73,7 +73,7 @@ class ProductImageProcessingServiceTest {
         when(storageService.headObject("products/test.png"))
                 .thenReturn(new StorageService.HeadObjectResult(50_000L, "image/png"));
         when(thumbnailRepository.findByProductId(product.getId()))
-                .thenReturn(List.of(new ProductImageThumbnail()));
+                .thenReturn(thumbEntities());
 
         ProductImageProcessingResult result = service.processAll();
 
@@ -158,7 +158,7 @@ class ProductImageProcessingServiceTest {
         when(storageService.headObject("products/good.png"))
                 .thenReturn(new StorageService.HeadObjectResult(50_000L, "image/png"));
         when(thumbnailRepository.findByProductId(good.getId()))
-                .thenReturn(List.of(new ProductImageThumbnail()));
+                .thenReturn(thumbEntities());
 
         when(storageService.headObject("products/missing.png"))
                 .thenThrow(NoSuchKeyException.builder().message("Not found").build());
@@ -181,6 +181,16 @@ class ProductImageProcessingServiceTest {
 
         assertThat(result.errors()).isNotEmpty();
         assertThat(result.errors().get(0)).contains(missingId.toString());
+    }
+
+    private List<ProductImageThumbnail> thumbEntities() {
+        ProductImageThumbnail sm = new ProductImageThumbnail();
+        sm.setSize("sm");
+        ProductImageThumbnail md = new ProductImageThumbnail();
+        md.setSize("md");
+        ProductImageThumbnail lg = new ProductImageThumbnail();
+        lg.setSize("lg");
+        return List.of(sm, md, lg);
     }
 
     private Product product(String imageUrl) {
