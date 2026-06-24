@@ -12,6 +12,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -54,7 +55,10 @@ public class StorageService {
     private static final String COMPANY_LOGO_FOLDER = "company-logos/";
     private static final String TEMP_PRODUCT_FOLDER = "temp/product-images/";
 
-    public record StoredImageObject(String key, String publicUrl) {
+    public record StoredImageObject(String key, String publicUrl, long sizeBytes, int heightPx) {
+        public StoredImageObject(String key, String publicUrl) {
+            this(key, publicUrl, 0, 0);
+        }
     }
 
     public record Thumbnails(
@@ -63,6 +67,38 @@ public class StorageService {
         StoredImageObject medium,
         StoredImageObject large
     ) {}
+
+    public record HeadObjectResult(long sizeBytes, String contentType) {}
+
+    public HeadObjectResult headObject(String key) {
+        try {
+            var response = s3Client.headObject(b -> b
+                .bucket(properties.getBucketName())
+                .key(key));
+            return new HeadObjectResult(
+                response.contentLength(),
+                response.contentType() != null ? response.contentType() : "application/octet-stream");
+        } catch (NoSuchKeyException e) {
+            throw e;
+        } catch (S3Exception e) {
+            log.error("Failed to head object: {}", key, e);
+            throw new StorageException("Failed to head object: " + key, e);
+        }
+    }
+
+    public byte[] getObject(String key) {
+        try {
+            var response = s3Client.getObject(b -> b
+                .bucket(properties.getBucketName())
+                .key(key));
+            return response.readAllBytes();
+        } catch (NoSuchKeyException e) {
+            throw e;
+        } catch (S3Exception | IOException e) {
+            log.error("Failed to get object: {}", key, e);
+            throw new StorageException("Failed to get object: " + key, e);
+        }
+    }
 
     public String uploadImage(MultipartFile file) {
         validateFileType(file, PRODUCT_IMAGE_TYPES, "Only PNG, JPG, JPEG and WEBP images are allowed");
@@ -139,7 +175,7 @@ public class StorageService {
 
             String publicUrl = buildPublicUrl(thumbnailKey);
             log.info("Thumbnail uploaded: {}", publicUrl);
-            return new StoredImageObject(thumbnailKey, publicUrl);
+            return new StoredImageObject(thumbnailKey, publicUrl, bytes.length, result.heightPx());
         } catch (Exception e) {
             log.warn("Failed to generate thumbnail {} for {}: {}",
                 THUMBNAIL_SUFFIXES[sizeIndex], file.getOriginalFilename(), e.getMessage());
