@@ -243,6 +243,40 @@ class ProductServiceTest {
     }
 
     @Test
+    void updateShouldDeleteNewlyUploadedImagesWhenUpdateFails() {
+        // PR #5 review: a new image is uploaded before the SKU validation; when the update
+        // fails afterwards the freshly uploaded R2 objects must be cleaned up, not orphaned.
+        Product product = product("Produto");
+        product.setImageUrl("https://cdn.example.com/old.png");
+        ProductRequest request = fullRequest(null, null);
+        request.setBarcode(null);
+        request.setSku("DUP-SKU");
+        MockMultipartFile image = image();
+
+        StorageService.Thumbnails newThumbs = new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("new_original", "https://cdn.example.com/new.png"),
+                new StorageService.StoredImageObject("new_sm", "https://cdn.example.com/new_sm.jpg"),
+                new StorageService.StoredImageObject("new_md", "https://cdn.example.com/new_md.jpg"),
+                new StorageService.StoredImageObject("new_lg", "https://cdn.example.com/new_lg.jpg"));
+
+        when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
+                .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
+        when(storageService.uploadProductImageWithThumbnails(image)).thenReturn(newThumbs);
+        when(productRepository.findBySkuAndTenantId("DUP-SKU", tenantId))
+                .thenReturn(Optional.of(product("Outro produto")));
+
+        assertThatThrownBy(() -> productService.update(product.getId(), request, image))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("SKU DUP-SKU");
+
+        verify(storageService).deleteImage("https://cdn.example.com/new.png");
+        verify(storageService).deleteStorageKeyQuietly("new_sm");
+        verify(storageService).deleteStorageKeyQuietly("new_md");
+        verify(storageService).deleteStorageKeyQuietly("new_lg");
+    }
+
+    @Test
     void updateShouldRejectMissingCategoryAndDeletedBrand() {
         Product product = product("Produto");
         UUID categoryId = UUID.randomUUID();

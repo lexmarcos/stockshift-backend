@@ -125,12 +125,24 @@ public class ProductService {
             saveThumbnails(saved.getId(), thumbs);
             return saved;
         } catch (RuntimeException exception) {
-            deleteUploadedImageQuietly(thumbs.original().publicUrl());
-            if (thumbs.small() != null) storageService.deleteStorageKeyQuietly(thumbs.small().key());
-            if (thumbs.medium() != null) storageService.deleteStorageKeyQuietly(thumbs.medium().key());
-            if (thumbs.large() != null) storageService.deleteStorageKeyQuietly(thumbs.large().key());
+            deleteUploadedImagesQuietly(thumbs);
             throw exception;
         }
+    }
+
+    /**
+     * Deletes freshly uploaded image objects (original + thumbnails) when the surrounding
+     * operation fails before commit, preventing orphaned R2 objects (PR #5 review). Used by
+     * both the create and update image paths.
+     */
+    private void deleteUploadedImagesQuietly(StorageService.Thumbnails thumbs) {
+        if (thumbs == null || storageService == null) {
+            return;
+        }
+        deleteUploadedImageQuietly(thumbs.original().publicUrl());
+        if (thumbs.small() != null) storageService.deleteStorageKeyQuietly(thumbs.small().key());
+        if (thumbs.medium() != null) storageService.deleteStorageKeyQuietly(thumbs.medium().key());
+        if (thumbs.large() != null) storageService.deleteStorageKeyQuietly(thumbs.large().key());
     }
 
     private void saveThumbnails(UUID productId, StorageService.Thumbnails thumbs) {
@@ -345,15 +357,48 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         var before = auditSnapshotService.snapshot(product);
 
-        // Upload new image if provided
-        StorageService.Thumbnails newThumbnails = null;
-        if (image != null && !image.isEmpty() && storageService != null) {
-            // Delete old image and thumbnails if exists
-            deleteProductImages(product);
-            newThumbnails = storageService.uploadProductImageWithThumbnails(image);
-            product.setImageUrl(SanitizationUtil.sanitizeUrl(newThumbnails.original().publicUrl()));
+        StorageService.Thumbnails newThumbnails = replaceProductImage(product, image);
+        try {
+            return persistProductUpdate(product, request, tenantId, before, newThumbnails);
+        } catch (RuntimeException exception) {
+            // The upload already happened; a later failure (validation, save) rolls back the
+            // transaction but cannot un-upload the new R2 objects, so delete them explicitly.
+            deleteUploadedImagesQuietly(newThumbnails);
+            throw exception;
         }
+    }
 
+    private StorageService.Thumbnails replaceProductImage(Product product, MultipartFile image) {
+        if (image == null || image.isEmpty() || storageService == null) {
+            return null;
+        }
+        // Old objects are removed only after commit (see deleteProductImages).
+        deleteProductImages(product);
+        StorageService.Thumbnails thumbnails = storageService.uploadProductImageWithThumbnails(image);
+        product.setImageUrl(SanitizationUtil.sanitizeUrl(thumbnails.original().publicUrl()));
+        return thumbnails;
+    }
+
+    private ProductResponse persistProductUpdate(
+            Product product,
+            ProductRequest request,
+            UUID tenantId,
+            java.util.Map<String, Object> before,
+            StorageService.Thumbnails newThumbnails) {
+        applyProductFields(product, request, tenantId);
+
+        Product updated = productRepository.save(product);
+        if (newThumbnails != null) {
+            saveThumbnails(updated.getId(), newThumbnails);
+        }
+        var after = auditSnapshotService.snapshot(updated);
+        recordProductAudit("PRODUCT_UPDATED", before, after, updated.getId());
+        log.info("Updated product {} for tenant {}", updated.getId(), tenantId);
+
+        return mapToResponse(updated);
+    }
+
+    private void applyProductFields(Product product, ProductRequest request, UUID tenantId) {
         // Validate unique barcode if changed
         if (request.getBarcode() != null && !request.getBarcode().equals(product.getBarcode())) {
             productRepository.findByBarcodeAndTenantId(request.getBarcode(), tenantId)
@@ -398,16 +443,6 @@ public class ProductService {
         product.setAttributes(request.getAttributes());
         product.setHasExpiration(request.getHasExpiration() != null ? request.getHasExpiration() : false);
         product.setActive(request.getActive() != null ? request.getActive() : true);
-
-        Product updated = productRepository.save(product);
-        if (newThumbnails != null) {
-            saveThumbnails(updated.getId(), newThumbnails);
-        }
-        var after = auditSnapshotService.snapshot(updated);
-        recordProductAudit("PRODUCT_UPDATED", before, after, updated.getId());
-        log.info("Updated product {} for tenant {}", id, tenantId);
-
-        return mapToResponse(updated);
     }
 
     @Transactional
