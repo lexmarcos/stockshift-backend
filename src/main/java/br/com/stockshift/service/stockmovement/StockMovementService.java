@@ -12,6 +12,7 @@ import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.ProductImageProcessingService;
 import br.com.stockshift.service.ProductService;
 import br.com.stockshift.service.audit.AuditEventCreateRequest;
 import br.com.stockshift.service.audit.AuditService;
@@ -51,6 +52,7 @@ public class StockMovementService {
   private final ProductService productService;
   private final AuditService auditService;
   private final ProductImageUploadService productImageUploadService;
+  private final ProductImageProcessingService productImageProcessingService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
@@ -133,7 +135,22 @@ public class StockMovementService {
 
     itemReq.getNewProduct().setHasExpiration(itemReq.getExpirationDate() != null);
     itemReq.getNewProduct().setImageUrl(resolveInlineProductImageUrl(itemReq, promotedImageClaims));
-    return productService.createEntity(itemReq.getNewProduct());
+    Product created = productService.createEntity(itemReq.getNewProduct());
+    generateInlineProductThumbnails(created);
+    return created;
+  }
+
+  /**
+   * Inline products promote a temp upload into a bare {@code image_url} with no thumbnail
+   * rows (PR #5 review), unlike the direct multipart upload path. Backfill them through the
+   * processing service so {@code ProductResponse.thumbnails} is populated. The call is
+   * error-isolated (never throws), so a thumbnail failure does not abort the movement.
+   */
+  private void generateInlineProductThumbnails(Product product) {
+    if (product.getImageUrl() == null) {
+      return;
+    }
+    productImageProcessingService.processProduct(product);
   }
 
   private String resolveInlineProductImageUrl(
