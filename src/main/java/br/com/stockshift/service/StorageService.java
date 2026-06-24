@@ -16,7 +16,14 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import br.com.stockshift.service.imaging.ThumbnailGenerator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -28,6 +35,14 @@ public class StorageService {
 
     private final S3Client s3Client;
     private final StorageProperties properties;
+
+    @Autowired(required = false)
+    @Nullable
+    private ThumbnailGenerator thumbnailGenerator;
+
+    private static final int[] THUMBNAIL_WIDTHS = {150, 400, 800};
+    private static final String[] THUMBNAIL_SUFFIXES = {"_sm", "_md", "_lg"};
+    private static final float[] THUMBNAIL_QUALITIES = {0.80f, 0.82f, 0.85f};
 
     private static final Set<String> PRODUCT_IMAGE_TYPES = Set.of(
         "image/png", "image/jpeg", "image/jpg", "image/webp"
@@ -42,6 +57,13 @@ public class StorageService {
 
     public record StoredImageObject(String key, String publicUrl) {
     }
+
+    public record Thumbnails(
+        StoredImageObject original,
+        StoredImageObject small,
+        StoredImageObject medium,
+        StoredImageObject large
+    ) {}
 
     public String uploadImage(MultipartFile file) {
         validateFileType(file, PRODUCT_IMAGE_TYPES, "Only PNG, JPG, JPEG and WEBP images are allowed");
@@ -68,6 +90,67 @@ public class StorageService {
     public String uploadCompanyLogo(MultipartFile file) {
         validateCompanyLogo(file);
         return uploadFile(file, COMPANY_LOGO_FOLDER);
+    }
+
+    public Thumbnails uploadProductImageWithThumbnails(MultipartFile file) {
+        validateFileType(file, PRODUCT_IMAGE_TYPES,
+            "Only PNG, JPG, JPEG and WEBP images are allowed");
+
+        StoredImageObject original = uploadFileObject(file, PRODUCT_FOLDER, null);
+        StoredImageObject small = null;
+        StoredImageObject medium = null;
+        StoredImageObject large = null;
+
+        if (thumbnailGenerator != null) {
+            small = generateAndUploadThumbnail(file, 0, original);
+            medium = generateAndUploadThumbnail(file, 1, original);
+            large = generateAndUploadThumbnail(file, 2, original);
+        }
+
+        return new Thumbnails(original, small, medium, large);
+    }
+
+    private StoredImageObject generateAndUploadThumbnail(
+            MultipartFile file, int sizeIndex, StoredImageObject original) {
+        try {
+            ThumbnailGenerator.ThumbnailSpec spec = new ThumbnailGenerator.ThumbnailSpec(
+                THUMBNAIL_WIDTHS[sizeIndex], THUMBNAIL_QUALITIES[sizeIndex]);
+
+            String thumbnailKey = deriveThumbnailKey(original.key(), THUMBNAIL_SUFFIXES[sizeIndex]);
+            InputStream originalStream = file.getInputStream();
+            ThumbnailGenerator.ThumbnailResult result =
+                thumbnailGenerator.generate(originalStream, file.getContentType(),
+                    file.getOriginalFilename(), spec);
+            originalStream.close();
+
+            byte[] bytes = result.inputStream().readAllBytes();
+            result.inputStream().close();
+
+            PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(properties.getBucketName())
+                .key(thumbnailKey)
+                .contentType("image/jpeg")
+                .contentLength((long) bytes.length)
+                .build();
+
+            s3Client.putObject(request, RequestBody.fromBytes(bytes));
+
+            String publicUrl = buildPublicUrl(thumbnailKey);
+            log.info("Thumbnail uploaded: {}", publicUrl);
+            return new StoredImageObject(thumbnailKey, publicUrl);
+        } catch (Exception e) {
+            log.warn("Failed to generate thumbnail {} for {}: {}",
+                THUMBNAIL_SUFFIXES[sizeIndex], file.getOriginalFilename(), e.getMessage());
+            return null;
+        }
+    }
+
+    private String deriveThumbnailKey(String originalKey, String suffix) {
+        int dotIndex = originalKey.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return originalKey.substring(0, dotIndex) + suffix + ".jpg";
+        }
+        return originalKey + suffix + ".jpg";
     }
 
     private String uploadFile(MultipartFile file, String folder) {
@@ -122,6 +205,13 @@ public class StorageService {
         }
 
         deleteKey(extractKeyFromUrl(imageUrl), imageUrl);
+    }
+
+    public void deleteProductImages(String imageUrl, List<String> thumbnailKeys) {
+        deleteImage(imageUrl);
+        if (thumbnailKeys != null) {
+            thumbnailKeys.forEach(this::deleteStorageKeyQuietly);
+        }
     }
 
     public void deleteStorageKeyQuietly(String storageKey) {
