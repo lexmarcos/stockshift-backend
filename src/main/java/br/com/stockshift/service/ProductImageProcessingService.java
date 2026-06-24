@@ -162,9 +162,18 @@ public class ProductImageProcessingService {
             // A per-size transient failure inside buildThumbnails would produce a
             // partial set; retiring the old rows would turn a single-size failure into
             // permanently missing thumbnail URLs (PR #5 review). Require all three.
-            // Clean up the partial R2 uploads so they aren't orphaned.
-            replacements.forEach(
-                    t -> storageService.deleteStorageKeyQuietly(t.getStorageKey()));
+            //
+            // Clean up partial R2 uploads, but only keys that are NOT already referenced
+            // by the existing DB rows. Thumbnail keys are deterministic
+            // (products/{uuid}_sm.jpg), so a reprocess of an existing product uploads
+            // to the same keys; deleting a success just because a sibling failed would
+            // corrupt the surviving old URLs.
+            Set<String> existingKeys = existingThumbnails.stream()
+                    .map(ProductImageThumbnail::getStorageKey)
+                    .collect(Collectors.toSet());
+            replacements.stream()
+                    .filter(t -> !existingKeys.contains(t.getStorageKey()))
+                    .forEach(t -> storageService.deleteStorageKeyQuietly(t.getStorageKey()));
             throw new IllegalStateException(
                     "Thumbnail generation incomplete for product " + product.getId()
                     + ": expected " + THUMBNAIL_SUFFIXES.length
