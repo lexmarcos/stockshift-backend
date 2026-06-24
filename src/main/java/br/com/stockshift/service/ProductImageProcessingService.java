@@ -16,6 +16,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -50,6 +51,10 @@ public class ProductImageProcessingService {
             return new ProductImageProcessingResult(0, 0, 0, 0, 0,
                     List.of("Product not found: " + productId));
         }
+        return processProducts(List.of(product));
+    }
+
+    public ProductImageProcessingResult processProduct(Product product) {
         return processProducts(List.of(product));
     }
 
@@ -142,7 +147,7 @@ public class ProductImageProcessingService {
                     .outputQuality(COMPRESSION_QUALITY)
                     .toOutputStream(out);
             byte[] compressed = out.toByteArray();
-            log.info("Compressed image from {} bytes to {} bytes", original.length, compressed.length);
+            log.debug("Compressed image from {} bytes to {} bytes", original.length, compressed.length);
             return compressed;
         } catch (Exception e) {
             throw new RuntimeException("Failed to compress image", e);
@@ -170,8 +175,10 @@ public class ProductImageProcessingService {
                 ThumbnailGenerator.ThumbnailResult result = thumbnailGenerator.generate(
                         new ByteArrayInputStream(sourceBytes), "image/jpeg", "source", spec);
 
-                byte[] thumbBytes = result.inputStream().readAllBytes();
-                result.inputStream().close();
+                byte[] thumbBytes;
+                try (InputStream is = result.inputStream()) {
+                    thumbBytes = is.readAllBytes();
+                }
 
                 String thumbKey = deriveThumbnailKey(originalKey, THUMBNAIL_SUFFIXES[i]);
                 String thumbUrl = buildPublicUrl(thumbKey);
