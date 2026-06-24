@@ -6,6 +6,7 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.ProductImageThumbnail;
 import br.com.stockshift.model.enums.BarcodeType;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
@@ -110,13 +111,16 @@ class ProductServiceTest {
         when(brandRepository.findByTenantIdAndId(tenantId, brand.getId()))
                 .thenReturn(Optional.of(brand));
         when(storageService.uploadProductImageWithThumbnails(image))
-                .thenReturn(thumbnails("https://cdn.example.com/product.png"));
+                .thenReturn(thumbnails());
+        when(thumbnailRepository.findByProductId(any())).thenReturn(thumbEntities());
 
         var response = productService.create(fullRequest(category.getId(), brand.getId()), image);
 
         assertThat(response.getCategoryName()).isEqualTo("Bebidas");
         assertThat(response.getBrand().getName()).isEqualTo("Acme");
         assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/product.png");
+        assertThat(response.getThumbnails()).containsKeys("sm", "md", "lg");
+        assertThat(response.getThumbnails().get("sm")).isEqualTo("https://cdn.example.com/product_sm.jpg");
         assertThat(response.getSku()).isEqualTo("SKU-1");
         verify(auditService).record(any());
     }
@@ -162,8 +166,14 @@ class ProductServiceTest {
     void createShouldDeleteUploadedImageWhenImagePersistenceFails() {
         ProductRequest request = fullRequest(null, null);
         MockMultipartFile image = image();
+        var rollbackThumbs = new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("products/rollback.png", "https://cdn.example.com/rollback.png"),
+                new StorageService.StoredImageObject("products/rollback_sm.jpg", "https://cdn.example.com/rollback_sm.jpg"),
+                null,
+                null
+        );
         when(storageService.uploadProductImageWithThumbnails(image))
-                .thenReturn(thumbnails("https://cdn.example.com/rollback.png"));
+                .thenReturn(rollbackThumbs);
         when(productRepository.save(any(Product.class)))
                 .thenAnswer(invocation -> {
                     Product product = invocation.getArgument(0);
@@ -176,6 +186,7 @@ class ProductServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("image write failed");
         verify(storageService).deleteImage("https://cdn.example.com/rollback.png");
+        verify(storageService).deleteStorageKeyQuietly("products/rollback_sm.jpg");
     }
 
     @Test
@@ -191,17 +202,20 @@ class ProductServiceTest {
         MockMultipartFile image = image();
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
-        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
+        when(thumbnailRepository.findByProductId(product.getId()))
+                .thenReturn(List.of())
+                .thenReturn(thumbEntities());
         when(storageService.uploadProductImageWithThumbnails(image))
-                .thenReturn(thumbnails("https://cdn.example.com/new.png"));
+                .thenReturn(thumbnails());
 
         var response = productService.update(product.getId(), request, image);
 
         assertThat(response.getName()).isEqualTo("Produto novo");
         assertThat(response.getCategoryId()).isNull();
         assertThat(response.getBrand()).isNull();
-        assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/new.png");
-        verify(storageService).deleteProductImages("https://cdn.example.com/old.png", List.of());
+        assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/product.png");
+        assertThat(response.getThumbnails()).containsKeys("sm", "md", "lg");
+        verify(storageService).deleteProductImages(eq("https://cdn.example.com/old.png"), any());
         verify(auditService).record(any());
     }
 
@@ -254,6 +268,20 @@ class ProductServiceTest {
 
         assertThatThrownBy(() -> productService.findById(UUID.randomUUID()))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void mapToResponseShouldReturnEmptyThumbnailsForProductWithoutImage() {
+        Product product = product("Sem imagem");
+        product.setImageUrl(null);
+        when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
+                .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId()))
+                .thenReturn(java.util.List.of());
+
+        var response = productService.findById(product.getId());
+
+        assertThat(response.getThumbnails()).isEmpty();
     }
 
     @Test
@@ -347,10 +375,32 @@ class ProductServiceTest {
         return new MockMultipartFile("image", "product.png", "image/png", new byte[]{1});
     }
 
-    private StorageService.Thumbnails thumbnails(String url) {
-        return new StorageService.Thumbnails(
-                new StorageService.StoredImageObject("key-" + url, url),
-                null, null, null
+    private StorageService.Thumbnails thumbnails() {
+        var original = new StorageService.StoredImageObject(
+                "products/test.png", "https://cdn.example.com/product.png");
+        var small = new StorageService.StoredImageObject(
+                "products/test_sm.jpg", "https://cdn.example.com/product_sm.jpg");
+        var medium = new StorageService.StoredImageObject(
+                "products/test_md.jpg", "https://cdn.example.com/product_md.jpg");
+        var large = new StorageService.StoredImageObject(
+                "products/test_lg.jpg", "https://cdn.example.com/product_lg.jpg");
+        return new StorageService.Thumbnails(original, small, medium, large);
+    }
+
+    private List<ProductImageThumbnail> thumbEntities() {
+        return List.of(
+                ProductImageThumbnail.builder()
+                        .size("sm")
+                        .publicUrl("https://cdn.example.com/product_sm.jpg")
+                        .build(),
+                ProductImageThumbnail.builder()
+                        .size("md")
+                        .publicUrl("https://cdn.example.com/product_md.jpg")
+                        .build(),
+                ProductImageThumbnail.builder()
+                        .size("lg")
+                        .publicUrl("https://cdn.example.com/product_lg.jpg")
+                        .build()
         );
     }
 }

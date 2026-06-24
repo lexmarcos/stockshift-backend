@@ -30,7 +30,8 @@ public class ProductResponse {
     private Boolean hasExpiration;
     private Boolean active;
     private String imageUrl;
-    private Map<String, String> thumbnails;
+    @Builder.Default
+    private Map<String, String> thumbnails = Map.of();
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
