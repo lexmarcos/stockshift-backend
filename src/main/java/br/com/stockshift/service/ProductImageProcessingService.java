@@ -7,9 +7,11 @@ import br.com.stockshift.repository.ProductImageThumbnailRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.imaging.ThumbnailGenerator;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 import javax.imageio.ImageIO;
@@ -24,7 +26,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
+@ConditionalOnBean(StorageService.class)
 @Slf4j
 public class ProductImageProcessingService {
 
@@ -36,8 +38,21 @@ public class ProductImageProcessingService {
 
     private final ProductRepository productRepository;
     private final ProductImageThumbnailRepository thumbnailRepository;
-    private final StorageService storageService;
+    @Autowired(required = false)
+    @Nullable
+    private StorageService storageService;
     private final ThumbnailGenerator thumbnailGenerator;
+
+    public ProductImageProcessingService(
+            ProductRepository productRepository,
+            ProductImageThumbnailRepository thumbnailRepository,
+            @Nullable StorageService storageService,
+            ThumbnailGenerator thumbnailGenerator) {
+        this.productRepository = productRepository;
+        this.thumbnailRepository = thumbnailRepository;
+        this.storageService = storageService;
+        this.thumbnailGenerator = thumbnailGenerator;
+    }
 
     public ProductImageProcessingResult processAll() {
         UUID tenantId = TenantContext.getTenantId();

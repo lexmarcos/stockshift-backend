@@ -23,6 +23,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,7 +54,10 @@ public class StockMovementService {
   private final ProductService productService;
   private final AuditService auditService;
   private final ProductImageUploadService productImageUploadService;
-  private final ProductImageProcessingService productImageProcessingService;
+
+  @Autowired(required = false)
+  @Nullable
+  private ProductImageProcessingService productImageProcessingService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
@@ -147,7 +152,7 @@ public class StockMovementService {
    * error-isolated (never throws), so a thumbnail failure does not abort the movement.
    */
   private void generateInlineProductThumbnails(Product product) {
-    if (product.getImageUrl() == null) {
+    if (product.getImageUrl() == null || productImageProcessingService == null) {
       return;
     }
     productImageProcessingService.processProduct(product);

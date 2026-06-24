@@ -41,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -102,6 +103,8 @@ class StockMovementServiceTest {
     warehouseId = UUID.randomUUID();
     userId = UUID.randomUUID();
     TenantContext.setTenantId(tenantId);
+    ReflectionTestUtils.setField(service, "productImageProcessingService",
+        productImageProcessingService);
   }
 
   @AfterEach
