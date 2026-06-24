@@ -13,6 +13,7 @@ import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StorageServiceTest {
@@ -116,5 +117,13 @@ class StorageServiceTest {
         assertThrows(InvalidFileTypeException.class, () -> {
             storageService.uploadCompanyLogo(file);
         });
+    }
+
+    @Test
+    void deleteProductImagesShouldHandleNullThumbnailKeys() {
+        when(properties.getPublicUrl()).thenReturn("https://cdn.example.com");
+
+        assertDoesNotThrow(() -> storageService.deleteProductImages(
+            "https://cdn.example.com/products/test.png", null));
     }
 }
