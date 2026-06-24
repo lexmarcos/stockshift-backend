@@ -8,30 +8,34 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.ProductImageThumbnail;
 import br.com.stockshift.repository.BatchRepository;
-import br.com.stockshift.repository.CategoryRepository;
 import br.com.stockshift.repository.BrandRepository;
+import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.ProductImageThumbnailRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.audit.AuditEventCreateRequest;
 import br.com.stockshift.service.audit.AuditService;
 import br.com.stockshift.service.audit.AuditSnapshotService;
 import br.com.stockshift.util.SanitizationUtil;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ProductService {
 
@@ -41,9 +45,27 @@ public class ProductService {
     private final BrandRepository brandRepository;
     private final AuditService auditService;
     private final AuditSnapshotService auditSnapshotService;
+    private final ProductImageThumbnailRepository thumbnailRepository;
     @Autowired(required = false)
     @Nullable
     private StorageService storageService;
+
+    public ProductService(
+            ProductRepository productRepository,
+            BatchRepository batchRepository,
+            CategoryRepository categoryRepository,
+            BrandRepository brandRepository,
+            AuditService auditService,
+            AuditSnapshotService auditSnapshotService,
+            ProductImageThumbnailRepository thumbnailRepository) {
+        this.productRepository = productRepository;
+        this.batchRepository = batchRepository;
+        this.categoryRepository = categoryRepository;
+        this.brandRepository = brandRepository;
+        this.auditService = auditService;
+        this.auditSnapshotService = auditSnapshotService;
+        this.thumbnailRepository = thumbnailRepository;
+    }
 
     /**
      * Generates a unique SKU for a product
@@ -96,14 +118,62 @@ public class ProductService {
             return product;
         }
 
-        String imageUrl = storageService.uploadImage(image);
+        StorageService.Thumbnails thumbs = storageService.uploadProductImageWithThumbnails(image);
         try {
-            product.setImageUrl(SanitizationUtil.sanitizeUrl(imageUrl));
-            return productRepository.save(product);
+            product.setImageUrl(SanitizationUtil.sanitizeUrl(thumbs.original().publicUrl()));
+            Product saved = productRepository.save(product);
+            saveThumbnails(saved.getId(), thumbs);
+            return saved;
         } catch (RuntimeException exception) {
-            deleteUploadedImageQuietly(imageUrl);
+            deleteUploadedImagesQuietly(thumbs);
             throw exception;
         }
+    }
+
+    /**
+     * Deletes freshly uploaded image objects (original + thumbnails) when the surrounding
+     * operation fails before commit, preventing orphaned R2 objects (PR #5 review). Used by
+     * both the create and update image paths.
+     */
+    private void deleteUploadedImagesQuietly(StorageService.Thumbnails thumbs) {
+        if (thumbs == null || storageService == null) {
+            return;
+        }
+        deleteUploadedImageQuietly(thumbs.original().publicUrl());
+        if (thumbs.small() != null) storageService.deleteStorageKeyQuietly(thumbs.small().key());
+        if (thumbs.medium() != null) storageService.deleteStorageKeyQuietly(thumbs.medium().key());
+        if (thumbs.large() != null) storageService.deleteStorageKeyQuietly(thumbs.large().key());
+    }
+
+    private void saveThumbnails(UUID productId, StorageService.Thumbnails thumbs) {
+        List<ProductImageThumbnail> entities = new java.util.ArrayList<>();
+        if (thumbs.small() != null) {
+            entities.add(buildThumbnailEntity(productId, "sm", thumbs.small(), 150));
+        }
+        if (thumbs.medium() != null) {
+            entities.add(buildThumbnailEntity(productId, "md", thumbs.medium(), 400));
+        }
+        if (thumbs.large() != null) {
+            entities.add(buildThumbnailEntity(productId, "lg", thumbs.large(), 800));
+        }
+        if (!entities.isEmpty()) {
+            thumbnailRepository.saveAll(entities);
+        }
+    }
+
+    private ProductImageThumbnail buildThumbnailEntity(
+            UUID productId, String size, StorageService.StoredImageObject stored, int width) {
+        return ProductImageThumbnail.builder()
+                .productId(productId)
+                .size(size)
+                .storageKey(stored.key())
+                .publicUrl(stored.publicUrl())
+                .widthPx(width)
+                .heightPx(stored.heightPx() > 0 ? stored.heightPx() : null)
+                .sizeBytes(stored.sizeBytes())
+                .contentType("image/jpeg")
+                .createdAt(java.time.LocalDateTime.now())
+                .build();
     }
 
     private Product createProductEntity(ProductRequest request) {
@@ -168,6 +238,46 @@ public class ProductService {
         return saved;
     }
 
+    /**
+     * Removes a product's image + thumbnail DB rows now, but defers the irreversible
+     * storage deletion until the surrounding transaction commits.
+     *
+     * <p>Deleting storage eagerly (PR #5 review) could orphan a product: if the update
+     * transaction later rolled back (e.g. duplicate SKU validation or a thumbnail upload
+     * exception), the {@code thumbnailRepository.deleteAll} and {@code imageUrl} change
+     * were restored while the R2 objects were already gone, leaving the rows pointing at
+     * missing objects and breaking thumbnail URLs.
+     */
+    private void deleteProductImages(Product product) {
+        if (product.getImageUrl() == null || storageService == null) {
+            return;
+        }
+        List<ProductImageThumbnail> oldThumbnails = thumbnailRepository.findByProductId(product.getId());
+        List<String> thumbnailKeys = oldThumbnails.stream()
+                .map(ProductImageThumbnail::getStorageKey)
+                .collect(Collectors.toList());
+        thumbnailRepository.deleteAll(oldThumbnails);
+        thumbnailRepository.flush();
+        scheduleStorageDeletion(product.getImageUrl(), thumbnailKeys);
+    }
+
+    private void scheduleStorageDeletion(String imageUrl, List<String> thumbnailKeys) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            storageService.deleteProductImages(imageUrl, thumbnailKeys);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    storageService.deleteProductImages(imageUrl, thumbnailKeys);
+                } catch (RuntimeException ex) {
+                    log.warn("Failed to delete old product images after commit: {}", imageUrl, ex);
+                }
+            }
+        });
+    }
+
     public void deleteUploadedImageQuietly(String imageUrl) {
         if (imageUrl == null || storageService == null) {
             return;
@@ -183,8 +293,10 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> findAll() {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.findAllByTenantId(tenantId).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.findAllByTenantId(tenantId);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
@@ -199,24 +311,30 @@ public class ProductService {
     @Transactional(readOnly = true)
     public List<ProductResponse> findByCategory(UUID categoryId) {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.findByTenantIdAndCategoryId(tenantId, categoryId).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.findByTenantIdAndCategoryId(tenantId, categoryId);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> findActive(Boolean active) {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.findByTenantIdAndActive(tenantId, active).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.findByTenantIdAndActive(tenantId, active);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<ProductResponse> search(String searchTerm) {
         UUID tenantId = TenantContext.getTenantId();
-        return productRepository.searchByTenantId(tenantId, searchTerm).stream()
-                .map(this::mapToResponse)
+        List<Product> products = productRepository.searchByTenantId(tenantId, searchTerm);
+        Map<UUID, Map<String, String>> thumbnailMaps = buildThumbnailMapForProducts(products);
+        return products.stream()
+                .map(p -> mapToResponse(p, thumbnailMaps.getOrDefault(p.getId(), Map.of())))
                 .collect(Collectors.toList());
     }
 
@@ -244,16 +362,48 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         var before = auditSnapshotService.snapshot(product);
 
-        // Upload new image if provided
-        if (image != null && !image.isEmpty() && storageService != null) {
-            // Delete old image if exists
-            if (product.getImageUrl() != null && storageService != null) {
-                storageService.deleteImage(product.getImageUrl());
-            }
-            String imageUrl = storageService.uploadImage(image);
-            product.setImageUrl(imageUrl);
+        StorageService.Thumbnails newThumbnails = replaceProductImage(product, image);
+        try {
+            return persistProductUpdate(product, request, tenantId, before, newThumbnails);
+        } catch (RuntimeException exception) {
+            // The upload already happened; a later failure (validation, save) rolls back the
+            // transaction but cannot un-upload the new R2 objects, so delete them explicitly.
+            deleteUploadedImagesQuietly(newThumbnails);
+            throw exception;
         }
+    }
 
+    private StorageService.Thumbnails replaceProductImage(Product product, MultipartFile image) {
+        if (image == null || image.isEmpty() || storageService == null) {
+            return null;
+        }
+        // Old objects are removed only after commit (see deleteProductImages).
+        deleteProductImages(product);
+        StorageService.Thumbnails thumbnails = storageService.uploadProductImageWithThumbnails(image);
+        product.setImageUrl(SanitizationUtil.sanitizeUrl(thumbnails.original().publicUrl()));
+        return thumbnails;
+    }
+
+    private ProductResponse persistProductUpdate(
+            Product product,
+            ProductRequest request,
+            UUID tenantId,
+            java.util.Map<String, Object> before,
+            StorageService.Thumbnails newThumbnails) {
+        applyProductFields(product, request, tenantId);
+
+        Product updated = productRepository.save(product);
+        if (newThumbnails != null) {
+            saveThumbnails(updated.getId(), newThumbnails);
+        }
+        var after = auditSnapshotService.snapshot(updated);
+        recordProductAudit("PRODUCT_UPDATED", before, after, updated.getId());
+        log.info("Updated product {} for tenant {}", updated.getId(), tenantId);
+
+        return mapToResponse(updated);
+    }
+
+    private void applyProductFields(Product product, ProductRequest request, UUID tenantId) {
         // Validate unique barcode if changed
         if (request.getBarcode() != null && !request.getBarcode().equals(product.getBarcode())) {
             productRepository.findByBarcodeAndTenantId(request.getBarcode(), tenantId)
@@ -298,13 +448,6 @@ public class ProductService {
         product.setAttributes(request.getAttributes());
         product.setHasExpiration(request.getHasExpiration() != null ? request.getHasExpiration() : false);
         product.setActive(request.getActive() != null ? request.getActive() : true);
-
-        Product updated = productRepository.save(product);
-        var after = auditSnapshotService.snapshot(updated);
-        recordProductAudit("PRODUCT_UPDATED", before, after, updated.getId());
-        log.info("Updated product {} for tenant {}", id, tenantId);
-
-        return mapToResponse(updated);
     }
 
     @Transactional
@@ -320,10 +463,8 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product", "id", id));
         var before = auditSnapshotService.snapshot(product);
 
-        // Delete image if exists
-        if (product.getImageUrl() != null && storageService != null) {
-            storageService.deleteImage(product.getImageUrl());
-        }
+        // Delete image and thumbnails if exists
+        deleteProductImages(product);
 
         int deletedBatches = batchRepository.softDeleteByProduct(id, tenantId);
         product.setDeletedAt(LocalDateTime.now());
@@ -352,6 +493,10 @@ public class ProductService {
     }
 
     private ProductResponse mapToResponse(Product product) {
+        return mapToResponse(product, buildThumbnailMap(product.getId()));
+    }
+
+    private ProductResponse mapToResponse(Product product, Map<String, String> thumbnailMap) {
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
@@ -367,9 +512,43 @@ public class ProductService {
                 .hasExpiration(product.getHasExpiration())
                 .active(product.getActive())
                 .imageUrl(product.getImageUrl())
+                .thumbnails(thumbnailMap)
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
+    }
+
+    private Map<String, String> buildThumbnailMap(UUID productId) {
+        List<ProductImageThumbnail> thumbnails = thumbnailRepository.findByProductId(productId);
+        if (thumbnails.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> map = new HashMap<>();
+        for (ProductImageThumbnail t : thumbnails) {
+            map.put(t.getSize(), t.getPublicUrl());
+        }
+        return map;
+    }
+
+    private Map<UUID, Map<String, String>> buildThumbnailMapForProducts(List<Product> products) {
+        if (products.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> productIds = products.stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+        List<ProductImageThumbnail> allThumbnails = thumbnailRepository.findByProductIdIn(productIds);
+
+        Map<UUID, Map<String, String>> result = new HashMap<>();
+        for (ProductImageThumbnail t : allThumbnails) {
+            result.computeIfAbsent(t.getProductId(), k -> new HashMap<>())
+                    .put(t.getSize(), t.getPublicUrl());
+        }
+        // Ensure every product has at least an empty map
+        for (Product product : products) {
+            result.putIfAbsent(product.getId(), Map.of());
+        }
+        return result;
     }
 
     private BrandResponse mapBrandToResponse(Brand brand) {

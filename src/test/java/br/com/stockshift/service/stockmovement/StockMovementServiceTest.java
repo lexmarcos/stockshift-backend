@@ -23,6 +23,8 @@ import br.com.stockshift.repository.StockMovementRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.dto.admin.ProductImageProcessingResult;
+import br.com.stockshift.service.ProductImageProcessingService;
 import br.com.stockshift.service.ProductService;
 import br.com.stockshift.service.audit.AuditService;
 import br.com.stockshift.service.upload.ProductImageUploadClaim;
@@ -39,6 +41,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -84,6 +87,8 @@ class StockMovementServiceTest {
   private AuditService auditService;
   @Mock
   private ProductImageUploadService productImageUploadService;
+  @Mock
+  private ProductImageProcessingService productImageProcessingService;
 
   @InjectMocks
   private StockMovementService service;
@@ -98,6 +103,8 @@ class StockMovementServiceTest {
     warehouseId = UUID.randomUUID();
     userId = UUID.randomUUID();
     TenantContext.setTenantId(tenantId);
+    ReflectionTestUtils.setField(service, "productImageProcessingService",
+        productImageProcessingService);
   }
 
   @AfterEach
@@ -167,6 +174,43 @@ class StockMovementServiceTest {
         claim.finalImageUrl().equals(productRequest.getImageUrl())));
     verify(productImageUploadService).markConsumed(claim);
     verify(productImageUploadService).registerStorageCleanup(List.of(claim));
+  }
+
+  @Test
+  void shouldGenerateThumbnailsForInlineProductWithPromotedImage() {
+    // PR #5 review: promoted temp uploads only set image_url, so thumbnails must be
+    // backfilled through the processing service.
+    UUID uploadId = UUID.randomUUID();
+    Product product = buildProduct("Inline Product");
+    product.setImageUrl("https://cdn.test/products/key.webp");
+    Warehouse warehouse = buildWarehouse();
+    ProductImageUploadClaim claim = new ProductImageUploadClaim(
+        uploadId,
+        "temp/key.webp",
+        "products/key.webp",
+        "https://cdn.test/products/key.webp");
+    CreateStockMovementRequest request = buildInlineRequest(StockMovementType.PURCHASE_IN);
+    request.getItems().get(0).setImageUploadId(uploadId);
+    stubInlineInMovement(product, warehouse);
+    when(productImageUploadService.promotePendingUpload(uploadId)).thenReturn(claim);
+    when(productImageProcessingService.processProduct(product))
+        .thenReturn(ProductImageProcessingResult.empty());
+
+    service.create(request);
+
+    verify(productImageProcessingService).processProduct(product);
+  }
+
+  @Test
+  void shouldNotGenerateThumbnailsForInlineProductWithoutImage() {
+    Product product = buildProduct("Inline Product");
+    Warehouse warehouse = buildWarehouse();
+    CreateStockMovementRequest request = buildInlineRequest(StockMovementType.PURCHASE_IN);
+    stubInlineInMovement(product, warehouse);
+
+    service.create(request);
+
+    verify(productImageProcessingService, never()).processProduct(any());
   }
 
   @Test

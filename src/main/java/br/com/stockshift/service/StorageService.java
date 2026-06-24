@@ -12,11 +12,18 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
+import br.com.stockshift.service.imaging.ThumbnailGenerator;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
+
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -29,6 +36,14 @@ public class StorageService {
     private final S3Client s3Client;
     private final StorageProperties properties;
 
+    @Autowired(required = false)
+    @Nullable
+    private ThumbnailGenerator thumbnailGenerator;
+
+    private static final int[] THUMBNAIL_WIDTHS = {150, 400, 800};
+    private static final String[] THUMBNAIL_SUFFIXES = {"_sm", "_md", "_lg"};
+    private static final float[] THUMBNAIL_QUALITIES = {0.80f, 0.82f, 0.85f};
+
     private static final Set<String> PRODUCT_IMAGE_TYPES = Set.of(
         "image/png", "image/jpeg", "image/jpg", "image/webp"
     );
@@ -40,7 +55,48 @@ public class StorageService {
     private static final String COMPANY_LOGO_FOLDER = "company-logos/";
     private static final String TEMP_PRODUCT_FOLDER = "temp/product-images/";
 
-    public record StoredImageObject(String key, String publicUrl) {
+    public record StoredImageObject(String key, String publicUrl, long sizeBytes, int heightPx) {
+        public StoredImageObject(String key, String publicUrl) {
+            this(key, publicUrl, 0, 0);
+        }
+    }
+
+    public record Thumbnails(
+        StoredImageObject original,
+        StoredImageObject small,
+        StoredImageObject medium,
+        StoredImageObject large
+    ) {}
+
+    public record HeadObjectResult(long sizeBytes, String contentType) {}
+
+    public HeadObjectResult headObject(String key) {
+        try {
+            var response = s3Client.headObject(b -> b
+                .bucket(properties.getBucketName())
+                .key(key));
+            return new HeadObjectResult(
+                response.contentLength(),
+                response.contentType() != null ? response.contentType() : "application/octet-stream");
+        } catch (NoSuchKeyException e) {
+            throw e;
+        } catch (S3Exception e) {
+            log.error("Failed to head object: {}", key, e);
+            throw new StorageException("Failed to head object: " + key, e);
+        }
+    }
+
+    public byte[] getObject(String key) {
+        try (var response = s3Client.getObject(b -> b
+                .bucket(properties.getBucketName())
+                .key(key))) {
+            return response.readAllBytes();
+        } catch (NoSuchKeyException e) {
+            throw e;
+        } catch (S3Exception | IOException e) {
+            log.error("Failed to get object: {}", key, e);
+            throw new StorageException("Failed to get object: " + key, e);
+        }
     }
 
     public String uploadImage(MultipartFile file) {
@@ -68,6 +124,70 @@ public class StorageService {
     public String uploadCompanyLogo(MultipartFile file) {
         validateCompanyLogo(file);
         return uploadFile(file, COMPANY_LOGO_FOLDER);
+    }
+
+    public Thumbnails uploadProductImageWithThumbnails(MultipartFile file) {
+        validateFileType(file, PRODUCT_IMAGE_TYPES,
+            "Only PNG, JPG, JPEG and WEBP images are allowed");
+
+        StoredImageObject original = uploadFileObject(file, PRODUCT_FOLDER, null);
+        StoredImageObject small = null;
+        StoredImageObject medium = null;
+        StoredImageObject large = null;
+
+        if (thumbnailGenerator != null) {
+            small = generateAndUploadThumbnail(file, 0, original);
+            medium = generateAndUploadThumbnail(file, 1, original);
+            large = generateAndUploadThumbnail(file, 2, original);
+        }
+
+        return new Thumbnails(original, small, medium, large);
+    }
+
+    private StoredImageObject generateAndUploadThumbnail(
+            MultipartFile file, int sizeIndex, StoredImageObject original) {
+        try {
+            ThumbnailGenerator.ThumbnailSpec spec = new ThumbnailGenerator.ThumbnailSpec(
+                THUMBNAIL_WIDTHS[sizeIndex], THUMBNAIL_QUALITIES[sizeIndex]);
+
+            String thumbnailKey = deriveThumbnailKey(original.key(), THUMBNAIL_SUFFIXES[sizeIndex]);
+
+            ThumbnailGenerator.ThumbnailResult result;
+            try (InputStream originalStream = file.getInputStream()) {
+                result = thumbnailGenerator.generate(originalStream, file.getContentType(),
+                    file.getOriginalFilename(), spec);
+            }
+
+            byte[] bytes;
+            try (InputStream thumbnailStream = result.inputStream()) {
+                bytes = thumbnailStream.readAllBytes();
+            }
+
+            PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(properties.getBucketName())
+                .key(thumbnailKey)
+                .contentType("image/jpeg")
+                .contentLength((long) bytes.length)
+                .build();
+
+            s3Client.putObject(request, RequestBody.fromBytes(bytes));
+
+            String publicUrl = buildPublicUrl(thumbnailKey);
+            log.info("Thumbnail uploaded: {}", publicUrl);
+            return new StoredImageObject(thumbnailKey, publicUrl, bytes.length, result.heightPx());
+        } catch (Exception e) {
+            log.warn("Failed to generate thumbnail {} for {}: {}",
+                THUMBNAIL_SUFFIXES[sizeIndex], file.getOriginalFilename(), e.getMessage());
+            return null;
+        }
+    }
+
+    private String deriveThumbnailKey(String originalKey, String suffix) {
+        int dotIndex = originalKey.lastIndexOf('.');
+        if (dotIndex > 0) {
+            return originalKey.substring(0, dotIndex) + suffix + ".jpg";
+        }
+        return originalKey + suffix + ".jpg";
     }
 
     private String uploadFile(MultipartFile file, String folder) {
@@ -101,7 +221,7 @@ public class StorageService {
         }
     }
 
-    private void copyObject(String sourceKey, String destinationKey) {
+    public void copyObject(String sourceKey, String destinationKey) {
         try {
             CopyObjectRequest request = CopyObjectRequest.builder()
                     .sourceBucket(properties.getBucketName())
@@ -116,12 +236,34 @@ public class StorageService {
         }
     }
 
+    public void uploadBytes(String key, byte[] bytes, String contentType) {
+        try {
+            PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(properties.getBucketName())
+                .key(key)
+                .contentType(contentType)
+                .contentLength((long) bytes.length)
+                .build();
+            s3Client.putObject(request, RequestBody.fromBytes(bytes));
+        } catch (S3Exception e) {
+            log.error("Failed to upload bytes to storage: {}", key, e);
+            throw new StorageException("Failed to upload to storage", e);
+        }
+    }
+
     public void deleteImage(String imageUrl) {
         if (imageUrl == null || !imageUrl.startsWith(properties.getPublicUrl())) {
             return;
         }
 
         deleteKey(extractKeyFromUrl(imageUrl), imageUrl);
+    }
+
+    public void deleteProductImages(String imageUrl, List<String> thumbnailKeys) {
+        deleteImage(imageUrl);
+        if (thumbnailKeys != null) {
+            thumbnailKeys.forEach(this::deleteStorageKeyQuietly);
+        }
     }
 
     public void deleteStorageKeyQuietly(String storageKey) {
@@ -199,6 +341,10 @@ public class StorageService {
             return imageUrl.substring(publicUrl.length() + 1);
         }
         throw new IllegalArgumentException("Invalid image URL: " + imageUrl);
+    }
+
+    String getPublicUrl() {
+        return properties.getPublicUrl();
     }
 
     private String buildPublicUrl(String key) {

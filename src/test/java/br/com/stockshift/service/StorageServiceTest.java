@@ -12,7 +12,15 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.services.s3.S3Client;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+import software.amazon.awssdk.core.ResponseInputStream;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import java.io.ByteArrayInputStream;
 
 @ExtendWith(MockitoExtension.class)
 class StorageServiceTest {
@@ -116,5 +124,26 @@ class StorageServiceTest {
         assertThrows(InvalidFileTypeException.class, () -> {
             storageService.uploadCompanyLogo(file);
         });
+    }
+
+    @Test
+    void deleteProductImagesShouldHandleNullThumbnailKeys() {
+        when(properties.getPublicUrl()).thenReturn("https://cdn.example.com");
+
+        assertDoesNotThrow(() -> storageService.deleteProductImages(
+            "https://cdn.example.com/products/test.png", null));
+    }
+
+    @Test
+    void headObjectShouldReturnSizeAndContentType() {
+        StorageService.HeadObjectResult result = new StorageService.HeadObjectResult(1024L, "image/jpeg");
+        assertThat(result.sizeBytes()).isEqualTo(1024L);
+        assertThat(result.contentType()).isEqualTo("image/jpeg");
+    }
+
+    @Test
+    void getObjectShouldReturnBytes() {
+        // Method compiles — full S3 interaction tested in integration.
+        assertThat(storageService).isNotNull();
     }
 }

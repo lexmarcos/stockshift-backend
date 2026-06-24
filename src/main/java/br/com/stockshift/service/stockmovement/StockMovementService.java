@@ -12,6 +12,7 @@ import br.com.stockshift.model.enums.StockMovementType;
 import br.com.stockshift.repository.*;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.ProductImageProcessingService;
 import br.com.stockshift.service.ProductService;
 import br.com.stockshift.service.audit.AuditEventCreateRequest;
 import br.com.stockshift.service.audit.AuditService;
@@ -22,8 +23,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -51,6 +56,10 @@ public class StockMovementService {
   private final ProductService productService;
   private final AuditService auditService;
   private final ProductImageUploadService productImageUploadService;
+
+  @Autowired(required = false)
+  @Nullable
+  private ProductImageProcessingService productImageProcessingService;
 
   // ── Manual movement (usage, gift, loss, etc.) ──────────────────────────
 
@@ -133,7 +142,44 @@ public class StockMovementService {
 
     itemReq.getNewProduct().setHasExpiration(itemReq.getExpirationDate() != null);
     itemReq.getNewProduct().setImageUrl(resolveInlineProductImageUrl(itemReq, promotedImageClaims));
-    return productService.createEntity(itemReq.getNewProduct());
+    Product created = productService.createEntity(itemReq.getNewProduct());
+    generateInlineProductThumbnails(created);
+    return created;
+  }
+
+  /**
+   * Inline products promote a temp upload into a bare {@code image_url} with no thumbnail
+   * rows (PR #5 review), unlike the direct multipart upload path. Backfill them through the
+   * processing service so {@code ProductResponse.thumbnails} is populated. The call is
+   * error-isolated (never throws), so a thumbnail failure does not abort the movement.
+   */
+  /**
+   * Inline products promote a temp upload into a bare {@code image_url} with no thumbnail
+   * rows (PR #5 review), unlike the direct multipart upload path. Backfill them through the
+   * processing service so {@code ProductResponse.thumbnails} is populated.
+   *
+   * <p>Thumbnail generation uploads objects to R2 and saves rows inside the processing
+   * service, but the call is deferred to {@code afterCommit}: if the movement rolls back
+   * the DB rows are discarded while R2 objects would remain orphaned (there is no cleanup
+   * hook for the generated keys). Running after commit means thumbnails are only produced
+   * when the movement succeeds, and no rollback cleanup is needed.
+   */
+  private void generateInlineProductThumbnails(Product product) {
+    if (product.getImageUrl() == null || productImageProcessingService == null) {
+      return;
+    }
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      productImageProcessingService.processProduct(product);
+      return;
+    }
+    ProductImageProcessingService svc = productImageProcessingService;
+    Product p = product;
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        svc.processProduct(p);
+      }
+    });
   }
 
   private String resolveInlineProductImageUrl(

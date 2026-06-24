@@ -6,10 +6,12 @@ import br.com.stockshift.exception.ResourceNotFoundException;
 import br.com.stockshift.model.entity.Brand;
 import br.com.stockshift.model.entity.Category;
 import br.com.stockshift.model.entity.Product;
+import br.com.stockshift.model.entity.ProductImageThumbnail;
 import br.com.stockshift.model.enums.BarcodeType;
 import br.com.stockshift.repository.BatchRepository;
 import br.com.stockshift.repository.BrandRepository;
 import br.com.stockshift.repository.CategoryRepository;
+import br.com.stockshift.repository.ProductImageThumbnailRepository;
 import br.com.stockshift.repository.ProductRepository;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.audit.AuditService;
@@ -36,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +60,8 @@ class ProductServiceTest {
     private AuditSnapshotService auditSnapshotService;
     @Mock
     private StorageService storageService;
+    @Mock
+    private ProductImageThumbnailRepository thumbnailRepository;
 
     private ProductService productService;
     private UUID tenantId;
@@ -71,7 +76,8 @@ class ProductServiceTest {
                 categoryRepository,
                 brandRepository,
                 auditService,
-                auditSnapshotService
+                auditSnapshotService,
+                thumbnailRepository
         );
         ReflectionTestUtils.setField(productService, "storageService", storageService);
         when(auditSnapshotService.snapshot(any())).thenReturn(Map.of("id", "value"));
@@ -105,13 +111,17 @@ class ProductServiceTest {
                 .thenReturn(Optional.of(category));
         when(brandRepository.findByTenantIdAndId(tenantId, brand.getId()))
                 .thenReturn(Optional.of(brand));
-        when(storageService.uploadImage(image)).thenReturn("https://cdn.example.com/product.png");
+        when(storageService.uploadProductImageWithThumbnails(image))
+                .thenReturn(thumbnails());
+        when(thumbnailRepository.findByProductId(any())).thenReturn(thumbEntities());
 
         var response = productService.create(fullRequest(category.getId(), brand.getId()), image);
 
         assertThat(response.getCategoryName()).isEqualTo("Bebidas");
         assertThat(response.getBrand().getName()).isEqualTo("Acme");
         assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/product.png");
+        assertThat(response.getThumbnails()).containsKeys("sm", "md", "lg");
+        assertThat(response.getThumbnails().get("sm")).isEqualTo("https://cdn.example.com/product_sm.jpg");
         assertThat(response.getSku()).isEqualTo("SKU-1");
         verify(auditService).record(any());
     }
@@ -157,7 +167,14 @@ class ProductServiceTest {
     void createShouldDeleteUploadedImageWhenImagePersistenceFails() {
         ProductRequest request = fullRequest(null, null);
         MockMultipartFile image = image();
-        when(storageService.uploadImage(image)).thenReturn("https://cdn.example.com/rollback.png");
+        var rollbackThumbs = new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("products/rollback.png", "https://cdn.example.com/rollback.png"),
+                new StorageService.StoredImageObject("products/rollback_sm.jpg", "https://cdn.example.com/rollback_sm.jpg"),
+                null,
+                null
+        );
+        when(storageService.uploadProductImageWithThumbnails(image))
+                .thenReturn(rollbackThumbs);
         when(productRepository.save(any(Product.class)))
                 .thenAnswer(invocation -> {
                     Product product = invocation.getArgument(0);
@@ -170,6 +187,7 @@ class ProductServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("image write failed");
         verify(storageService).deleteImage("https://cdn.example.com/rollback.png");
+        verify(storageService).deleteStorageKeyQuietly("products/rollback_sm.jpg");
     }
 
     @Test
@@ -185,16 +203,77 @@ class ProductServiceTest {
         MockMultipartFile image = image();
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
-        when(storageService.uploadImage(image)).thenReturn("https://cdn.example.com/new.png");
+        when(thumbnailRepository.findByProductId(product.getId()))
+                .thenReturn(List.of())
+                .thenReturn(thumbEntities());
+        when(storageService.uploadProductImageWithThumbnails(image))
+                .thenReturn(thumbnails());
 
         var response = productService.update(product.getId(), request, image);
 
         assertThat(response.getName()).isEqualTo("Produto novo");
         assertThat(response.getCategoryId()).isNull();
         assertThat(response.getBrand()).isNull();
-        assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/new.png");
-        verify(storageService).deleteImage("https://cdn.example.com/old.png");
+        assertThat(response.getImageUrl()).isEqualTo("https://cdn.example.com/product.png");
+        assertThat(response.getThumbnails()).containsKeys("sm", "md", "lg");
+        verify(storageService).deleteProductImages(eq("https://cdn.example.com/old.png"), any());
         verify(auditService).record(any());
+    }
+
+    @Test
+    void updateWithoutImageShouldPreserveExistingThumbnails() {
+        Product product = product("Produto com imagem");
+        product.setImageUrl("https://cdn.example.com/old.png");
+        ProductRequest request = fullRequest(null, null);
+        request.setName("Nome atualizado");
+        request.setSku("SKU-NEW");
+        request.setBarcode("888");
+        when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
+                .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId()))
+                .thenReturn(thumbEntities());
+
+        var response = productService.update(product.getId(), request, null);
+
+        assertThat(response.getThumbnails()).isNotEmpty();
+        assertThat(response.getThumbnails()).containsKeys("sm", "md", "lg");
+        // Verify old image was NOT deleted
+        verify(storageService, never()).deleteImage(any());
+        verify(storageService, never()).deleteProductImages(any(), any());
+    }
+
+    @Test
+    void updateShouldDeleteNewlyUploadedImagesWhenUpdateFails() {
+        // PR #5 review: a new image is uploaded before the SKU validation; when the update
+        // fails afterwards the freshly uploaded R2 objects must be cleaned up, not orphaned.
+        Product product = product("Produto");
+        product.setImageUrl("https://cdn.example.com/old.png");
+        ProductRequest request = fullRequest(null, null);
+        request.setBarcode(null);
+        request.setSku("DUP-SKU");
+        MockMultipartFile image = image();
+
+        StorageService.Thumbnails newThumbs = new StorageService.Thumbnails(
+                new StorageService.StoredImageObject("new_original", "https://cdn.example.com/new.png"),
+                new StorageService.StoredImageObject("new_sm", "https://cdn.example.com/new_sm.jpg"),
+                new StorageService.StoredImageObject("new_md", "https://cdn.example.com/new_md.jpg"),
+                new StorageService.StoredImageObject("new_lg", "https://cdn.example.com/new_lg.jpg"));
+
+        when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
+                .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
+        when(storageService.uploadProductImageWithThumbnails(image)).thenReturn(newThumbs);
+        when(productRepository.findBySkuAndTenantId("DUP-SKU", tenantId))
+                .thenReturn(Optional.of(product("Outro produto")));
+
+        assertThatThrownBy(() -> productService.update(product.getId(), request, image))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("SKU DUP-SKU");
+
+        verify(storageService).deleteImage("https://cdn.example.com/new.png");
+        verify(storageService).deleteStorageKeyQuietly("new_sm");
+        verify(storageService).deleteStorageKeyQuietly("new_md");
+        verify(storageService).deleteStorageKeyQuietly("new_lg");
     }
 
     @Test
@@ -225,6 +304,7 @@ class ProductServiceTest {
         Product product = product("Produto");
         product.setCategory(category("Categoria"));
         product.setBrand(brand("Marca", null));
+        when(thumbnailRepository.findByProductIdIn(any())).thenReturn(List.of());
         when(productRepository.findAllByTenantId(tenantId)).thenReturn(List.of(product));
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
@@ -248,16 +328,31 @@ class ProductServiceTest {
     }
 
     @Test
+    void mapToResponseShouldReturnEmptyThumbnailsForProductWithoutImage() {
+        Product product = product("Sem imagem");
+        product.setImageUrl(null);
+        when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
+                .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId()))
+                .thenReturn(java.util.List.of());
+
+        var response = productService.findById(product.getId());
+
+        assertThat(response.getThumbnails()).isEmpty();
+    }
+
+    @Test
     void deleteShouldSoftDeleteProductImageAndRecordAudit() {
         Product product = product("Produto");
         product.setImageUrl("https://cdn.example.com/product.png");
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
 
         productService.delete(product.getId());
 
         assertThat(product.getDeletedAt()).isNotNull();
-        verify(storageService).deleteImage("https://cdn.example.com/product.png");
+        verify(storageService).deleteProductImages("https://cdn.example.com/product.png", List.of());
         verify(batchRepository).softDeleteByProduct(product.getId(), tenantId);
         verify(productRepository).save(product);
         verify(auditService).record(any());
@@ -268,6 +363,7 @@ class ProductServiceTest {
         Product product = product("Produto");
         when(productRepository.findByTenantIdAndId(tenantId, product.getId()))
                 .thenReturn(Optional.of(product));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
         ArgumentCaptor<br.com.stockshift.service.audit.AuditEventCreateRequest> captor =
                 ArgumentCaptor.forClass(br.com.stockshift.service.audit.AuditEventCreateRequest.class);
 
@@ -334,5 +430,34 @@ class ProductServiceTest {
 
     private MockMultipartFile image() {
         return new MockMultipartFile("image", "product.png", "image/png", new byte[]{1});
+    }
+
+    private StorageService.Thumbnails thumbnails() {
+        var original = new StorageService.StoredImageObject(
+                "products/test.png", "https://cdn.example.com/product.png");
+        var small = new StorageService.StoredImageObject(
+                "products/test_sm.jpg", "https://cdn.example.com/product_sm.jpg");
+        var medium = new StorageService.StoredImageObject(
+                "products/test_md.jpg", "https://cdn.example.com/product_md.jpg");
+        var large = new StorageService.StoredImageObject(
+                "products/test_lg.jpg", "https://cdn.example.com/product_lg.jpg");
+        return new StorageService.Thumbnails(original, small, medium, large);
+    }
+
+    private List<ProductImageThumbnail> thumbEntities() {
+        return List.of(
+                ProductImageThumbnail.builder()
+                        .size("sm")
+                        .publicUrl("https://cdn.example.com/product_sm.jpg")
+                        .build(),
+                ProductImageThumbnail.builder()
+                        .size("md")
+                        .publicUrl("https://cdn.example.com/product_md.jpg")
+                        .build(),
+                ProductImageThumbnail.builder()
+                        .size("lg")
+                        .publicUrl("https://cdn.example.com/product_lg.jpg")
+                        .build()
+        );
     }
 }
