@@ -60,9 +60,22 @@ public class ProductImageProcessingService {
     }
 
     public ProductImageProcessingResult processAll() {
+        return processAll(null);
+    }
+
+    /**
+     * Processes products that still need work, stopping once {@code maxToProcess} of them have
+     * actually been processed or failed. Already-good products are skipped via a cheap HEAD check
+     * and do not consume the budget, so the endpoint can be called repeatedly to make bounded
+     * forward progress over a large catalog instead of scanning everything in one request — the
+     * blast radius that turned a single bad WebP into a full-service crash (PR #6).
+     *
+     * @param maxToProcess cap on non-skipped products; {@code null} means no cap (process all).
+     */
+    public ProductImageProcessingResult processAll(@Nullable Integer maxToProcess) {
         UUID tenantId = TenantContext.getTenantId();
         List<Product> products = productRepository.findAllByTenantId(tenantId);
-        return processProducts(products);
+        return processProducts(products, maxToProcess);
     }
 
     public ProductImageProcessingResult processOne(UUID productId) {
@@ -73,14 +86,14 @@ public class ProductImageProcessingService {
             return new ProductImageProcessingResult(0, 0, 0, 0, 0,
                     List.of("Product not found: " + productId));
         }
-        return processProducts(List.of(product));
+        return processProducts(List.of(product), null);
     }
 
     public ProductImageProcessingResult processProduct(Product product) {
-        return processProducts(List.of(product));
+        return processProducts(List.of(product), null);
     }
 
-    private ProductImageProcessingResult processProducts(List<Product> products) {
+    private ProductImageProcessingResult processProducts(List<Product> products, @Nullable Integer maxToProcess) {
         int total = 0;
         int processed = 0;
         int skipped = 0;
@@ -105,6 +118,12 @@ public class ProductImageProcessingService {
                 log.warn("Failed to process image for product {}: {}", product.getId(), e.getMessage());
                 failed++;
                 errors.add(product.getId() + ": " + e.getMessage());
+            }
+
+            // Only real work (processed/compressed/failed) consumes the budget; cheap HEAD-check
+            // skips do not, so a call always makes forward progress on up to maxToProcess products.
+            if (maxToProcess != null && (processed + failed) >= maxToProcess) {
+                break;
             }
         }
 

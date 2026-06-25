@@ -191,6 +191,62 @@ class ProductImageProcessingServiceTest {
         assertThat(result.errors().get(0)).contains(missingId.toString());
     }
 
+    @Test
+    void shouldStopAfterReachingProcessLimit() {
+        Product p1 = product("https://cdn.example.com/products/p1.png");
+        Product p2 = product("https://cdn.example.com/products/p2.png");
+        Product p3 = product("https://cdn.example.com/products/p3.png");
+        when(productRepository.findAllByTenantId(tenantId)).thenReturn(List.of(p1, p2, p3));
+
+        // All three need work, but limit=2 must stop before p3 is even examined.
+        stubProcessableProduct(p1, "products/p1.png");
+        stubProcessableProduct(p2, "products/p2.png");
+        stubSucceedingThumbnailGenerator();
+
+        ProductImageProcessingResult result = service.processAll(2);
+
+        assertThat(result.processed()).isEqualTo(2);
+        assertThat(result.total()).isEqualTo(2);
+        verify(storageService, never()).headObject("products/p3.png");
+    }
+
+    @Test
+    void shouldNotCountSkippedProductsAgainstLimit() {
+        Product alreadyGood = product("https://cdn.example.com/products/done.png");
+        Product needsWork = product("https://cdn.example.com/products/todo.png");
+        when(productRepository.findAllByTenantId(tenantId))
+                .thenReturn(List.of(alreadyGood, needsWork));
+
+        // 'alreadyGood' is skipped first and must not consume the limit=1 budget,
+        // so 'needsWork' (examined after it) still gets processed.
+        when(storageService.headObject("products/done.png"))
+                .thenReturn(new StorageService.HeadObjectResult(50_000L, "image/png"));
+        when(thumbnailRepository.findByProductId(alreadyGood.getId()))
+                .thenReturn(thumbEntities());
+        stubProcessableProduct(needsWork, "products/todo.png");
+        stubSucceedingThumbnailGenerator();
+
+        ProductImageProcessingResult result = service.processAll(1);
+
+        assertThat(result.skipped()).isEqualTo(1);
+        assertThat(result.processed()).isEqualTo(1);
+        assertThat(result.total()).isEqualTo(2);
+    }
+
+    /** Stubs a small original with no thumbnails: processed (no compression), not skipped. */
+    private void stubProcessableProduct(Product product, String key) {
+        when(storageService.headObject(key))
+                .thenReturn(new StorageService.HeadObjectResult(50_000L, "image/png"));
+        when(thumbnailRepository.findByProductId(product.getId())).thenReturn(List.of());
+        when(storageService.getObject(key)).thenReturn(new byte[]{1, 2, 3});
+    }
+
+    private void stubSucceedingThumbnailGenerator() {
+        when(thumbnailGenerator.generate(any(), anyString(), anyString(), any()))
+                .thenAnswer(inv -> new ThumbnailGenerator.ThumbnailResult(
+                        new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}), 150, 150, 3L, "jpg"));
+    }
+
     private List<ProductImageThumbnail> thumbEntities() {
         ProductImageThumbnail sm = new ProductImageThumbnail();
         sm.setSize("sm");
