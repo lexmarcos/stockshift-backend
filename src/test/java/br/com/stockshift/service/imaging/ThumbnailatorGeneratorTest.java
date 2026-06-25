@@ -41,14 +41,14 @@ class ThumbnailatorGeneratorTest {
 
     @Test
     void shouldDecodeWebPContentType() throws Exception {
-        // Generate a valid WebP via ImageIO.write (uses the webp-imageio plugin
-        // that was just added as a dependency), then decode it through the
-        // generator. Without the plugin ImageIO.read returns null and the test
-        // fails with "Thumbnail generation failed".
-        BufferedImage source = new BufferedImage(10, 10, BufferedImage.TYPE_INT_RGB);
-        ByteArrayOutputStream webpOut = new ByteArrayOutputStream();
-        ImageIO.write(source, "webp", webpOut);
-        InputStream original = new ByteArrayInputStream(webpOut.toByteArray());
+        // Decode a real WebP fixture (12x9 RGBA, exercising the alpha/BGRA
+        // upsampling path that segfaulted under the native Sejda webp-imageio
+        // plugin). The decoder is now the pure-Java TwelveMonkeys imageio-webp:
+        // a bad WebP throws IOException instead of crashing the JVM. The plugin
+        // is decode-only, so the fixture is loaded from resources rather than
+        // produced via ImageIO.write (no WebP writer exists anymore).
+        InputStream original = getClass().getResourceAsStream("/images/sample.webp");
+        assertThat(original).as("WebP test fixture must be on the classpath").isNotNull();
 
         ThumbnailGenerator.ThumbnailSpec spec = new ThumbnailGenerator.ThumbnailSpec(150, 0.80f);
 
