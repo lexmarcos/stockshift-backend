@@ -54,7 +54,12 @@ dependencies {
 
 	// Image thumbnails
 	implementation 'net.coobird:thumbnailator:0.4.20'
-	implementation 'org.sejda.imageio:webp-imageio:0.1.6'
+	// Pure-Java WebP decoder. Replaces org.sejda.imageio:webp-imageio:0.1.6,
+	// whose native libwebp-imageio.so crashed the JVM with SIGSEGV in
+	// UpsampleBgraLinePair_SSE2 when ImageIO.read() decoded certain WebP
+	// originals during /process-images (native fault, uncatchable in Java).
+	implementation 'com.twelvemonkeys.imageio:imageio-webp:3.12.0'
+	implementation 'com.twelvemonkeys.imageio:imageio-core:3.12.0'
 
 	// Report generation
 	implementation 'org.apache.poi:poi-ooxml:5.2.5'
