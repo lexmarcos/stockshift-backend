@@ -12,6 +12,7 @@ import br.com.stockshift.repository.*;
 import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.WarehouseAccessService;
 import br.com.stockshift.service.audit.AuditEventCreateRequest;
 import br.com.stockshift.service.audit.AuditService;
 
@@ -54,6 +55,7 @@ public class SaleService {
     private final InfinitePayCheckoutService infinitePayCheckoutService;
     private final TenantRepository tenantRepository;
     private final AuditService auditService;
+    private final WarehouseAccessService warehouseAccessService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     // ── Create sale ─────────────────────────────────────────────────────────
@@ -63,6 +65,7 @@ public class SaleService {
         UUID tenantId = TenantContext.getTenantId();
         UUID userId = securityUtils.getCurrentUserId();
         UUID warehouseId = request.getWarehouseId();
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
 
         // Validate warehouse belongs to tenant
         Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)
@@ -244,6 +247,7 @@ public class SaleService {
 
         Sale sale = saleRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", id));
+        warehouseAccessService.validateWarehouseAccess(sale.getWarehouseId());
 
         String warehouseName = warehouseRepository.findById(sale.getWarehouseId())
                 .map(Warehouse::getName).orElse("Unknown");
@@ -278,9 +282,10 @@ public class SaleService {
                                            LocalDateTime dateFrom, LocalDateTime dateTo,
                                            Pageable pageable) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID effectiveWarehouseId = resolveReadableWarehouseFilter(warehouseId);
 
         Page<Sale> sales = saleRepository.findWithFilters(
-                tenantId, warehouseId, paymentMethod, status, dateFrom, dateTo, pageable);
+                tenantId, effectiveWarehouseId, paymentMethod, status, dateFrom, dateTo, pageable);
 
         return sales.map(sale -> {
             String warehouseName = warehouseRepository.findById(sale.getWarehouseId())
@@ -300,6 +305,7 @@ public class SaleService {
 
         Sale sale = saleRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", id));
+        warehouseAccessService.validateWarehouseAccess(sale.getWarehouseId());
 
         if (sale.getStatus() == SaleStatus.CANCELLED) {
             throw new BadRequestException("Sale is already cancelled");
@@ -579,8 +585,23 @@ public class SaleService {
             return saleRepository.findById(saleId)
                     .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
         }
-        return saleRepository.findByTenantIdAndId(tenantId, saleId)
+        Sale sale = saleRepository.findByTenantIdAndId(tenantId, saleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Sale", "id", saleId));
+        warehouseAccessService.validateWarehouseAccess(sale.getWarehouseId());
+        return sale;
+    }
+
+    private UUID resolveReadableWarehouseFilter(UUID requestedWarehouseId) {
+        if (requestedWarehouseId != null) {
+            warehouseAccessService.validateWarehouseAccess(requestedWarehouseId);
+            return requestedWarehouseId;
+        }
+        if (warehouseAccessService.hasFullAccess()) {
+            return null;
+        }
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+        warehouseAccessService.validateWarehouseAccess(currentWarehouseId);
+        return currentWarehouseId;
     }
 
     // ── Next code ───────────────────────────────────────────────────────────

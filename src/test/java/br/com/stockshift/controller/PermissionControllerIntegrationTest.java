@@ -25,4 +25,11 @@ class PermissionControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data[*].code").value(org.hamcrest.Matchers.hasItem("products:read")))
                 .andExpect(jsonPath("$.data[*].code").value(org.hamcrest.Matchers.hasItem("product_prompts:read")));
     }
+
+    @Test
+    @WithMockUser(authorities = {"products:read"})
+    void shouldRejectPermissionsForUserWithoutPermissionRead() throws Exception {
+        mockMvc.perform(get("/api/permissions"))
+                .andExpect(status().isForbidden());
+    }
 }

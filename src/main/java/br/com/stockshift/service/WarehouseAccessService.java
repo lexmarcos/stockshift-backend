@@ -60,13 +60,13 @@ public class WarehouseAccessService {
             throw new ForbiddenException("Warehouse is required");
         }
 
+        if (hasFullAccess()) {
+            return;
+        }
+
         UUID currentWarehouseId = WarehouseContext.getWarehouseId();
         if (currentWarehouseId != null && !currentWarehouseId.equals(warehouseId)) {
             throw new ForbiddenException("Requested warehouse is outside current token scope");
-        }
-
-        if (hasFullAccess()) {
-            return;
         }
 
         UUID userId = getCurrentUserId();

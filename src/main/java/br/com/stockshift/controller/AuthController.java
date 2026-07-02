@@ -115,8 +115,17 @@ public class AuthController {
 
     @PostMapping("/register")
     @Operation(summary = "Register", description = "Register new tenant with first admin user")
-    public ResponseEntity<ApiResponse<RegisterResponse>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<RegisterResponse>> register(
+            @Valid @RequestBody RegisterRequest request,
+            HttpServletResponse servletResponse) {
         RegisterResponse response = tenantService.register(request);
+
+        cookieUtil.addAccessTokenCookie(servletResponse, response.getAccessToken());
+        cookieUtil.addRefreshTokenCookie(servletResponse, response.getRefreshToken());
+
+        response.setAccessToken(null);
+        response.setRefreshToken(null);
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Registration successful", response));
     }

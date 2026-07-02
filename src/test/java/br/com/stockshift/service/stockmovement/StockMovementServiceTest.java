@@ -6,6 +6,7 @@ import br.com.stockshift.dto.stockmovement.CreateStockMovementRequest;
 import br.com.stockshift.dto.stockmovement.StockMovementResponse;
 import br.com.stockshift.dto.stockmovement.WarehouseMovementSummaryResponse;
 import br.com.stockshift.exception.BadRequestException;
+import br.com.stockshift.exception.ForbiddenException;
 import br.com.stockshift.exception.InsufficientStockException;
 import br.com.stockshift.mapper.StockMovementMapper;
 import br.com.stockshift.model.entity.Batch;
@@ -26,6 +27,7 @@ import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.dto.admin.ProductImageProcessingResult;
 import br.com.stockshift.service.ProductImageProcessingService;
 import br.com.stockshift.service.ProductService;
+import br.com.stockshift.service.WarehouseAccessService;
 import br.com.stockshift.service.audit.AuditService;
 import br.com.stockshift.service.upload.ProductImageUploadClaim;
 import br.com.stockshift.service.upload.ProductImageUploadService;
@@ -54,6 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.atLeastOnce;
@@ -89,6 +92,8 @@ class StockMovementServiceTest {
   private ProductImageUploadService productImageUploadService;
   @Mock
   private ProductImageProcessingService productImageProcessingService;
+  @Mock
+  private WarehouseAccessService warehouseAccessService;
 
   @InjectMocks
   private StockMovementService service;
@@ -345,6 +350,37 @@ class StockMovementServiceTest {
   }
 
   @Test
+  void shouldRejectRequestedWarehouseOutsideScopeOnList() {
+    UUID otherWarehouseId = UUID.randomUUID();
+    doThrow(new ForbiddenException("Requested warehouse is outside current token scope"))
+        .when(warehouseAccessService).validateWarehouseAccess(otherWarehouseId);
+
+    assertThatThrownBy(() -> service.list(otherWarehouseId, null, null, null, null,
+        PageRequest.of(0, 10)))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessageContaining("outside current token scope");
+
+    verify(movementRepository, never()).findWithFilters(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void shouldRejectMovementFromWarehouseOutsideScopeOnGetById() {
+    StockMovement movement = movement(StockMovementType.PURCHASE_IN, MovementDirection.IN);
+    UUID otherWarehouseId = UUID.randomUUID();
+    movement.setWarehouseId(otherWarehouseId);
+    when(movementRepository.findByTenantIdAndId(tenantId, movement.getId()))
+        .thenReturn(Optional.of(movement));
+    doThrow(new ForbiddenException("Requested warehouse is outside current token scope"))
+        .when(warehouseAccessService).validateWarehouseAccess(otherWarehouseId);
+
+    assertThatThrownBy(() -> service.getById(movement.getId()))
+        .isInstanceOf(ForbiddenException.class)
+        .hasMessageContaining("outside current token scope");
+
+    verify(warehouseRepository, never()).findById(otherWarehouseId);
+  }
+
+  @Test
   void shouldSummarizeWarehouseMovementsByTypeAndDirection() {
     Warehouse warehouse = buildWarehouse();
     Product product = buildProduct("Existing");
@@ -352,7 +388,8 @@ class StockMovementServiceTest {
     inMovement.addItem(item(product, new BigDecimal("5")));
     StockMovement outMovement = movement(StockMovementType.LOSS, MovementDirection.OUT);
     outMovement.addItem(item(product, new BigDecimal("2")));
-    when(warehouseRepository.findAllByTenantId(tenantId)).thenReturn(List.of(warehouse));
+    when(securityUtils.getCurrentWarehouseId()).thenReturn(warehouseId);
+    when(warehouseRepository.findByTenantIdAndId(tenantId, warehouseId)).thenReturn(Optional.of(warehouse));
     when(movementRepository.findForWarehouseSummary(eq(tenantId), eq(List.of(warehouseId)), any(), any()))
         .thenReturn(List.of(inMovement, outMovement));
 
@@ -363,6 +400,24 @@ class StockMovementServiceTest {
     assertThat(response.getWarehouses().get(0).getTotalIn()).isEqualByComparingTo("5");
     assertThat(response.getWarehouses().get(0).getTotalOut()).isEqualByComparingTo("2");
     assertThat(response.getWarehouses().get(0).getMovementsByType()).hasSize(2);
+  }
+
+  @Test
+  void shouldSummarizeAllWarehousesForFullAccessUser() {
+    Warehouse warehouse = buildWarehouse();
+    Warehouse secondWarehouse = buildWarehouse(UUID.randomUUID(), "Second");
+    when(warehouseAccessService.hasFullAccess()).thenReturn(true);
+    when(warehouseRepository.findAllByTenantId(tenantId)).thenReturn(List.of(warehouse, secondWarehouse));
+    when(movementRepository.findForWarehouseSummary(
+        eq(tenantId), eq(List.of(warehouse.getId(), secondWarehouse.getId())), any(), any()))
+        .thenReturn(List.of());
+
+    WarehouseMovementSummaryResponse response = service.getWarehouseSummary(
+        LocalDateTime.now().minusDays(7), LocalDateTime.now());
+
+    assertThat(response.getWarehouses())
+        .extracting(WarehouseMovementSummaryResponse.WarehouseSummary::getWarehouseId)
+        .containsExactly(warehouse.getId(), secondWarehouse.getId());
   }
 
   private void stubInlineInMovement(Product product, Warehouse warehouse) {
@@ -527,10 +582,14 @@ class StockMovementServiceTest {
   }
 
   private Warehouse buildWarehouse() {
+    return buildWarehouse(warehouseId, "Main");
+  }
+
+  private Warehouse buildWarehouse(UUID id, String name) {
     Warehouse warehouse = new Warehouse();
-    warehouse.setId(warehouseId);
+    warehouse.setId(id);
     warehouse.setTenantId(tenantId);
-    warehouse.setName("Main");
+    warehouse.setName(name);
     return warehouse;
   }
 }

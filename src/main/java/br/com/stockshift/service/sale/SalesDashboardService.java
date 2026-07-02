@@ -2,7 +2,9 @@ package br.com.stockshift.service.sale;
 
 import br.com.stockshift.dto.sale.*;
 import br.com.stockshift.repository.SaleRepository;
+import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.WarehouseAccessService;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,31 +23,43 @@ public class SalesDashboardService {
 
     private final SaleRepository saleRepository;
     private final Clock clock;
+    private final WarehouseAccessService warehouseAccessService;
+    private final SecurityUtils securityUtils;
 
     @Autowired
-    public SalesDashboardService(SaleRepository saleRepository) {
-        this(saleRepository, Clock.systemDefaultZone());
+    public SalesDashboardService(
+            SaleRepository saleRepository,
+            WarehouseAccessService warehouseAccessService,
+            SecurityUtils securityUtils) {
+        this(saleRepository, Clock.systemDefaultZone(), warehouseAccessService, securityUtils);
     }
 
-    SalesDashboardService(SaleRepository saleRepository, Clock clock) {
+    SalesDashboardService(
+            SaleRepository saleRepository,
+            Clock clock,
+            WarehouseAccessService warehouseAccessService,
+            SecurityUtils securityUtils) {
         this.saleRepository = saleRepository;
         this.clock = clock;
+        this.warehouseAccessService = warehouseAccessService;
+        this.securityUtils = securityUtils;
     }
 
     @Transactional(readOnly = true)
     public SalesDashboardResponse getDashboard(UUID warehouseId) {
         UUID tenantId = TenantContext.getTenantId();
+        UUID effectiveWarehouseId = resolveReadableWarehouseFilter(warehouseId);
         LocalDate today = LocalDate.now(clock);
 
-        KpiPeriod todayKpi = buildKpi(tenantId, warehouseId,
+        KpiPeriod todayKpi = buildKpi(tenantId, effectiveWarehouseId,
                 today.atStartOfDay(), today.plusDays(1).atStartOfDay());
-        KpiPeriod weekKpi = buildKpi(tenantId, warehouseId,
+        KpiPeriod weekKpi = buildKpi(tenantId, effectiveWarehouseId,
                 today.with(DayOfWeek.MONDAY).atStartOfDay(), today.plusDays(1).atStartOfDay());
-        KpiPeriod monthKpi = buildKpi(tenantId, warehouseId,
+        KpiPeriod monthKpi = buildKpi(tenantId, effectiveWarehouseId,
                 today.withDayOfMonth(1).atStartOfDay(), today.plusDays(1).atStartOfDay());
 
         List<Object[]> rawChart = saleRepository.dailySalesInPeriod(
-                tenantId, warehouseId,
+                tenantId, effectiveWarehouseId,
                 today.withDayOfMonth(1).atStartOfDay(),
                 today.plusDays(1).atStartOfDay());
 
@@ -76,6 +90,19 @@ public class SalesDashboardService {
                         .build())
                 .dailyChart(dailyChart)
                 .build();
+    }
+
+    private UUID resolveReadableWarehouseFilter(UUID requestedWarehouseId) {
+        if (requestedWarehouseId != null) {
+            warehouseAccessService.validateWarehouseAccess(requestedWarehouseId);
+            return requestedWarehouseId;
+        }
+        if (warehouseAccessService.hasFullAccess()) {
+            return null;
+        }
+        UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+        warehouseAccessService.validateWarehouseAccess(currentWarehouseId);
+        return currentWarehouseId;
     }
 
     private KpiPeriod buildKpi(UUID tenantId, UUID warehouseId, LocalDateTime from, LocalDateTime to) {

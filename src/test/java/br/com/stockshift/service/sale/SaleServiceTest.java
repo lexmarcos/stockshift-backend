@@ -8,6 +8,7 @@ import br.com.stockshift.dto.sale.NextSaleCodeResponse;
 import br.com.stockshift.dto.sale.SaleResponse;
 import br.com.stockshift.dto.sale.SaleSummaryResponse;
 import br.com.stockshift.exception.BadRequestException;
+import br.com.stockshift.exception.ForbiddenException;
 import br.com.stockshift.exception.InsufficientStockException;
 import br.com.stockshift.mapper.SaleMapper;
 import br.com.stockshift.model.entity.Batch;
@@ -33,6 +34,7 @@ import br.com.stockshift.repository.UserRepository;
 import br.com.stockshift.repository.WarehouseRepository;
 import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
+import br.com.stockshift.service.WarehouseAccessService;
 import br.com.stockshift.service.audit.AuditService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,7 +66,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,6 +101,8 @@ class SaleServiceTest {
     private TenantRepository tenantRepository;
     @Mock
     private AuditService auditService;
+    @Mock
+    private WarehouseAccessService warehouseAccessService;
 
     @InjectMocks
     private SaleService saleService;
@@ -211,6 +217,21 @@ class SaleServiceTest {
     }
 
     @Test
+    void createShouldRejectWarehouseOutsideScopeBeforeLookup() {
+        UUID otherWarehouseId = UUID.randomUUID();
+        CreateSaleRequest request = saleRequest(PaymentMode.DIRECT, List.of());
+        request.setWarehouseId(otherWarehouseId);
+        doThrow(new ForbiddenException("Requested warehouse is outside current token scope"))
+                .when(warehouseAccessService).validateWarehouseAccess(otherWarehouseId);
+
+        assertThatThrownBy(() -> saleService.create(request))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("outside current token scope");
+
+        verify(warehouseRepository, never()).findByTenantIdAndId(tenantId, otherWarehouseId);
+    }
+
+    @Test
     void createShouldRejectAutoAllocationWithInsufficientStock() {
         Batch batch = batch(product, warehouse, BigDecimal.ONE, 1000L);
         CreateSaleRequest request = saleRequest(PaymentMode.DIRECT,
@@ -278,6 +299,39 @@ class SaleServiceTest {
         verify(ledgerRepository).save(ledgerCaptor.capture());
         assertThat(ledgerCaptor.getValue().getEntryType()).isEqualTo(LedgerEntryType.SALE_CANCEL_IN);
         verify(auditService).record(any());
+    }
+
+    @Test
+    void getByIdShouldRejectSaleFromWarehouseOutsideScope() {
+        Sale sale = sale(PaymentMode.DIRECT, SaleStatus.COMPLETED);
+        UUID otherWarehouseId = UUID.randomUUID();
+        sale.setWarehouseId(otherWarehouseId);
+        when(saleRepository.findByTenantIdAndId(tenantId, sale.getId())).thenReturn(Optional.of(sale));
+        doThrow(new ForbiddenException("Requested warehouse is outside current token scope"))
+                .when(warehouseAccessService).validateWarehouseAccess(otherWarehouseId);
+
+        assertThatThrownBy(() -> saleService.getById(sale.getId()))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("outside current token scope");
+
+        verify(mapper, never()).toResponse(any(Sale.class), anyString());
+    }
+
+    @Test
+    void cancelShouldRejectSaleFromWarehouseOutsideScope() {
+        Sale sale = sale(PaymentMode.DIRECT, SaleStatus.COMPLETED);
+        UUID otherWarehouseId = UUID.randomUUID();
+        sale.setWarehouseId(otherWarehouseId);
+        when(saleRepository.findByTenantIdAndId(tenantId, sale.getId())).thenReturn(Optional.of(sale));
+        doThrow(new ForbiddenException("Requested warehouse is outside current token scope"))
+                .when(warehouseAccessService).validateWarehouseAccess(otherWarehouseId);
+
+        assertThatThrownBy(() -> saleService.cancel(sale.getId(),
+                CancelSaleRequest.builder().cancellationReason("Customer asked").build()))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("outside current token scope");
+
+        verify(batchRepository, never()).findByIdForUpdate(any());
     }
 
     @Test
@@ -389,6 +443,44 @@ class SaleServiceTest {
         NextSaleCodeResponse nextCode = saleService.getNextCode();
 
         assertThat(nextCode.getCode()).endsWith("0009");
+    }
+
+    @Test
+    void listShouldRejectRequestedWarehouseOutsideScope() {
+        UUID otherWarehouseId = UUID.randomUUID();
+        doThrow(new ForbiddenException("Requested warehouse is outside current token scope"))
+                .when(warehouseAccessService).validateWarehouseAccess(otherWarehouseId);
+
+        assertThatThrownBy(() -> saleService.list(otherWarehouseId, null, null, null, null,
+                PageRequest.of(0, 10)))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("outside current token scope");
+
+        verify(saleRepository, never()).findWithFilters(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void listWithoutWarehouseShouldUseCurrentWarehouseForRegularUser() {
+        when(securityUtils.getCurrentWarehouseId()).thenReturn(warehouseId);
+        when(saleRepository.findWithFilters(eq(tenantId), eq(warehouseId), isNull(), isNull(),
+                isNull(), isNull(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        assertThat(saleService.list(null, null, null, null, null,
+                PageRequest.of(0, 10)).getContent()).isEmpty();
+
+        verify(warehouseAccessService).validateWarehouseAccess(warehouseId);
+    }
+
+    @Test
+    void listWithoutWarehouseShouldKeepTenantWideQueryForFullAccessUser() {
+        when(warehouseAccessService.hasFullAccess()).thenReturn(true);
+        when(saleRepository.findWithFilters(eq(tenantId), isNull(), isNull(), isNull(),
+                isNull(), isNull(), any())).thenReturn(new PageImpl<>(List.of()));
+
+        assertThat(saleService.list(null, null, null, null, null,
+                PageRequest.of(0, 10)).getContent()).isEmpty();
+
+        verify(securityUtils, never()).getCurrentWarehouseId();
     }
 
     private CreateSaleRequest saleRequest(PaymentMode mode, List<CreateSaleItemRequest> items) {

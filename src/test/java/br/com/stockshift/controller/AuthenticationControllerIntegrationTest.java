@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import br.com.stockshift.BaseIntegrationTest;
 import br.com.stockshift.dto.auth.LoginRequest;
+import br.com.stockshift.dto.auth.RegisterRequest;
 import br.com.stockshift.dto.auth.SwitchWarehouseRequest;
 import br.com.stockshift.model.entity.Permission;
 import br.com.stockshift.model.entity.RefreshToken;
@@ -136,6 +137,30 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                                 .andExpect(jsonPath("$.data.email").value("auth@test.com"))
                                 .andExpect(jsonPath("$.data.accessToken").doesNotExist()) // Should not be in JSON
                                 .andExpect(jsonPath("$.data.refreshToken").doesNotExist()) // Should not be in JSON
+                                .andExpect(cookie().exists("accessToken"))
+                                .andExpect(cookie().exists("refreshToken"))
+                                .andExpect(cookie().httpOnly("accessToken", true))
+                                .andExpect(cookie().httpOnly("refreshToken", true))
+                                .andExpect(cookie().path("accessToken", "/"))
+                                .andExpect(cookie().path("refreshToken", "/"));
+        }
+
+        @Test
+        void shouldRegisterWithHttpOnlyCookiesAndNoTokensInJsonBody() throws Exception {
+                RegisterRequest request = RegisterRequest.builder()
+                                .companyName("Registered Tenant")
+                                .email("registered@test.com")
+                                .password("password123")
+                                .build();
+
+                mockMvc.perform(post("/api/auth/register")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.success").value(true))
+                                .andExpect(jsonPath("$.data.userEmail").value("registered@test.com"))
+                                .andExpect(jsonPath("$.data.accessToken").doesNotExist())
+                                .andExpect(jsonPath("$.data.refreshToken").doesNotExist())
                                 .andExpect(cookie().exists("accessToken"))
                                 .andExpect(cookie().exists("refreshToken"))
                                 .andExpect(cookie().httpOnly("accessToken", true))
@@ -282,6 +307,61 @@ class AuthenticationControllerIntegrationTest extends BaseIntegrationTest {
                 // Same successor handed back, and no extra token minted.
                 assertEquals(successorCookie.getValue(), replayCookie.getValue());
                 assertEquals(tokensAfterFirstRefresh, refreshTokenRepository.count());
+        }
+
+        @Test
+        void shouldRejectRotatedRefreshTokenAfterGraceWindow() throws Exception {
+                MvcResult loginResult = performLogin();
+                Cookie originalRefreshCookie = loginResult.getResponse().getCookie("refreshToken");
+                assertNotNull(originalRefreshCookie);
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isOk());
+
+                RefreshToken originalToken = refreshTokenRepository.findByToken(originalRefreshCookie.getValue())
+                                .orElseThrow();
+                originalToken.setRotatedAt(LocalDateTime.now().minusMinutes(2));
+                refreshTokenRepository.saveAndFlush(originalToken);
+                entityManager.flush();
+                entityManager.clear();
+
+                mockMvc.perform(post("/api/auth/refresh")
+                                .cookie(originalRefreshCookie))
+                                .andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        void shouldReturnSameLoginFailureShapeForExistingAndMissingUsers() throws Exception {
+                LoginRequest missingUser = new LoginRequest();
+                missingUser.setEmail("missing-auth@test.com");
+                missingUser.setPassword("wrong-password");
+
+                MvcResult missingUserResult = mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(missingUser))
+                                .header("X-Forwarded-For", "198.51.100.10"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.message").value("Invalid email or password"))
+                                .andReturn();
+
+                LoginRequest existingUser = new LoginRequest();
+                existingUser.setEmail("auth@test.com");
+                existingUser.setPassword("wrong-password");
+
+                MvcResult existingUserResult = mockMvc.perform(post("/api/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(existingUser))
+                                .header("X-Forwarded-For", "198.51.100.11"))
+                                .andExpect(status().isUnauthorized())
+                                .andExpect(jsonPath("$.message").value("Invalid email or password"))
+                                .andReturn();
+
+                String missingBody = missingUserResult.getResponse().getContentAsString();
+                String existingBody = existingUserResult.getResponse().getContentAsString();
+                assertEquals(
+                                objectMapper.readTree(missingBody).path("requiresCaptcha").asBoolean(),
+                                objectMapper.readTree(existingBody).path("requiresCaptcha").asBoolean());
         }
 
         // Codex review: when A -> B -> C have all rotated within A's grace, a slow replay

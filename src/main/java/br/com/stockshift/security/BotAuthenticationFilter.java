@@ -16,6 +16,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 
 @Component
@@ -56,9 +58,12 @@ public class BotAuthenticationFilter extends OncePerRequestFilter {
 
     private boolean isValidRequest(HttpServletRequest request) {
         String submittedKey = request.getHeader(HEADER_NAME);
-        return properties.isConfigured()
-                && StringUtils.hasText(submittedKey)
-                && submittedKey.equals(properties.getApiKey());
+        if (!properties.isConfigured() || !StringUtils.hasText(submittedKey)) {
+            return false;
+        }
+        byte[] submitted = submittedKey.getBytes(StandardCharsets.UTF_8);
+        byte[] expected = properties.getApiKey().getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(submitted, expected);
     }
 
     private void authenticateBotRequest(HttpServletRequest request) {
