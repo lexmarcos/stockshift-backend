@@ -102,6 +102,14 @@ class WarehouseAccessServiceTest {
     }
 
     @Test
+    void warehouseAccessShouldLetFullAccessBypassActiveWarehouseScope() {
+        setPrincipal(List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        WarehouseContext.setWarehouseId(UUID.randomUUID());
+
+        warehouseAccessService.validateWarehouseAccess(warehouseId);
+    }
+
+    @Test
     void permissionResolverShouldReturnWildcardCodesRoleNamesAndLegacyCodes() {
         Role admin = role("ADMIN");
         when(userRoleWarehouseRepository.findRolesByUserIdAndWarehouseId(userId, warehouseId))

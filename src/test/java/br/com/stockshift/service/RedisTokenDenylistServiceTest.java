@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -24,10 +25,12 @@ class RedisTokenDenylistServiceTest {
     private ValueOperations<String, String> valueOperations;
 
     private RedisTokenDenylistService denylistService;
+    private AtomicLong nowMillis;
 
     @BeforeEach
     void setUp() {
-        denylistService = new RedisTokenDenylistService(redisTemplate);
+        nowMillis = new AtomicLong(1000L);
+        denylistService = new RedisTokenDenylistService(redisTemplate, nowMillis::get);
     }
 
     @Test
@@ -76,8 +79,8 @@ class RedisTokenDenylistServiceTest {
     }
 
     @Test
-    void isDenylisted_whenRedisThrowsException_shouldReturnFalse() {
-        // Given (fail-open strategy)
+    void isDenylisted_whenRedisThrowsException_shouldReturnTrue() {
+        // Given
         String jti = "any-jti";
         when(redisTemplate.hasKey(anyString())).thenThrow(new RuntimeException("Redis unavailable"));
 
@@ -85,16 +88,36 @@ class RedisTokenDenylistServiceTest {
         boolean result = denylistService.isDenylisted(jti);
 
         // Then
-        assertThat(result).isFalse();
+        assertThat(result).isTrue();
     }
 
     @Test
-    void addToDenylist_whenRedisThrowsException_shouldNotThrow() {
-        // Given (fail-open strategy)
+    void addToDenylist_whenRedisThrowsException_shouldDenylistLocally() {
+        // Given
         String jti = "test-jti";
         when(redisTemplate.opsForValue()).thenThrow(new RuntimeException("Redis unavailable"));
 
-        // When/Then - should not throw
+        // When
         denylistService.addToDenylist(jti, 60000L);
+
+        // Then
+        assertThat(denylistService.isDenylisted(jti)).isTrue();
+        verify(redisTemplate, never()).hasKey("token:denylist:test-jti");
+    }
+
+    @Test
+    void isDenylisted_whenLocalFallbackEntryExpired_shouldCheckRedis() {
+        // Given
+        String jti = "expired-jti";
+        when(redisTemplate.opsForValue()).thenThrow(new RuntimeException("Redis unavailable"));
+        denylistService.addToDenylist(jti, 5L);
+        nowMillis.addAndGet(6L);
+        when(redisTemplate.hasKey("token:denylist:expired-jti")).thenReturn(false);
+
+        // When
+        boolean result = denylistService.isDenylisted(jti);
+
+        // Then
+        assertThat(result).isFalse();
     }
 }

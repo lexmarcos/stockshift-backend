@@ -14,6 +14,7 @@ import br.com.stockshift.security.SecurityUtils;
 import br.com.stockshift.security.TenantContext;
 import br.com.stockshift.service.ProductImageProcessingService;
 import br.com.stockshift.service.ProductService;
+import br.com.stockshift.service.WarehouseAccessService;
 import br.com.stockshift.service.audit.AuditEventCreateRequest;
 import br.com.stockshift.service.audit.AuditService;
 import br.com.stockshift.service.upload.ProductImageUploadClaim;
@@ -56,6 +57,7 @@ public class StockMovementService {
   private final ProductService productService;
   private final AuditService auditService;
   private final ProductImageUploadService productImageUploadService;
+  private final WarehouseAccessService warehouseAccessService;
 
   @Autowired(required = false)
   @Nullable
@@ -393,6 +395,7 @@ public class StockMovementService {
 
     StockMovement movement = movementRepository.findByTenantIdAndId(tenantId, id)
         .orElseThrow(() -> new ResourceNotFoundException("StockMovement", "id", id));
+    warehouseAccessService.validateWarehouseAccess(movement.getWarehouseId());
 
     String warehouseName = warehouseRepository.findById(movement.getWarehouseId())
         .map(Warehouse::getName).orElse("Unknown");
@@ -405,10 +408,7 @@ public class StockMovementService {
       LocalDateTime dateFrom, LocalDateTime dateTo,
       Pageable pageable) {
     UUID tenantId = TenantContext.getTenantId();
-    UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
-
-    // Use current warehouse if not specified
-    UUID effectiveWarehouseId = warehouseId != null ? warehouseId : currentWarehouseId;
+    UUID effectiveWarehouseId = resolveReadableWarehouseId(warehouseId);
 
     Page<StockMovement> movements;
     if (productId != null) {
@@ -429,8 +429,7 @@ public class StockMovementService {
   public WarehouseMovementSummaryResponse getWarehouseSummary(LocalDateTime dateFrom, LocalDateTime dateTo) {
     UUID tenantId = TenantContext.getTenantId();
 
-    // Get all warehouses for this tenant
-    List<Warehouse> warehouses = warehouseRepository.findAllByTenantId(tenantId);
+    List<Warehouse> warehouses = findSummaryWarehouses(tenantId);
     List<UUID> warehouseIds = warehouses.stream().map(Warehouse::getId).collect(Collectors.toList());
 
     List<StockMovement> movements = movementRepository.findForWarehouseSummary(
@@ -484,6 +483,27 @@ public class StockMovementService {
     return WarehouseMovementSummaryResponse.builder()
         .warehouses(summaries)
         .build();
+  }
+
+  private UUID resolveReadableWarehouseId(UUID requestedWarehouseId) {
+    if (requestedWarehouseId != null) {
+      warehouseAccessService.validateWarehouseAccess(requestedWarehouseId);
+      return requestedWarehouseId;
+    }
+    UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+    warehouseAccessService.validateWarehouseAccess(currentWarehouseId);
+    return currentWarehouseId;
+  }
+
+  private List<Warehouse> findSummaryWarehouses(UUID tenantId) {
+    if (warehouseAccessService.hasFullAccess()) {
+      return warehouseRepository.findAllByTenantId(tenantId);
+    }
+    UUID currentWarehouseId = securityUtils.getCurrentWarehouseId();
+    warehouseAccessService.validateWarehouseAccess(currentWarehouseId);
+    Warehouse warehouse = warehouseRepository.findByTenantIdAndId(tenantId, currentWarehouseId)
+        .orElseThrow(() -> new ResourceNotFoundException("Warehouse", "id", currentWarehouseId));
+    return List.of(warehouse);
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
